@@ -639,6 +639,13 @@ th {
   line-height: 1.6;
 }
 
+.brand-hero-meta {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
 .brand-hero-sponsor {
   aspect-ratio: 5 / 1;
 }

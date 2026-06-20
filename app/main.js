@@ -209,6 +209,16 @@ function formatDirectionLabel(direction) {
   return "Neutral";
 }
 
+function getEventDisplayName() {
+  return (state.event.name || "").trim() || "DynoForce Event";
+}
+
+function getEventSummaryLine() {
+  return [formatDate(state.event.date), state.event.location, state.event.challengeType]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function formatEntryDirection(entry) {
   return formatDirectionLabel(entry.forceMode || entry.direction || "neutral");
 }
@@ -819,11 +829,11 @@ async function downloadPdf() {
     pdf.setTextColor("#ffffff");
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(28);
-    pdf.text(state.event.name, margin + 24, y + 34);
+    pdf.text(getEventDisplayName(), margin + 24, y + 34);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(12);
-    pdf.text(`${state.event.location} · ${formatDate(state.event.date)} · ${state.event.challengeType}`, margin + 24, y + 58);
-    pdf.text(`Powered by DynoForce`, margin + 24, y + 76);
+    pdf.text(getEventSummaryLine() || "DynoForce Event", margin + 24, y + 58);
+    pdf.text(state.event.organiser ? `Veranstalter: ${state.event.organiser}` : "Powered by DynoForce", margin + 24, y + 76);
 
     if (eventLogo) {
       pdf.addImage(eventLogo, imageFormatFromDataUrl(eventLogo), pageWidth - margin - 132, y + 14, 54, 54);
@@ -841,7 +851,7 @@ async function downloadPdf() {
 
     const summaryRows = [
       ["Veranstalter", state.event.organiser],
-      ["Beschreibung", state.event.description || "—"],
+      ["Beschreibung", state.event.description || "Professionelles Event mit Live-Rangliste und DynoForce Messung."],
       ["Griff", state.event.gripType],
       ["Richtung", normalizeForceMode(state.event.forceMode)],
       ["Wertung", state.event.scoringMode],
@@ -867,7 +877,8 @@ async function downloadPdf() {
       pdf.text("Live verfolgen", pageWidth - margin - 120, 344);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
-      pdf.text(pdf.splitTextToSize(getPublicUrl(), 120), pageWidth - margin - 120, 360);
+      pdf.text("event.dynoforce.ch", pageWidth - margin - 120, 360);
+      pdf.text("QR-Code mit Smartphone scannen", pageWidth - margin - 120, 374);
     }
 
     if (sponsorBanner) {
@@ -1045,10 +1056,6 @@ function brandingPreviewImage(url, label) {
 }
 
 function publicBrandingSection() {
-  if (!state.event.headerBanner && !state.event.eventLogo && !state.event.venueLogo && !state.event.sponsorBanner) {
-    return "";
-  }
-
   return `
     <div class="card brand-hero">
       ${state.event.headerBanner ? `<img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" />` : ""}
@@ -1059,8 +1066,9 @@ function publicBrandingSection() {
         </div>
         <div class="brand-hero-copy">
           <div class="eyebrow">DynoForce Event</div>
-          <h1 class="hero-title">${state.event.name}</h1>
-          <p>${state.event.description || `${state.event.challengeType} in ${state.event.location}`}</p>
+          <h1 class="hero-title">${getEventDisplayName()}</h1>
+          <div class="brand-hero-meta">${getEventSummaryLine() || "Live Event"}</div>
+          <p>${state.event.description || `${state.event.organiser || "Veranstalter"} präsentiert dieses Event.`}</p>
         </div>
       </div>
       ${state.event.sponsorBanner ? `<img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" />` : ""}
@@ -1214,7 +1222,7 @@ function template(page) {
           ${page === "public" ? `
             ${publicBrandingSection()}
             <div class="grid two">
-              <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.location} · ${formatDate(state.event.date)} · ${state.event.challengeType}</p></div><div class="status-badge">${state.event.status}</div></div></div>
+              <div class="card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div><div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
               <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">PDF herunterladen</button></div></div>
             </div>
             <div class="grid" style="margin-top:18px;">
