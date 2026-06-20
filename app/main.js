@@ -1,8 +1,10 @@
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "firebase/auth";
 import {
@@ -139,6 +141,24 @@ function clearError() {
     state.flashMessage = "";
     state.flashType = "info";
   }
+}
+
+function isSafariLikeBrowser() {
+  const ua = navigator.userAgent || "";
+  return (/Safari/i.test(ua) && !/Chrome|Chromium|Edg|Firefox/i.test(ua)) || /iPhone|iPad|iPod/i.test(ua);
+}
+
+function getAuthErrorMessage(error) {
+  const code = error?.code || "";
+
+  if (code === "auth/popup-closed-by-user") return "Google Login wurde vor Abschluss geschlossen.";
+  if (code === "auth/popup-blocked") return "Der Browser hat das Google-Login-Popup blockiert.";
+  if (code === "auth/cancelled-popup-request") return "Die Google-Anmeldung wurde durch eine neue Anfrage ersetzt.";
+  if (code === "auth/unauthorized-domain") return "Die Domain ist in Firebase Authentication noch nicht als autorisierte Domain eingetragen.";
+  if (code === "auth/operation-not-allowed") return "Google Login ist im Firebase-Projekt noch nicht aktiviert.";
+  if (code === "auth/invalid-credential") return "Die erhaltenen Anmeldedaten sind ungültig.";
+
+  return error?.message || "Unbekannter Firebase-Auth-Fehler.";
 }
 
 function safeUnsub(key) {
@@ -545,7 +565,22 @@ async function signInEmail(email, password) {
 
 async function signInGoogle() {
   const provider = new GoogleAuthProvider();
-  await signInWithPopup(auth, provider);
+  provider.setCustomParameters({ prompt: "select_account" });
+
+  if (isSafariLikeBrowser()) {
+    await signInWithRedirect(auth, provider);
+    return;
+  }
+
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    if (error?.code === "auth/popup-blocked" || error?.code === "auth/popup-closed-by-user") {
+      throw error;
+    }
+
+    await signInWithRedirect(auth, provider);
+  }
 }
 
 function escapePdfText(value) {
@@ -836,7 +871,7 @@ function bindGeneralUi() {
       clearError();
       setFlash("Erfolgreich angemeldet.");
     } catch (error) {
-      setError(`Login fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+      setError(`Login fehlgeschlagen: ${getAuthErrorMessage(error)}`);
       render();
     }
   });
@@ -845,9 +880,9 @@ function bindGeneralUi() {
     try {
       await signInGoogle();
       clearError();
-      setFlash("Google Login erfolgreich.");
+      setFlash("Google Login gestartet...");
     } catch (error) {
-      setError(`Google Login fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+      setError(`Google Login fehlgeschlagen: ${getAuthErrorMessage(error)}`);
       render();
     }
   });
@@ -1004,6 +1039,12 @@ state.unsubscribers.auth = onAuthStateChanged(auth, async (user) => {
   }
   await routeAndLoad();
 });
+
+try {
+  await getRedirectResult(auth);
+} catch (error) {
+  setError(`Google Login fehlgeschlagen: ${getAuthErrorMessage(error)}`);
+}
 
 window.addEventListener("popstate", routeAndLoad);
 await routeAndLoad();
