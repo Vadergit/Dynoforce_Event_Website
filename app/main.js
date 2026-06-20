@@ -61,7 +61,6 @@ const state = {
   lockedMode: null,
   isInAttempt: false,
   elapsedSeconds: 0,
-  goal: 90,
   flashMessage: "",
   flashType: "info",
   lastError: "",
@@ -69,7 +68,8 @@ const state = {
   saving: false,
   uploading: "",
   liveEntry: {
-    participantName: "",
+    firstName: "",
+    lastName: "",
     attemptNumber: 1,
   },
   dashboardLoaded: false,
@@ -159,8 +159,14 @@ function isDirectionAllowed(direction) {
   return false;
 }
 
-function getLiveParticipantName() {
-  return state.liveEntry.participantName || "";
+function getLiveParticipantDisplayName() {
+  return [state.liveEntry.firstName, state.liveEntry.lastName].map((value) => value.trim()).filter(Boolean).join(" ");
+}
+
+function getParticipantNameParts() {
+  const firstName = (state.liveEntry.firstName || "").trim();
+  const lastName = (state.liveEntry.lastName || "").trim();
+  return { firstName, lastName, participantName: [firstName, lastName].filter(Boolean).join(" ").trim() };
 }
 
 function getLiveAttemptNumber() {
@@ -618,8 +624,13 @@ async function saveLiveResult() {
     render();
     return;
   }
-  const name = getLiveParticipantName().trim() || "Gast";
-  const attemptNumber = getLiveAttemptNumber();
+  const { firstName, lastName, participantName } = getParticipantNameParts();
+  const name = participantName || "Gast";
+  const existingAttempts = state.results.filter((entry) => {
+    const entryName = (entry.participantName || entry.name || "").trim().toLowerCase();
+    return entryName === name.trim().toLowerCase();
+  }).length;
+  const attemptNumber = Math.min(existingAttempts + 1, state.event.attempts);
   const measured = getMeasuredValue();
   const forceMode = state.peakDirection === "push" ? "push" : state.peakDirection === "pull" ? "pull" : state.lockedMode;
 
@@ -646,6 +657,8 @@ async function saveLiveResult() {
     await addDoc(collection(db, "results"), {
       eventId: state.event.id,
       ownerUid: state.user.uid,
+      firstName,
+      lastName,
       participantName: name,
       value: measured,
       unit: "kg",
@@ -660,13 +673,19 @@ async function saveLiveResult() {
     });
 
     state.currentAttempt = Math.min(attemptNumber + 1, state.event.attempts);
-    state.liveEntry.participantName = "";
-    state.liveEntry.attemptNumber = state.currentAttempt;
+    state.liveEntry.firstName = "";
+    state.liveEntry.lastName = "";
+    state.liveEntry.attemptNumber = 1;
+    state.currentAttempt = 1;
+    state.currentForce = 0;
+    state.signedForce = 0;
     state.peak = 0;
     state.rawPeak = 0;
     state.peakDirection = "neutral";
+    state.forceDirection = "neutral";
     state.lockedMode = null;
     state.isInAttempt = false;
+    state.elapsedSeconds = 0;
     setFlash(`Resultat gespeichert: ${name} · ${measured.toFixed(1)} kg`);
     render();
   } catch (error) {
@@ -788,7 +807,6 @@ function updateLiveMeasurementDom() {
 
   setText("liveForceValue", state.currentForce.toFixed(1));
   setText("liveRecordValue", Number(state.results[0]?.value || 0).toFixed(1));
-  setText("liveGoalValue", state.goal.toFixed(1));
   setText("liveDirectionValue", state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral");
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
   setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
@@ -803,7 +821,12 @@ function updateLiveMeasurementDom() {
   setText("sidebarSignalLabel", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
   setText("sidebarDeviceLabel", state.ble.device?.name || "Kein Gerät");
   setText("topChipLabel", state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden");
-  setText("liveAttemptDisplay", `Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}`);
+  const currentName = getLiveParticipantDisplayName().trim().toLowerCase();
+  const existingAttempts = currentName
+    ? state.results.filter((entry) => ((entry.participantName || entry.name || "").trim().toLowerCase() === currentName)).length
+    : 0;
+  const nextAttempt = Math.min(existingAttempts + 1, state.event.attempts);
+  setText("liveAttemptDisplay", `Versuch ${nextAttempt} / ${state.event.attempts}`);
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -844,7 +867,7 @@ function template(page) {
   const record = state.results[0]?.value || 0;
   const average = averageValue();
   const last = state.results[state.results.length - 1];
-  const placement = state.results.findIndex((entry) => (entry.participantName || entry.name) === getLiveParticipantName()) + 1;
+  const placement = state.results.findIndex((entry) => (entry.participantName || entry.name) === getLiveParticipantDisplayName()) + 1;
   const lockedPage = !state.user && ["dashboard", "setup", "branding", "live"].includes(page);
 
   return `
@@ -955,14 +978,14 @@ function template(page) {
               <div class="grid">
                 <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
                 <div class="card">
-                  <div class="card-header"><div><h3>Live-Messung</h3><p>Grosse zentrale Anzeige für aktuelle Kraft, Peak, Zeit und Zielwert.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${state.currentForce.toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong id="liveRecordValue">${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Zielwert</span><strong id="liveGoalValue">${state.goal.toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                  <div class="card-header"><div><h3>Live-Messung</h3><p>Grosse zentrale Anzeige für aktuelle Kraft, Peak, Zeit und den gespeicherten Wert.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
+                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${state.currentForce.toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong id="liveRecordValue">${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button primary" id="resetPeak" ${!state.connected ? "disabled" : ""}>Peak zurücksetzen</button><button class="button" id="tareButton" ${!state.connected ? "disabled" : ""}>Tare senden</button><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
                   <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong id="livePeakDirectionValue">${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Zeit</small><strong id="liveElapsedValue">00:${String(state.elapsedSeconds).padStart(2, "0")}</strong></div><div class="mini-card"><small>Punktzahl</small><strong id="liveScoreValue">${Math.round(state.peak * 10)}</strong></div></div>
                 </div>
                 <div class="grid two">
                   <div class="card"><div class="card-header"><div><h3>Gerätebereich</h3><p>Web Bluetooth Status, Akku und Signal.</p></div></div><div class="metric-list"><div class="metric-line"><span>Verbindung</span><strong id="liveConnectionValue">${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong id="liveBatteryValue">${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong id="liveSignalValue">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
-                  <div class="card"><div class="card-header"><div><h3>Teilnehmerbereich</h3><p>Kein Login erforderlich.</p></div></div><div class="field-grid"><div class="field"><label>Name</label><input id="participantNameInput" value="${getLiveParticipantName()}" placeholder="Teilnehmername" /></div><div class="field"><label>Versuch Nummer</label><input id="participantAttemptInput" type="number" min="1" max="${state.event.attempts}" value="${getLiveAttemptNumber()}" /></div></div></div>
+                  <div class="card"><div class="card-header"><div><h3>Teilnehmerbereich</h3><p>Kein Login erforderlich.</p></div></div><div class="field-grid"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Nächster Versuch</span><strong>${getLiveAttemptNumber()} / ${state.event.attempts}</strong></div></div></div>
                 </div>
               </div>
               <div class="grid">
@@ -1064,7 +1087,8 @@ function bindDashboardActions() {
     };
     state.results = [];
     state.liveEntry = {
-      participantName: "",
+      firstName: "",
+      lastName: "",
       attemptNumber: 1,
     };
     await saveEvent();
@@ -1128,12 +1152,13 @@ function bindBrandingActions() {
 }
 
 function bindLiveActions() {
-  root.querySelector("#participantNameInput")?.addEventListener("input", (event) => {
-    state.liveEntry.participantName = event.target.value;
+  root.querySelector("#participantFirstNameInput")?.addEventListener("input", (event) => {
+    state.liveEntry.firstName = event.target.value;
+    updateLiveMeasurementDom();
   });
-  root.querySelector("#participantAttemptInput")?.addEventListener("input", (event) => {
-    const nextAttempt = Number(event.target.value);
-    state.liveEntry.attemptNumber = Number.isFinite(nextAttempt) && nextAttempt > 0 ? nextAttempt : 1;
+  root.querySelector("#participantLastNameInput")?.addEventListener("input", (event) => {
+    state.liveEntry.lastName = event.target.value;
+    updateLiveMeasurementDom();
   });
   root.querySelector("#tareButton")?.addEventListener("click", () => sendCommand(new Uint8Array([BLE.cmdTare])));
   root.querySelector("#resetPeak")?.addEventListener("click", () => {
