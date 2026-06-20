@@ -357,6 +357,9 @@ function onStateCharacteristicChanged(event) {
   if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && isDirectionAllowed(direction)) {
     state.isInAttempt = true;
   } else if (state.isInAttempt && absForce < ATTEMPT_END_THRESHOLD) {
+    if (state.peak >= PEAK_MINIMUM_THRESHOLD) {
+      state.currentAttempt = Math.min(state.currentAttempt + 1, state.event.attempts);
+    }
     state.isInAttempt = false;
     state.lockedMode = null;
   }
@@ -667,10 +670,16 @@ async function saveLiveResult() {
       createdAt: serverTimestamp(),
     });
 
-    await updateDoc(doc(db, "events", state.event.id), {
-      participantCount: state.results.length + 1,
-      updatedAt: serverTimestamp(),
-    });
+    let eventUpdateWarning = "";
+    try {
+      await updateDoc(doc(db, "events", state.event.id), {
+        participantCount: state.results.length + 1,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (eventUpdateError) {
+      console.warn("Event update after result save failed:", eventUpdateError);
+      eventUpdateWarning = " Resultat wurde gespeichert, aber die Teilnehmerzahl konnte nicht sofort aktualisiert werden.";
+    }
 
     state.currentAttempt = Math.min(attemptNumber + 1, state.event.attempts);
     state.liveEntry.firstName = "";
@@ -686,7 +695,7 @@ async function saveLiveResult() {
     state.lockedMode = null;
     state.isInAttempt = false;
     state.elapsedSeconds = 0;
-    setFlash(`Resultat gespeichert: ${name} · ${measured.toFixed(1)} kg`);
+    setFlash(`Resultat gespeichert: ${name} · ${measured.toFixed(1)} kg${eventUpdateWarning}`);
     render();
   } catch (error) {
     setError(`Resultat speichern fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
@@ -825,7 +834,9 @@ function updateLiveMeasurementDom() {
   const existingAttempts = currentName
     ? state.results.filter((entry) => ((entry.participantName || entry.name || "").trim().toLowerCase() === currentName)).length
     : 0;
-  const nextAttempt = Math.min(existingAttempts + 1, state.event.attempts);
+  const nextAttempt = currentName
+    ? Math.min(Math.max(existingAttempts + 1, state.currentAttempt), state.event.attempts)
+    : Math.min(state.currentAttempt, state.event.attempts);
   setText("liveAttemptDisplay", `Versuch ${nextAttempt} / ${state.event.attempts}`);
 
   const progressBar = document.getElementById("liveProgressBar");
