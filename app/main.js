@@ -209,6 +209,17 @@ function formatDirectionLabel(direction) {
   return "Neutral";
 }
 
+function formatEntryDirection(entry) {
+  return formatDirectionLabel(entry.forceMode || entry.direction || "neutral");
+}
+
+function getLivePlacement() {
+  const measuredValue = getMeasuredValue();
+  if (measuredValue < PEAK_MINIMUM_THRESHOLD) return "—";
+  const betterResults = state.results.filter((entry) => Number(entry.value || 0) > measuredValue).length;
+  return `#${betterResults + 1}`;
+}
+
 function getFinalAttemptValue(attempts) {
   if (!attempts.length) return 0;
   if (state.event.scoringMode === "Durchschnitt") {
@@ -842,11 +853,12 @@ function downloadPdf() {
 
 function leaderboardTable(items, limit) {
   return `
-    <tr><th>#</th><th>Name</th><th>Resultat</th></tr>
+    <tr><th>#</th><th>Name</th><th>Richtung</th><th>Resultat</th></tr>
     ${items.slice(0, limit).map((item, index) => `
       <tr>
         <td><span class="rank-pill">${medalForRank(index)}</span></td>
         <td>${item.participantName || item.name}</td>
+        <td>${formatEntryDirection(item)}</td>
         <td>${Number(item.value).toFixed(1)} kg</td>
       </tr>
     `).join("")}
@@ -867,6 +879,7 @@ function updateLiveMeasurementDom() {
 
   setText("liveForceValue", getDisplayForceValue().toFixed(1));
   setText("liveRecordValue", `${Number(state.results[0]?.value || 0).toFixed(1)} kg`);
+  setText("livePlacementValue", getLivePlacement());
   setText("liveDirectionValue", formatDirectionLabel(state.forceDirection));
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
   setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
@@ -1073,13 +1086,10 @@ function template(page) {
             <div class="grid live">
               <div class="grid">
                 <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
-                <div class="grid two">
-                  <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div><div class="metric-line"><span>Erfasste Versuche</span><strong>${getCompletedAttemptsCount()} / ${state.event.attempts}</strong></div></div></div>
-                  <div class="card"><div class="card-header"><div><h3>Messgerät</h3><p>Verbindung und Bereitschaft für den nächsten Durchgang.</p></div></div><div class="metric-list"><div class="metric-line"><span>Status</span><strong id="liveConnectionValue">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong id="liveBatteryValue">${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong id="liveSignalValue">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
-                </div>
+                <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid two"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div></div></div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong>—</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
                   <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                   <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird."}</p>
