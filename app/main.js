@@ -363,7 +363,7 @@ function onStateCharacteristicChanged(event) {
   state.elapsedSeconds = Math.floor(packet.tMs / 1000) % 60;
   state.battery = packet.batteryPercent;
   state.signal = packet.charging ? "Stabil · lädt" : "Stabil";
-  render();
+  updateLiveMeasurementDom();
 }
 
 async function connectToDevice() {
@@ -778,6 +778,39 @@ function qrImage(url) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=264x264&margin=0&data=${encodeURIComponent(url)}`;
 }
 
+function updateLiveMeasurementDom() {
+  if (state.currentPage !== "live") return;
+
+  const setText = (id, value) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  };
+
+  setText("liveForceValue", state.currentForce.toFixed(1));
+  setText("liveRecordValue", Number(state.results[0]?.value || 0).toFixed(1));
+  setText("liveGoalValue", state.goal.toFixed(1));
+  setText("liveDirectionValue", state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral");
+  setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
+  setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
+  setText("livePeakDirectionValue", state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—");
+  setText("liveElapsedValue", `00:${String(state.elapsedSeconds).padStart(2, "0")}`);
+  setText("liveScoreValue", String(Math.round(state.peak * 10)));
+  setText("liveConnectionValue", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
+  setText("liveBatteryValue", state.connected ? `${state.battery}%` : "—");
+  setText("liveSignalValue", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
+  setText("sidebarConnectionLabel", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
+  setText("sidebarBatteryLabel", state.connected ? `${state.battery}%` : "—");
+  setText("sidebarSignalLabel", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
+  setText("sidebarDeviceLabel", state.ble.device?.name || "Kein Gerät");
+  setText("topChipLabel", state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden");
+  setText("liveAttemptDisplay", `Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}`);
+
+  const progressBar = document.getElementById("liveProgressBar");
+  if (progressBar) {
+    progressBar.style.width = `${Math.max(8, Math.min(100, state.currentForce))}%`;
+  }
+}
+
 function loginCard() {
   return `
     <div class="card" style="max-width:420px;margin:60px auto;">
@@ -826,9 +859,9 @@ function template(page) {
         </nav>
         <div class="panel">
           <div class="panel-label">Gerätestatus</div>
-          <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span>${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</span></div><strong>${state.connected ? `${state.battery}%` : "—"}</strong></div>
-          <div class="status-row"><span class="muted">Signal</span><strong>${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div>
-          <div class="status-row"><span class="muted">Gerät</span><strong>${state.ble.device?.name || "Kein Gerät"}</strong></div>
+          <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</span></div><strong id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong></div>
+          <div class="status-row"><span class="muted">Signal</span><strong id="sidebarSignalLabel">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div>
+          <div class="status-row"><span class="muted">Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "Kein Gerät"}</strong></div>
           <div class="action-row"><button class="button" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
         </div>
         <div class="panel">
@@ -846,7 +879,7 @@ function template(page) {
         <div class="content-inner">
           <div class="topbar">
             <div><div class="eyebrow">DynoGrip Event System</div><h2>${pageMeta[page][0]}</h2><p>${pageMeta[page][1]}</p></div>
-            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span>${state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden"}</span></div>
+            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden"}</span></div>
           </div>
           ${(state.lastError || state.flashMessage) ? `<div class="notice ${state.lastError || state.flashType === "error" ? "error" : ""}">${state.lastError || state.flashMessage}</div>` : ""}
           ${lockedPage ? loginCard() : ""}
@@ -922,13 +955,13 @@ function template(page) {
               <div class="grid">
                 <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
                 <div class="card">
-                  <div class="card-header"><div><h3>Live-Messung</h3><p>Grosse zentrale Anzeige für aktuelle Kraft, Peak, Zeit und Zielwert.</p></div><span>Versuch ${state.currentAttempt} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value">${state.currentForce.toFixed(1)}<span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong>${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Zielwert</span><strong>${state.goal.toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong>${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong>${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                  <div class="card-header"><div><h3>Live-Messung</h3><p>Grosse zentrale Anzeige für aktuelle Kraft, Peak, Zeit und Zielwert.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
+                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${state.currentForce.toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong id="liveRecordValue">${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Zielwert</span><strong id="liveGoalValue">${state.goal.toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button primary" id="resetPeak" ${!state.connected ? "disabled" : ""}>Peak zurücksetzen</button><button class="button" id="tareButton" ${!state.connected ? "disabled" : ""}>Tare senden</button><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
-                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong>${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong>${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Zeit</small><strong>00:${String(state.elapsedSeconds).padStart(2, "0")}</strong></div><div class="mini-card"><small>Punktzahl</small><strong>${Math.round(state.peak * 10)}</strong></div></div>
+                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong id="livePeakDirectionValue">${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Zeit</small><strong id="liveElapsedValue">00:${String(state.elapsedSeconds).padStart(2, "0")}</strong></div><div class="mini-card"><small>Punktzahl</small><strong id="liveScoreValue">${Math.round(state.peak * 10)}</strong></div></div>
                 </div>
                 <div class="grid two">
-                  <div class="card"><div class="card-header"><div><h3>Gerätebereich</h3><p>Web Bluetooth Status, Akku und Signal.</p></div></div><div class="metric-list"><div class="metric-line"><span>Verbindung</span><strong>${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong>${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong>${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
+                  <div class="card"><div class="card-header"><div><h3>Gerätebereich</h3><p>Web Bluetooth Status, Akku und Signal.</p></div></div><div class="metric-list"><div class="metric-line"><span>Verbindung</span><strong id="liveConnectionValue">${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong id="liveBatteryValue">${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong id="liveSignalValue">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
                   <div class="card"><div class="card-header"><div><h3>Teilnehmerbereich</h3><p>Kein Login erforderlich.</p></div></div><div class="field-grid"><div class="field"><label>Name</label><input id="participantNameInput" value="${getLiveParticipantName()}" placeholder="Teilnehmername" /></div><div class="field"><label>Versuch Nummer</label><input id="participantAttemptInput" type="number" min="1" max="${state.event.attempts}" value="${getLiveAttemptNumber()}" /></div></div></div>
                 </div>
               </div>
