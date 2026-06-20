@@ -32,7 +32,8 @@ const BLE = {
 const FORCE_DIRECTION_THRESHOLD = 0.5;
 const MODE_LOCK_THRESHOLD = 1.0;
 const PEAK_MINIMUM_THRESHOLD = 2.0;
-const ATTEMPT_THRESHOLD = 2.0;
+const ATTEMPT_START_THRESHOLD = 2.0;
+const ATTEMPT_END_THRESHOLD = 2.0;
 
 const emptyBranding = {
   eventLogo: "",
@@ -886,19 +887,20 @@ function updateLiveMeasurementDom() {
 }
 
 function processAttemptDetectionTick() {
-  if (!state.connected || state.currentPage !== "live" || state.event.status !== "Live") {
-    state.previousForce = state.currentForce;
+  if (!state.connected || state.currentPage !== "live") {
     return;
   }
 
   const absForce = state.currentForce;
-  const prevForce = state.previousForce;
   const direction = state.lockedMode || state.forceDirection;
   const { firstName, lastName } = getParticipantNameParts();
-  const canTrackAttempt = Boolean(firstName && lastName) && isDirectionAllowed(direction);
+  const hasParticipant = Boolean(firstName && lastName);
+  const canTrackAttempt = hasParticipant && (direction === "neutral" ? normalizeForceMode(state.event.forceMode) === "Beide" : isDirectionAllowed(direction));
 
-  if (!state.isInAttempt && absForce > ATTEMPT_THRESHOLD && canTrackAttempt) {
+  if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && canTrackAttempt) {
     state.isInAttempt = true;
+    state.peak = absForce;
+    state.peakDirection = direction === "neutral" ? state.peakDirection : direction;
     if (absForce > state.peak) {
       state.peak = absForce;
       state.peakDirection = direction;
@@ -906,7 +908,7 @@ function processAttemptDetectionTick() {
     updateLiveMeasurementDom();
   }
 
-  if (state.isInAttempt && absForce <= ATTEMPT_THRESHOLD && prevForce > absForce) {
+  if (state.isInAttempt && absForce < ATTEMPT_END_THRESHOLD) {
     if (state.peak >= PEAK_MINIMUM_THRESHOLD) {
       state.liveEntry.attempts = [
         ...(state.liveEntry.attempts || []),
@@ -929,8 +931,6 @@ function processAttemptDetectionTick() {
       void finalizeParticipantResult(false);
     }
   }
-
-  state.previousForce = absForce;
 }
 
 function loginCard() {
