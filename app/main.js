@@ -1078,14 +1078,20 @@ function publicBrandingSection() {
 
 async function assetToDataUrl(url) {
   if (!url) return null;
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  try {
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn("Branding-Asset konnte nicht für PDF geladen werden", url, error);
+    return null;
+  }
 }
 
 function imageFormatFromDataUrl(dataUrl) {
