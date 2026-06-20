@@ -15,7 +15,6 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
   where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -123,6 +122,7 @@ const pageMeta = {
 };
 
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
+let attemptDetectionTimer = null;
 
 function slugify(value) {
   return String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "event";
@@ -196,6 +196,12 @@ function medalForRank(index) {
   if (index === 1) return "🥈";
   if (index === 2) return "🥉";
   return String(index + 1);
+}
+
+function formatDirectionLabel(direction) {
+  if (direction === "pull") return "Ziehen";
+  if (direction === "push") return "Drücken";
+  return "Neutral";
 }
 
 function getFinalAttemptValue(attempts) {
@@ -468,7 +474,6 @@ function onStateCharacteristicChanged(event) {
   const signedForce = -packet.force;
   const absForce = Math.abs(signedForce);
   const direction = directionFromSignedForce(signedForce);
-  const prevForce = state.previousForce;
 
   state.connected = true;
   state.connecting = false;
@@ -481,44 +486,6 @@ function onStateCharacteristicChanged(event) {
     state.lockedMode = direction;
   }
 
-  const { participantName } = getParticipantNameParts();
-  const canTrackAttempt = Boolean(participantName) && isDirectionAllowed(direction);
-
-  if (!state.isInAttempt && absForce > ATTEMPT_THRESHOLD && canTrackAttempt) {
-    state.isInAttempt = true;
-    state.wentBelowThreshold = false;
-  }
-
-  if (state.isInAttempt && absForce < ATTEMPT_THRESHOLD) {
-    state.wentBelowThreshold = true;
-  }
-
-  if (state.isInAttempt && state.wentBelowThreshold && absForce > prevForce) {
-    if (state.peak >= PEAK_MINIMUM_THRESHOLD) {
-      state.liveEntry.attempts = [
-        ...(state.liveEntry.attempts || []),
-        {
-          value: Number(state.peak.toFixed(1)),
-          direction: state.peakDirection,
-        },
-      ];
-      state.currentAttempt = Math.min((state.liveEntry.attempts?.length || 0) + 1, state.event.attempts);
-    }
-    state.isInAttempt = false;
-    state.lockedMode = null;
-    state.wentBelowThreshold = false;
-    state.peak = 0;
-    state.rawPeak = 0;
-    state.peakDirection = "neutral";
-    const shouldAutoSave = (state.liveEntry.attempts?.length || 0) >= state.event.attempts;
-    if (shouldAutoSave) {
-      state.previousForce = absForce;
-      updateLiveMeasurementDom();
-      void finalizeParticipantResult(false);
-      return;
-    }
-  }
-
   if (absForce >= PEAK_MINIMUM_THRESHOLD && isDirectionAllowed(direction) && absForce >= state.peak) {
     state.peak = absForce;
     state.peakDirection = direction;
@@ -527,7 +494,6 @@ function onStateCharacteristicChanged(event) {
   state.elapsedSeconds = Math.floor(packet.tMs / 1000) % 60;
   state.battery = packet.batteryPercent;
   state.signal = packet.charging ? "Stabil · lädt" : "Stabil";
-  state.previousForce = absForce;
   updateLiveMeasurementDom();
 }
 
@@ -673,7 +639,7 @@ function subscribeToDashboard() {
   safeUnsub("dashboard");
   state.dashboardLoaded = false;
   state.unsubscribers.dashboard = onSnapshot(
-    query(collection(db, "events"), where("ownerUid", "==", state.user.uid), orderBy("date", "desc")),
+    query(collection(db, "events"), where("ownerUid", "==", state.user.uid)),
     (snapshot) => {
       state.events = snapshot.docs.map((eventDoc) => {
         const data = eventDoc.data();
@@ -681,10 +647,11 @@ function subscribeToDashboard() {
           id: eventDoc.id,
           name: data.name,
           date: formatDate(data.date),
+          sortDate: data.date || "",
           status: data.status,
           participants: Number(data.participantCount || 0),
         };
-      });
+      }).sort((a, b) => String(b.sortDate).localeCompare(String(a.sortDate)));
       state.dashboardLoaded = true;
       render();
     },
@@ -811,13 +778,14 @@ function escapePdfText(value) {
 
 function downloadPdf() {
   const lines = [
-    "DynoGrip Event Export",
+    "DynoForce Event Export",
     `Eventname: ${state.event.name}`,
     `Veranstalter: ${state.event.organiser}`,
     `Ort: ${state.event.location}`,
     `Datum: ${formatDate(state.event.date)}`,
     `Challenge: ${state.event.challengeType}`,
-    `Grip Type: ${state.event.gripType}`,
+    `Griff: ${state.event.gripType}`,
+    `Richtung: ${normalizeForceMode(state.event.forceMode)}`,
     `Wertung: ${state.event.scoringMode}`,
     `Status: ${state.event.status}`,
     `Teilnehmerzahl: ${state.results.length}`,
@@ -894,10 +862,9 @@ function updateLiveMeasurementDom() {
 
   setText("liveForceValue", state.currentForce.toFixed(1));
   setText("liveRecordValue", Number(state.results[0]?.value || 0).toFixed(1));
-  setText("liveDirectionValue", state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral");
+  setText("liveDirectionValue", formatDirectionLabel(state.forceDirection));
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
   setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
-  setText("livePeakDirectionValue", state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—");
   setText("liveConnectionValue", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
   setText("liveBatteryValue", state.connected ? `${state.battery}%` : "—");
   setText("liveSignalValue", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
@@ -909,12 +876,67 @@ function updateLiveMeasurementDom() {
   const nextAttempt = getLiveAttemptNumber();
   setText("liveAttemptDisplay", `Versuch ${nextAttempt} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${state.liveEntry.attempts.length} / ${state.event.attempts}`);
-  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Startet automatisch bei über 2 kg.");
+  setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
+  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird.");
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
     progressBar.style.width = `${Math.max(8, Math.min(100, state.currentForce))}%`;
   }
+}
+
+function processAttemptDetectionTick() {
+  if (!state.connected || state.currentPage !== "live" || state.event.status !== "Live") {
+    state.previousForce = state.currentForce;
+    return;
+  }
+
+  const absForce = state.currentForce;
+  const prevForce = state.previousForce;
+  const direction = state.lockedMode || state.forceDirection;
+  const { firstName, lastName } = getParticipantNameParts();
+  const canTrackAttempt = Boolean(firstName && lastName) && isDirectionAllowed(direction);
+
+  if (!state.isInAttempt && absForce > ATTEMPT_THRESHOLD && canTrackAttempt) {
+    state.isInAttempt = true;
+    state.wentBelowThreshold = false;
+    if (absForce > state.peak) {
+      state.peak = absForce;
+      state.peakDirection = direction;
+    }
+    updateLiveMeasurementDom();
+  }
+
+  if (state.isInAttempt && absForce < ATTEMPT_THRESHOLD) {
+    state.wentBelowThreshold = true;
+  }
+
+  if (state.isInAttempt && state.wentBelowThreshold && absForce > prevForce) {
+    if (state.peak > ATTEMPT_THRESHOLD) {
+      state.liveEntry.attempts = [
+        ...(state.liveEntry.attempts || []),
+        {
+          value: Number(state.peak.toFixed(1)),
+          direction: state.peakDirection || direction,
+        },
+      ];
+      state.currentAttempt = Math.min((state.liveEntry.attempts?.length || 0) + 1, state.event.attempts);
+    }
+
+    state.isInAttempt = false;
+    state.lockedMode = null;
+    state.wentBelowThreshold = false;
+    state.peak = 0;
+    state.rawPeak = 0;
+    state.peakDirection = "neutral";
+    updateLiveMeasurementDom();
+
+    if ((state.liveEntry.attempts?.length || 0) >= state.event.attempts) {
+      void finalizeParticipantResult(false);
+    }
+  }
+
+  state.previousForce = absForce;
 }
 
 function loginCard() {
@@ -958,7 +980,7 @@ function template(page) {
       <aside class="sidebar">
         <div class="brand">
           <div class="brand-mark">DF</div>
-          <div><h1>DynoGrip Event</h1><p>Powered by DynoForce</p></div>
+          <div><h1>DynoForce Event</h1><p>Powered by DynoForce</p></div>
         </div>
         <nav class="nav">
           ${Object.keys(pageMeta).map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")}
@@ -1014,7 +1036,7 @@ function template(page) {
                 <div class="field-grid two">
                   <div class="field"><label>Challenge</label><select id="challengeTypeInput"><option ${state.event.challengeType === "Maximalkraft" ? "selected" : ""}>Maximalkraft</option><option ${state.event.challengeType === "Dead Hang" ? "selected" : ""}>Dead Hang</option><option ${state.event.challengeType === "Endurance" ? "selected" : ""}>Endurance</option><option ${state.event.challengeType === "Freie Challenge" ? "selected" : ""}>Freie Challenge</option></select></div>
                   <div class="field"><label>Richtung</label><select id="forceModeInput"><option ${normalizeForceMode(state.event.forceMode) === "Beide" ? "selected" : ""}>Beide</option><option ${normalizeForceMode(state.event.forceMode) === "Ziehen" ? "selected" : ""}>Ziehen</option><option ${normalizeForceMode(state.event.forceMode) === "Drücken" ? "selected" : ""}>Drücken</option></select></div>
-                  <div class="field"><label>Grip Type</label><input id="gripTypeInput" value="${state.event.gripType}" /></div>
+                  <div class="field"><label>Griff</label><input id="gripTypeInput" value="${state.event.gripType}" /></div>
                   <div class="field"><label>Versuche</label><select id="attemptsInput"><option ${state.event.attempts === 1 ? "selected" : ""}>1 Versuch</option><option ${state.event.attempts === 3 ? "selected" : ""}>3 Versuche</option><option ${state.event.attempts === 5 ? "selected" : ""}>5 Versuche</option></select></div>
                   <div class="field"><label>Wertung</label><select id="scoringModeInput"><option ${state.event.scoringMode === "Bester Versuch" ? "selected" : ""}>Bester Versuch</option><option ${state.event.scoringMode === "Durchschnitt" ? "selected" : ""}>Durchschnitt</option><option ${state.event.scoringMode === "Letzter Versuch" ? "selected" : ""}>Letzter Versuch</option></select></div>
                 </div>
@@ -1054,16 +1076,16 @@ function template(page) {
             <div class="grid live">
               <div class="grid">
                 <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
-                <div class="card">
-                  <div class="card-header"><div><h3>Live-Messung</h3><p>Startet automatisch, sobald die Kraftschwelle von 2 kg überschritten wird.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${state.currentForce.toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong id="liveRecordValue">${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
-                  <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
-                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong id="livePeakDirectionValue">${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div></div>
-                  <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Startet automatisch bei über 2 kg."}</p>
-                </div>
                 <div class="grid two">
+                  <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div><div class="metric-line"><span>Nächster Versuch</span><strong>${getLiveAttemptNumber()} / ${state.event.attempts}</strong></div></div></div>
                   <div class="card"><div class="card-header"><div><h3>Messgerät</h3><p>Verbindung und Bereitschaft für den nächsten Durchgang.</p></div></div><div class="metric-list"><div class="metric-line"><span>Status</span><strong id="liveConnectionValue">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong id="liveBatteryValue">${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong id="liveSignalValue">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
-                  <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Nächster Versuch</span><strong>${getLiveAttemptNumber()} / ${state.event.attempts}</strong></div></div></div>
+                </div>
+                <div class="card">
+                  <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
+                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${state.currentForce.toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong id="liveRecordValue">${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Speicherwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                  <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
+                  <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
+                  <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird."}</p>
                 </div>
               </div>
               <div class="grid">
@@ -1149,7 +1171,7 @@ function bindDashboardActions() {
     state.event = {
       ...state.event,
       id: `event-${Date.now()}`,
-      name: "Neues DynoGrip Event",
+      name: "Neues DynoForce Event",
       description: "Neue Challenge ohne App und ohne Login.",
       organiser: state.user.displayName || state.user.email || "Veranstalter",
       location: "Ort",
@@ -1262,6 +1284,10 @@ function render() {
     if (state.currentPage === "live") bindLiveActions();
     if (state.currentPage === "public") bindPublicActions();
   }
+}
+
+if (!attemptDetectionTimer) {
+  attemptDetectionTimer = window.setInterval(processAttemptDetectionTick, 50);
 }
 
 async function routeAndLoad() {
