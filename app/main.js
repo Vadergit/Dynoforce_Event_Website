@@ -31,6 +31,12 @@ const BLE = {
   cmdResetPeak: 0x09,
 };
 
+const FORCE_DIRECTION_THRESHOLD = 0.5;
+const MODE_LOCK_THRESHOLD = 1.0;
+const PEAK_MINIMUM_THRESHOLD = 2.0;
+const ATTEMPT_START_THRESHOLD = 2.0;
+const ATTEMPT_END_THRESHOLD = 1.0;
+
 const emptyBranding = {
   eventLogo: "",
   venueLogo: "",
@@ -47,7 +53,13 @@ const state = {
   signal: "Nicht verbunden",
   currentAttempt: 1,
   currentForce: 0,
+  signedForce: 0,
   peak: 0,
+  rawPeak: 0,
+  forceDirection: "neutral",
+  peakDirection: "neutral",
+  lockedMode: null,
+  isInAttempt: false,
   elapsedSeconds: 0,
   goal: 90,
   flashMessage: "",
@@ -56,6 +68,10 @@ const state = {
   deviceInfo: null,
   saving: false,
   uploading: "",
+  liveEntry: {
+    participantName: "",
+    attemptNumber: 1,
+  },
   dashboardLoaded: false,
   eventLoaded: false,
   currentPage: "dashboard",
@@ -80,6 +96,7 @@ const state = {
     location: "Zürich",
     date: "2027-03-18",
     challengeType: "Maximalkraft",
+    forceMode: "Beide",
     gripType: "Sloper 35°",
     attempts: 3,
     scoringMode: "Bester Versuch",
@@ -120,6 +137,52 @@ function formatDate(dateString) {
 function averageValue() {
   if (!state.results.length) return 0;
   return state.results.reduce((sum, item) => sum + item.value, 0) / state.results.length;
+}
+
+function normalizeForceMode(value) {
+  if (value === "Ziehen" || value === "pull") return "Ziehen";
+  if (value === "Drücken" || value === "push") return "Drücken";
+  return "Beide";
+}
+
+function directionFromSignedForce(force) {
+  if (force > FORCE_DIRECTION_THRESHOLD) return "pull";
+  if (force < -FORCE_DIRECTION_THRESHOLD) return "push";
+  return "neutral";
+}
+
+function isDirectionAllowed(direction) {
+  const mode = normalizeForceMode(state.event.forceMode);
+  if (mode === "Beide") return direction === "pull" || direction === "push";
+  if (mode === "Ziehen") return direction === "pull";
+  if (mode === "Drücken") return direction === "push";
+  return false;
+}
+
+function getLiveParticipantName() {
+  return state.liveEntry.participantName || "";
+}
+
+function getLiveAttemptNumber() {
+  return Number(state.liveEntry.attemptNumber) || Number(state.currentAttempt) || 1;
+}
+
+function getMeasuredValue() {
+  const peakValue = Number(state.peak.toFixed(1));
+  const currentValue = Number(state.currentForce.toFixed(1));
+
+  if (state.event.challengeType === "Maximalkraft") {
+    return Math.max(0, peakValue || currentValue || 0);
+  }
+
+  return Math.max(0, currentValue || peakValue || 0);
+}
+
+function getSelectedForceModeKey() {
+  const mode = normalizeForceMode(state.event.forceMode);
+  if (mode === "Ziehen") return "pull";
+  if (mode === "Drücken") return "push";
+  return "both";
 }
 
 function setFlash(message, type = "info") {
@@ -237,7 +300,8 @@ function parseStatePacket(dataView) {
     const packet = {
       tMs: dataView.getUint32(offset, true),
       force: dataView.getFloat32((offset += 4), true),
-      peak: dataView.getFloat32((offset += 8), true),
+      slope: dataView.getFloat32((offset += 4), true),
+      peak: dataView.getFloat32((offset += 4), true),
       attemptCount: dataView.getUint16((offset += 4), true),
       batteryPercent: dataView.getUint8((offset += 2)),
       charging: dataView.getUint8((offset += 1)) === 1,
@@ -269,12 +333,34 @@ function onBluetoothDisconnected() {
 function onStateCharacteristicChanged(event) {
   const packet = parseStatePacket(event.target.value);
   if (!packet) return;
+  const signedForce = -packet.force;
+  const absForce = Math.abs(signedForce);
+  const direction = directionFromSignedForce(signedForce);
+
   state.connected = true;
   state.connecting = false;
-  state.currentForce = Math.abs(packet.force);
-  state.peak = Math.max(Math.abs(packet.peak), state.currentForce);
+  state.signedForce = signedForce;
+  state.currentForce = absForce;
+  state.forceDirection = direction;
+  state.rawPeak = Math.abs(signedForce) > Math.abs(state.rawPeak) && absForce >= PEAK_MINIMUM_THRESHOLD ? signedForce : state.rawPeak;
+
+  if (state.lockedMode === null && absForce >= MODE_LOCK_THRESHOLD && direction !== "neutral") {
+    state.lockedMode = direction;
+  }
+
+  if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && isDirectionAllowed(direction)) {
+    state.isInAttempt = true;
+  } else if (state.isInAttempt && absForce < ATTEMPT_END_THRESHOLD) {
+    state.isInAttempt = false;
+    state.lockedMode = null;
+  }
+
+  if (absForce >= PEAK_MINIMUM_THRESHOLD && isDirectionAllowed(direction) && absForce >= state.peak) {
+    state.peak = absForce;
+    state.peakDirection = direction;
+  }
+
   state.elapsedSeconds = Math.floor(packet.tMs / 1000) % 60;
-  state.currentAttempt = Math.max(1, packet.attemptCount || state.currentAttempt);
   state.battery = packet.batteryPercent;
   state.signal = packet.charging ? "Stabil · lädt" : "Stabil";
   render();
@@ -356,6 +442,7 @@ function eventDocToState(id, data) {
     location: data.location || "",
     date: data.date || new Date().toISOString().slice(0, 10),
     challengeType: data.challengeType || "Maximalkraft",
+    forceMode: normalizeForceMode(data.forceMode),
     gripType: data.gripType || "Freie Challenge",
     attempts: Number(data.attempts || 3),
     scoringMode: data.scoringMode || "Bester Versuch",
@@ -463,6 +550,7 @@ async function saveEvent(overrides = {}) {
       location: state.event.location,
       date: state.event.date,
       challengeType: state.event.challengeType,
+      forceMode: normalizeForceMode(state.event.forceMode),
       gripType: state.event.gripType,
       attempts: state.event.attempts,
       scoringMode: state.event.scoringMode,
@@ -530,9 +618,29 @@ async function saveLiveResult() {
     render();
     return;
   }
-  const name = document.getElementById("participantNameInput")?.value.trim() || "Gast";
-  const attemptNumber = Number(document.getElementById("participantAttemptInput")?.value) || state.currentAttempt || 1;
-  const measured = Math.max(10, Number(state.peak.toFixed(1)) || Number(state.currentForce.toFixed(1)) || (65 + Math.random() * 18));
+  const name = getLiveParticipantName().trim() || "Gast";
+  const attemptNumber = getLiveAttemptNumber();
+  const measured = getMeasuredValue();
+  const forceMode = state.peakDirection === "push" ? "push" : state.peakDirection === "pull" ? "pull" : state.lockedMode;
+
+  if (measured <= 0) {
+    setError("Noch kein Messwert vorhanden. Bitte zuerst eine Messung durchführen.");
+    render();
+    return;
+  }
+
+  if (!forceMode || !isDirectionAllowed(forceMode)) {
+    const selectedMode = normalizeForceMode(state.event.forceMode);
+    setError(`Dieser Versuch passt nicht zur gewählten Richtung (${selectedMode}).`);
+    render();
+    return;
+  }
+
+  if (!state.event.id) {
+    setError("Es ist noch kein Event ausgewählt.");
+    render();
+    return;
+  }
 
   try {
     await addDoc(collection(db, "results"), {
@@ -541,6 +649,7 @@ async function saveLiveResult() {
       participantName: name,
       value: measured,
       unit: "kg",
+      forceMode,
       attemptNumber,
       createdAt: serverTimestamp(),
     });
@@ -551,6 +660,13 @@ async function saveLiveResult() {
     });
 
     state.currentAttempt = Math.min(attemptNumber + 1, state.event.attempts);
+    state.liveEntry.participantName = "";
+    state.liveEntry.attemptNumber = state.currentAttempt;
+    state.peak = 0;
+    state.rawPeak = 0;
+    state.peakDirection = "neutral";
+    state.lockedMode = null;
+    state.isInAttempt = false;
     setFlash(`Resultat gespeichert: ${name} · ${measured.toFixed(1)} kg`);
     render();
   } catch (error) {
@@ -695,7 +811,7 @@ function template(page) {
   const record = state.results[0]?.value || 0;
   const average = averageValue();
   const last = state.results[state.results.length - 1];
-  const placement = state.results.findIndex((entry) => (entry.participantName || entry.name) === "Alex") + 1;
+  const placement = state.results.findIndex((entry) => (entry.participantName || entry.name) === getLiveParticipantName()) + 1;
   const lockedPage = !state.user && ["dashboard", "setup", "branding", "live"].includes(page);
 
   return `
@@ -764,6 +880,7 @@ function template(page) {
                 <div class="card-header"><div><h3>Challenge & Wertung</h3><p>Optimiert für schnelles Aufsetzen vor Ort.</p></div></div>
                 <div class="field-grid two">
                   <div class="field"><label>Challenge</label><select id="challengeTypeInput"><option ${state.event.challengeType === "Maximalkraft" ? "selected" : ""}>Maximalkraft</option><option ${state.event.challengeType === "Dead Hang" ? "selected" : ""}>Dead Hang</option><option ${state.event.challengeType === "Endurance" ? "selected" : ""}>Endurance</option><option ${state.event.challengeType === "Freie Challenge" ? "selected" : ""}>Freie Challenge</option></select></div>
+                  <div class="field"><label>Richtung</label><select id="forceModeInput"><option ${normalizeForceMode(state.event.forceMode) === "Beide" ? "selected" : ""}>Beide</option><option ${normalizeForceMode(state.event.forceMode) === "Ziehen" ? "selected" : ""}>Ziehen</option><option ${normalizeForceMode(state.event.forceMode) === "Drücken" ? "selected" : ""}>Drücken</option></select></div>
                   <div class="field"><label>Grip Type</label><input id="gripTypeInput" value="${state.event.gripType}" /></div>
                   <div class="field"><label>Versuche</label><select id="attemptsInput"><option ${state.event.attempts === 1 ? "selected" : ""}>1 Versuch</option><option ${state.event.attempts === 3 ? "selected" : ""}>3 Versuche</option><option ${state.event.attempts === 5 ? "selected" : ""}>5 Versuche</option></select></div>
                   <div class="field"><label>Wertung</label><select id="scoringModeInput"><option ${state.event.scoringMode === "Bester Versuch" ? "selected" : ""}>Bester Versuch</option><option ${state.event.scoringMode === "Durchschnitt" ? "selected" : ""}>Durchschnitt</option><option ${state.event.scoringMode === "Letzter Versuch" ? "selected" : ""}>Letzter Versuch</option></select></div>
@@ -806,13 +923,13 @@ function template(page) {
                 <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Grosse zentrale Anzeige für aktuelle Kraft, Peak, Zeit und Zielwert.</p></div><span>Versuch ${state.currentAttempt} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value">${state.currentForce.toFixed(1)}<span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong>${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Zielwert</span><strong>${state.goal.toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div></div></div>
+                  <div class="measure-wrap"><div><div class="force-value">${state.currentForce.toFixed(1)}<span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong>${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Zielwert</span><strong>${state.goal.toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong>${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong>${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button primary" id="resetPeak" ${!state.connected ? "disabled" : ""}>Peak zurücksetzen</button><button class="button" id="tareButton" ${!state.connected ? "disabled" : ""}>Tare senden</button><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
-                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong>${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Zeit</small><strong>00:${String(state.elapsedSeconds).padStart(2, "0")}</strong></div><div class="mini-card"><small>Punktzahl</small><strong>${Math.round(state.peak * 10)}</strong></div></div>
+                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong>${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong>${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Zeit</small><strong>00:${String(state.elapsedSeconds).padStart(2, "0")}</strong></div><div class="mini-card"><small>Punktzahl</small><strong>${Math.round(state.peak * 10)}</strong></div></div>
                 </div>
                 <div class="grid two">
                   <div class="card"><div class="card-header"><div><h3>Gerätebereich</h3><p>Web Bluetooth Status, Akku und Signal.</p></div></div><div class="metric-list"><div class="metric-line"><span>Verbindung</span><strong>${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong>${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong>${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
-                  <div class="card"><div class="card-header"><div><h3>Teilnehmerbereich</h3><p>Kein Login erforderlich.</p></div></div><div class="field-grid"><div class="field"><label>Name</label><input id="participantNameInput" value="Alex" /></div><div class="field"><label>Versuch Nummer</label><input id="participantAttemptInput" value="${state.currentAttempt}" /></div></div></div>
+                  <div class="card"><div class="card-header"><div><h3>Teilnehmerbereich</h3><p>Kein Login erforderlich.</p></div></div><div class="field-grid"><div class="field"><label>Name</label><input id="participantNameInput" value="${getLiveParticipantName()}" placeholder="Teilnehmername" /></div><div class="field"><label>Versuch Nummer</label><input id="participantAttemptInput" type="number" min="1" max="${state.event.attempts}" value="${getLiveAttemptNumber()}" /></div></div></div>
                 </div>
               </div>
               <div class="grid">
@@ -904,6 +1021,7 @@ function bindDashboardActions() {
       location: "Ort",
       date: new Date().toISOString().slice(0, 10),
       challengeType: "Maximalkraft",
+      forceMode: "Beide",
       gripType: "Freie Challenge",
       attempts: 3,
       scoringMode: "Bester Versuch",
@@ -912,6 +1030,10 @@ function bindDashboardActions() {
       ...emptyBranding,
     };
     state.results = [];
+    state.liveEntry = {
+      participantName: "",
+      attemptNumber: 1,
+    };
     await saveEvent();
     syncUrl("setup");
     await routeAndLoad();
@@ -936,6 +1058,7 @@ function bindSetupActions() {
     state.event.location = root.querySelector("#locationInput").value.trim() || state.event.location;
     state.event.description = root.querySelector("#descriptionInput").value.trim() || state.event.description;
     state.event.challengeType = root.querySelector("#challengeTypeInput").value;
+    state.event.forceMode = normalizeForceMode(root.querySelector("#forceModeInput").value);
     state.event.gripType = root.querySelector("#gripTypeInput").value.trim() || state.event.gripType;
     state.event.attempts = Number(root.querySelector("#attemptsInput").value.split(" ")[0]);
     state.event.scoringMode = root.querySelector("#scoringModeInput").value;
@@ -972,10 +1095,21 @@ function bindBrandingActions() {
 }
 
 function bindLiveActions() {
+  root.querySelector("#participantNameInput")?.addEventListener("input", (event) => {
+    state.liveEntry.participantName = event.target.value;
+  });
+  root.querySelector("#participantAttemptInput")?.addEventListener("input", (event) => {
+    const nextAttempt = Number(event.target.value);
+    state.liveEntry.attemptNumber = Number.isFinite(nextAttempt) && nextAttempt > 0 ? nextAttempt : 1;
+  });
   root.querySelector("#tareButton")?.addEventListener("click", () => sendCommand(new Uint8Array([BLE.cmdTare])));
   root.querySelector("#resetPeak")?.addEventListener("click", () => {
     state.peak = 0;
     state.currentForce = 0;
+    state.rawPeak = 0;
+    state.peakDirection = "neutral";
+    state.lockedMode = null;
+    state.isInAttempt = false;
     sendCommand(new Uint8Array([BLE.cmdResetPeak]));
   });
   root.querySelector("#saveResult")?.addEventListener("click", saveLiveResult);
@@ -992,6 +1126,9 @@ function bindPublicActions() {
 
 function render() {
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
+  if (!state.liveEntry.attemptNumber) {
+    state.liveEntry.attemptNumber = state.currentAttempt || 1;
+  }
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
 
