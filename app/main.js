@@ -788,67 +788,134 @@ async function signInGoogle() {
   }
 }
 
-function escapePdfText(value) {
-  return String(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-}
+async function downloadPdf() {
+  try {
+    const [{ jsPDF }, { default: QRCode }] = await Promise.all([
+      import("jspdf"),
+      import("qrcode"),
+    ]);
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 40;
+    let y = margin;
+    const primary = state.event.primaryColor || "#1f4f46";
 
-function downloadPdf() {
-  const lines = [
-    "DynoForce Event Export",
-    `Eventname: ${state.event.name}`,
-    `Veranstalter: ${state.event.organiser}`,
-    `Ort: ${state.event.location}`,
-    `Datum: ${formatDate(state.event.date)}`,
-    `Challenge: ${state.event.challengeType}`,
-    `Griff: ${state.event.gripType}`,
-    `Richtung: ${normalizeForceMode(state.event.forceMode)}`,
-    `Wertung: ${state.event.scoringMode}`,
-    `Status: ${state.event.status}`,
-    `Teilnehmerzahl: ${state.results.length}`,
-    `Bestwert: ${(state.results[0]?.value || 0).toFixed(1)} kg`,
-    `Durchschnitt: ${averageValue().toFixed(1)} kg`,
-    `Public URL: ${getPublicUrl()}`,
-    "Powered by DynoForce",
-    ...state.results.map((entry, index) => `${index + 1}. ${entry.participantName || entry.name} - ${Number(entry.value).toFixed(1)} kg`),
-  ];
+    const [headerBanner, eventLogo, venueLogo, sponsorBanner, qrCodeDataUrl] = await Promise.all([
+      assetToDataUrl(state.event.headerBanner),
+      assetToDataUrl(state.event.eventLogo),
+      assetToDataUrl(state.event.venueLogo),
+      assetToDataUrl(state.event.sponsorBanner),
+      QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 180 }),
+    ]);
 
-  const content = ["BT", "/F1 12 Tf", "40 800 Td"];
-  lines.forEach((line, index) => {
-    if (index > 0) content.push("0 -18 Td");
-    content.push(`(${escapePdfText(line)}) Tj`);
-  });
-  content.push("ET");
+    if (headerBanner) {
+      pdf.addImage(headerBanner, imageFormatFromDataUrl(headerBanner), margin, y, pageWidth - margin * 2, 120);
+      y += 140;
+    }
 
-  const stream = content.join("\n");
-  const objects = [
-    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
-    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
-    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
-    "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
-    `5 0 obj << /Length ${stream.length} >> stream\n${stream}\nendstream endobj`,
-  ];
+    pdf.setFillColor(primary);
+    pdf.roundedRect(margin, y, pageWidth - margin * 2, 92, 18, 18, "F");
+    pdf.setTextColor("#ffffff");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(28);
+    pdf.text(state.event.name, margin + 24, y + 34);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(12);
+    pdf.text(`${state.event.location} · ${formatDate(state.event.date)} · ${state.event.challengeType}`, margin + 24, y + 58);
+    pdf.text(`Powered by DynoForce`, margin + 24, y + 76);
 
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object) => {
-    offsets.push(pdf.length);
-    pdf += `${object}\n`;
-  });
-  const xrefStart = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  });
-  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+    if (eventLogo) {
+      pdf.addImage(eventLogo, imageFormatFromDataUrl(eventLogo), pageWidth - margin - 132, y + 14, 54, 54);
+    }
+    if (venueLogo) {
+      pdf.addImage(venueLogo, imageFormatFromDataUrl(venueLogo), pageWidth - margin - 68, y + 14, 54, 54);
+    }
 
-  const blob = new Blob([pdf], { type: "application/pdf" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `${state.event.id}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    y += 120;
+    pdf.setTextColor("#171717");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("Eventübersicht", margin, y);
+    y += 18;
+
+    const summaryRows = [
+      ["Veranstalter", state.event.organiser],
+      ["Beschreibung", state.event.description || "—"],
+      ["Griff", state.event.gripType],
+      ["Richtung", normalizeForceMode(state.event.forceMode)],
+      ["Wertung", state.event.scoringMode],
+      ["Teilnehmer", String(state.results.length)],
+      ["Bestwert", `${Number(state.results[0]?.value || 0).toFixed(1)} kg`],
+      ["Durchschnitt", `${averageValue().toFixed(1)} kg`],
+    ];
+
+    summaryRows.forEach(([label, value]) => {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text(`${label}:`, margin, y);
+      pdf.setFont("helvetica", "normal");
+      const lines = pdf.splitTextToSize(String(value), 280);
+      pdf.text(lines, margin + 90, y);
+      y += Math.max(18, lines.length * 14);
+    });
+
+    if (qrCodeDataUrl) {
+      pdf.addImage(qrCodeDataUrl, "PNG", pageWidth - margin - 120, 210, 120, 120);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text("Live verfolgen", pageWidth - margin - 120, 344);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.text(pdf.splitTextToSize(getPublicUrl(), 120), pageWidth - margin - 120, 360);
+    }
+
+    if (sponsorBanner) {
+      y += 8;
+      pdf.addImage(sponsorBanner, imageFormatFromDataUrl(sponsorBanner), margin, y, pageWidth - margin * 2, 64);
+      y += 84;
+    } else {
+      y += 26;
+    }
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("Rangliste", margin, y);
+    y += 20;
+
+    const tableTop = y;
+    const columns = [margin, margin + 34, margin + 250, margin + 360, pageWidth - margin];
+    pdf.setDrawColor(221, 216, 207);
+    pdf.line(margin, tableTop, pageWidth - margin, tableTop);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("#", columns[0], tableTop + 14);
+    pdf.text("Name", columns[1], tableTop + 14);
+    pdf.text("Richtung", columns[2], tableTop + 14);
+    pdf.text("Resultat", columns[3], tableTop + 14);
+    y = tableTop + 28;
+
+    state.results.forEach((entry, index) => {
+      if (y > pageHeight - 60) {
+        pdf.addPage();
+        y = margin;
+      }
+      pdf.setDrawColor(221, 216, 207);
+      pdf.line(margin, y + 8, pageWidth - margin, y + 8);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text(String(index + 1), columns[0], y);
+      pdf.text(entry.participantName || entry.name || "—", columns[1], y);
+      pdf.text(formatEntryDirection(entry), columns[2], y);
+      pdf.text(`${Number(entry.value || 0).toFixed(1)} kg`, columns[3], y);
+      y += 24;
+    });
+
+    pdf.save(`${state.event.id}.pdf`);
+  } catch (error) {
+    setError(`PDF konnte nicht erstellt werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
 }
 
 function leaderboardTable(items, limit) {
@@ -977,6 +1044,49 @@ function brandingPreviewImage(url, label) {
     : `${label}<br/>Noch kein Upload`;
 }
 
+function publicBrandingSection() {
+  if (!state.event.headerBanner && !state.event.eventLogo && !state.event.venueLogo && !state.event.sponsorBanner) {
+    return "";
+  }
+
+  return `
+    <div class="card brand-hero">
+      ${state.event.headerBanner ? `<img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" />` : ""}
+      <div class="brand-hero-content">
+        <div class="brand-hero-logos">
+          ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" />` : ""}
+          ${state.event.venueLogo ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" />` : ""}
+        </div>
+        <div class="brand-hero-copy">
+          <div class="eyebrow">DynoForce Event</div>
+          <h1 class="hero-title">${state.event.name}</h1>
+          <p>${state.event.description || `${state.event.challengeType} in ${state.event.location}`}</p>
+        </div>
+      </div>
+      ${state.event.sponsorBanner ? `<img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" />` : ""}
+    </div>
+  `;
+}
+
+async function assetToDataUrl(url) {
+  if (!url) return null;
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function imageFormatFromDataUrl(dataUrl) {
+  if (typeof dataUrl !== "string") return "PNG";
+  if (dataUrl.startsWith("data:image/jpeg") || dataUrl.startsWith("data:image/jpg")) return "JPEG";
+  if (dataUrl.startsWith("data:image/webp")) return "WEBP";
+  return "PNG";
+}
+
 function template(page) {
   const publicUrl = getPublicUrl();
   const displayUrl = getDisplayUrl();
@@ -1097,18 +1207,18 @@ function template(page) {
               </div>
               <div class="grid">
                 <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>Top 10 permanent sichtbar und automatisch aktualisiert.</p></div></div><table>${leaderboardTable(state.results, 10)}</table></div>
-                <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Öffnet die öffentliche Eventseite unter <code>/e/{eventId}</code>.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Zuschauer können die Rangliste live verfolgen, teilen und den PDF-Export öffnen.</p></div></div></div>
+                <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
               </div>
             </div>
           ` : ""}
           ${page === "public" ? `
+            ${publicBrandingSection()}
             <div class="grid two">
               <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.location} · ${formatDate(state.event.date)} · ${state.event.challengeType}</p></div><div class="status-badge">${state.event.status}</div></div></div>
               <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">PDF herunterladen</button></div></div>
             </div>
-            <div class="grid two" style="margin-top:18px;">
+            <div class="grid" style="margin-top:18px;">
               <div class="card"><div class="card-header"><div><h3>Komplette Rangliste</h3><p>Automatische Aktualisierung während des Events.</p></div></div><table>${leaderboardTable(state.results, state.results.length)}</table></div>
-              <div class="grid"><div class="card"><div class="card-header"><div><h3>QR-Code</h3><p>Direktlink für Zuschauer.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Live Rangliste ansehen, Event teilen und Resultate verfolgen.</p></div></div></div></div>
             </div>
           ` : ""}
           ${page === "display" ? `

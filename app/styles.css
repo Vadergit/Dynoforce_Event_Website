@@ -575,7 +575,8 @@ th {
 
 .qr {
   width: 132px;
-  height: 132px;
+  min-width: 132px;
+  aspect-ratio: 1 / 1;
   border-radius: 18px;
   background: #fff;
   border: 1px solid var(--line);
@@ -587,7 +588,59 @@ th {
 .qr img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-hero {
+  overflow: hidden;
+  padding: 0;
+}
+
+.brand-hero-banner,
+.brand-hero-sponsor {
+  width: 100%;
+  display: block;
   object-fit: cover;
+}
+
+.brand-hero-banner {
+  aspect-ratio: 4 / 1;
+}
+
+.brand-hero-content {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 24px;
+  padding: 28px;
+  align-items: center;
+}
+
+.brand-hero-logos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.brand-hero-logos img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 8px;
+}
+
+.brand-hero-copy p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.brand-hero-sponsor {
+  aspect-ratio: 5 / 1;
 }
 
 .display-board td {
@@ -609,7 +662,8 @@ th {
   .grid.live,
   .measure-wrap,
   .field-grid.two,
-  .hero {
+  .hero,
+  .brand-hero-content {
     grid-template-columns: 1fr;
     display: grid;
   }
