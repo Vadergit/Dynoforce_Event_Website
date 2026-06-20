@@ -439,16 +439,23 @@ a {
 }
 
 .force-value {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 10px;
   font-size: 112px;
-  line-height: 0.9;
+  line-height: 1;
   font-weight: 800;
   letter-spacing: -0.08em;
+  white-space: nowrap;
 }
 
 .force-unit {
   font-size: 28px;
   color: var(--muted);
   font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 12px;
+  letter-spacing: 0;
 }
 
 .progress {
