@@ -12,7 +12,6 @@ import {
   collection,
   doc,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -34,8 +33,7 @@ const BLE = {
 const FORCE_DIRECTION_THRESHOLD = 0.5;
 const MODE_LOCK_THRESHOLD = 1.0;
 const PEAK_MINIMUM_THRESHOLD = 2.0;
-const ATTEMPT_START_THRESHOLD = 2.0;
-const ATTEMPT_END_THRESHOLD = 1.0;
+const ATTEMPT_THRESHOLD = 5.0;
 
 const emptyBranding = {
   eventLogo: "",
@@ -60,6 +58,8 @@ const state = {
   peakDirection: "neutral",
   lockedMode: null,
   isInAttempt: false,
+  previousForce: 0,
+  wentBelowThreshold: false,
   elapsedSeconds: 0,
   flashMessage: "",
   flashType: "info",
@@ -191,6 +191,13 @@ function getSelectedForceModeKey() {
   return "both";
 }
 
+function medalForRank(index) {
+  if (index === 0) return "🏆";
+  if (index === 1) return "🥈";
+  if (index === 2) return "🥉";
+  return String(index + 1);
+}
+
 function getFinalAttemptValue(attempts) {
   if (!attempts.length) return 0;
   if (state.event.scoringMode === "Durchschnitt") {
@@ -215,6 +222,8 @@ function resetLiveEntryState() {
   state.forceDirection = "neutral";
   state.lockedMode = null;
   state.isInAttempt = false;
+  state.previousForce = 0;
+  state.wentBelowThreshold = false;
   state.elapsedSeconds = 0;
 }
 
@@ -459,6 +468,7 @@ function onStateCharacteristicChanged(event) {
   const signedForce = -packet.force;
   const absForce = Math.abs(signedForce);
   const direction = directionFromSignedForce(signedForce);
+  const prevForce = state.previousForce;
 
   state.connected = true;
   state.connecting = false;
@@ -474,9 +484,16 @@ function onStateCharacteristicChanged(event) {
   const { participantName } = getParticipantNameParts();
   const canTrackAttempt = Boolean(participantName) && isDirectionAllowed(direction);
 
-  if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && canTrackAttempt) {
+  if (!state.isInAttempt && absForce > ATTEMPT_THRESHOLD && canTrackAttempt) {
     state.isInAttempt = true;
-  } else if (state.isInAttempt && absForce < ATTEMPT_END_THRESHOLD) {
+    state.wentBelowThreshold = false;
+  }
+
+  if (state.isInAttempt && absForce < ATTEMPT_THRESHOLD) {
+    state.wentBelowThreshold = true;
+  }
+
+  if (state.isInAttempt && state.wentBelowThreshold && absForce > prevForce) {
     if (state.peak >= PEAK_MINIMUM_THRESHOLD) {
       state.liveEntry.attempts = [
         ...(state.liveEntry.attempts || []),
@@ -489,8 +506,13 @@ function onStateCharacteristicChanged(event) {
     }
     state.isInAttempt = false;
     state.lockedMode = null;
+    state.wentBelowThreshold = false;
+    state.peak = 0;
+    state.rawPeak = 0;
+    state.peakDirection = "neutral";
     const shouldAutoSave = (state.liveEntry.attempts?.length || 0) >= state.event.attempts;
     if (shouldAutoSave) {
+      state.previousForce = absForce;
       updateLiveMeasurementDom();
       void finalizeParticipantResult(false);
       return;
@@ -505,6 +527,7 @@ function onStateCharacteristicChanged(event) {
   state.elapsedSeconds = Math.floor(packet.tMs / 1000) % 60;
   state.battery = packet.batteryPercent;
   state.signal = packet.charging ? "Stabil · lädt" : "Stabil";
+  state.previousForce = absForce;
   updateLiveMeasurementDom();
 }
 
@@ -624,12 +647,12 @@ function subscribeToEvent(eventId) {
   });
 
   state.unsubscribers.results = onSnapshot(
-    query(collection(db, "results"), where("eventId", "==", eventId), orderBy("value", "desc")),
+    query(collection(db, "results"), where("eventId", "==", eventId)),
     (snapshot) => {
       state.results = snapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
-      }));
+      })).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
       render();
     },
     (error) => {
@@ -849,7 +872,7 @@ function leaderboardTable(items, limit) {
     <tr><th>#</th><th>Name</th><th>Resultat</th></tr>
     ${items.slice(0, limit).map((item, index) => `
       <tr>
-        <td><span class="rank-pill">${index + 1}</span></td>
+        <td><span class="rank-pill">${medalForRank(index)}</span></td>
         <td>${item.participantName || item.name}</td>
         <td>${Number(item.value).toFixed(1)} kg</td>
       </tr>
