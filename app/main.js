@@ -70,7 +70,7 @@ const state = {
   liveEntry: {
     firstName: "",
     lastName: "",
-    attemptNumber: 1,
+    attempts: [],
   },
   dashboardLoaded: false,
   eventLoaded: false,
@@ -170,7 +170,7 @@ function getParticipantNameParts() {
 }
 
 function getLiveAttemptNumber() {
-  return Number(state.liveEntry.attemptNumber) || Number(state.currentAttempt) || 1;
+  return Math.min((state.liveEntry.attempts?.length || 0) + 1, state.event.attempts || 1);
 }
 
 function getMeasuredValue() {
@@ -189,6 +189,123 @@ function getSelectedForceModeKey() {
   if (mode === "Ziehen") return "pull";
   if (mode === "Drücken") return "push";
   return "both";
+}
+
+function getFinalAttemptValue(attempts) {
+  if (!attempts.length) return 0;
+  if (state.event.scoringMode === "Durchschnitt") {
+    return attempts.reduce((sum, attempt) => sum + attempt.value, 0) / attempts.length;
+  }
+  if (state.event.scoringMode === "Letzter Versuch") {
+    return attempts[attempts.length - 1].value;
+  }
+  return Math.max(...attempts.map((attempt) => attempt.value));
+}
+
+function resetLiveEntryState() {
+  state.liveEntry.firstName = "";
+  state.liveEntry.lastName = "";
+  state.liveEntry.attempts = [];
+  state.currentAttempt = 1;
+  state.currentForce = 0;
+  state.signedForce = 0;
+  state.peak = 0;
+  state.rawPeak = 0;
+  state.peakDirection = "neutral";
+  state.forceDirection = "neutral";
+  state.lockedMode = null;
+  state.isInAttempt = false;
+  state.elapsedSeconds = 0;
+}
+
+async function ensureEventWritable() {
+  await setDoc(
+    doc(db, "events", state.event.id),
+    {
+      ownerUid: state.user.uid,
+      updatedAt: serverTimestamp(),
+      participantCount: state.results.length,
+    },
+    { merge: true },
+  );
+}
+
+async function finalizeParticipantResult(forceManualSave = false) {
+  if (!state.user) {
+    setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
+    render();
+    return false;
+  }
+
+  const { firstName, lastName, participantName } = getParticipantNameParts();
+  if (!firstName || !lastName) {
+    setError("Bitte Vorname und Name eingeben.");
+    render();
+    return false;
+  }
+
+  const attempts = [...(state.liveEntry.attempts || [])];
+  if (forceManualSave && state.isInAttempt && state.peak >= PEAK_MINIMUM_THRESHOLD) {
+    attempts.push({
+      value: Number(state.peak.toFixed(1)),
+      direction: state.peakDirection,
+    });
+  }
+
+  if (!attempts.length) {
+    setError("Noch kein gültiger Versuch vorhanden.");
+    render();
+    return false;
+  }
+
+  const directions = attempts.map((attempt) => attempt.direction).filter(Boolean);
+  const finalDirection = directions[directions.length - 1] || state.lockedMode || getSelectedForceModeKey();
+  if (!isDirectionAllowed(finalDirection)) {
+    setError("Die erfassten Versuche passen nicht zur gewählten Richtung.");
+    render();
+    return false;
+  }
+
+  try {
+    await ensureEventWritable();
+
+    const finalValue = Number(getFinalAttemptValue(attempts).toFixed(1));
+    await addDoc(collection(db, "results"), {
+      eventId: state.event.id,
+      ownerUid: state.user.uid,
+      firstName,
+      lastName,
+      participantName,
+      value: finalValue,
+      unit: "kg",
+      forceMode: finalDirection,
+      attemptNumber: attempts.length,
+      attemptsCompleted: attempts.length,
+      attemptsValues: attempts.map((attempt) => Number(attempt.value.toFixed(1))),
+      scoringMode: state.event.scoringMode,
+      createdAt: serverTimestamp(),
+    });
+
+    await setDoc(
+      doc(db, "events", state.event.id),
+      {
+        ownerUid: state.user.uid,
+        participantCount: state.results.length + 1,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    const savedName = participantName;
+    resetLiveEntryState();
+    setFlash(`Resultat gespeichert: ${savedName} · ${finalValue.toFixed(1)} kg`);
+    render();
+    return true;
+  } catch (error) {
+    setError(`Resultat speichern fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+    return false;
+  }
 }
 
 function setFlash(message, type = "info") {
@@ -354,14 +471,30 @@ function onStateCharacteristicChanged(event) {
     state.lockedMode = direction;
   }
 
-  if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && isDirectionAllowed(direction)) {
+  const { participantName } = getParticipantNameParts();
+  const canTrackAttempt = Boolean(participantName) && isDirectionAllowed(direction);
+
+  if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && canTrackAttempt) {
     state.isInAttempt = true;
   } else if (state.isInAttempt && absForce < ATTEMPT_END_THRESHOLD) {
     if (state.peak >= PEAK_MINIMUM_THRESHOLD) {
-      state.currentAttempt = Math.min(state.currentAttempt + 1, state.event.attempts);
+      state.liveEntry.attempts = [
+        ...(state.liveEntry.attempts || []),
+        {
+          value: Number(state.peak.toFixed(1)),
+          direction: state.peakDirection,
+        },
+      ];
+      state.currentAttempt = Math.min((state.liveEntry.attempts?.length || 0) + 1, state.event.attempts);
     }
     state.isInAttempt = false;
     state.lockedMode = null;
+    const shouldAutoSave = (state.liveEntry.attempts?.length || 0) >= state.event.attempts;
+    if (shouldAutoSave) {
+      updateLiveMeasurementDom();
+      void finalizeParticipantResult(false);
+      return;
+    }
   }
 
   if (absForce >= PEAK_MINIMUM_THRESHOLD && isDirectionAllowed(direction) && absForce >= state.peak) {
@@ -622,85 +755,7 @@ async function uploadBrandingFile(fieldName, file) {
 }
 
 async function saveLiveResult() {
-  if (!state.user) {
-    setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
-    render();
-    return;
-  }
-  const { firstName, lastName, participantName } = getParticipantNameParts();
-  const name = participantName || "Gast";
-  const existingAttempts = state.results.filter((entry) => {
-    const entryName = (entry.participantName || entry.name || "").trim().toLowerCase();
-    return entryName === name.trim().toLowerCase();
-  }).length;
-  const attemptNumber = Math.min(existingAttempts + 1, state.event.attempts);
-  const measured = getMeasuredValue();
-  const forceMode = state.peakDirection === "push" ? "push" : state.peakDirection === "pull" ? "pull" : state.lockedMode;
-
-  if (measured <= 0) {
-    setError("Noch kein Messwert vorhanden. Bitte zuerst eine Messung durchführen.");
-    render();
-    return;
-  }
-
-  if (!forceMode || !isDirectionAllowed(forceMode)) {
-    const selectedMode = normalizeForceMode(state.event.forceMode);
-    setError(`Dieser Versuch passt nicht zur gewählten Richtung (${selectedMode}).`);
-    render();
-    return;
-  }
-
-  if (!state.event.id) {
-    setError("Es ist noch kein Event ausgewählt.");
-    render();
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "results"), {
-      eventId: state.event.id,
-      ownerUid: state.user.uid,
-      firstName,
-      lastName,
-      participantName: name,
-      value: measured,
-      unit: "kg",
-      forceMode,
-      attemptNumber,
-      createdAt: serverTimestamp(),
-    });
-
-    let eventUpdateWarning = "";
-    try {
-      await updateDoc(doc(db, "events", state.event.id), {
-        participantCount: state.results.length + 1,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (eventUpdateError) {
-      console.warn("Event update after result save failed:", eventUpdateError);
-      eventUpdateWarning = " Resultat wurde gespeichert, aber die Teilnehmerzahl konnte nicht sofort aktualisiert werden.";
-    }
-
-    state.currentAttempt = Math.min(attemptNumber + 1, state.event.attempts);
-    state.liveEntry.firstName = "";
-    state.liveEntry.lastName = "";
-    state.liveEntry.attemptNumber = 1;
-    state.currentAttempt = 1;
-    state.currentForce = 0;
-    state.signedForce = 0;
-    state.peak = 0;
-    state.rawPeak = 0;
-    state.peakDirection = "neutral";
-    state.forceDirection = "neutral";
-    state.lockedMode = null;
-    state.isInAttempt = false;
-    state.elapsedSeconds = 0;
-    setFlash(`Resultat gespeichert: ${name} · ${measured.toFixed(1)} kg${eventUpdateWarning}`);
-    render();
-  } catch (error) {
-    setError(`Resultat speichern fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
-    render();
-  }
+  await finalizeParticipantResult(true);
 }
 
 async function signInEmail(email, password) {
@@ -820,8 +875,6 @@ function updateLiveMeasurementDom() {
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
   setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
   setText("livePeakDirectionValue", state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—");
-  setText("liveElapsedValue", `00:${String(state.elapsedSeconds).padStart(2, "0")}`);
-  setText("liveScoreValue", String(Math.round(state.peak * 10)));
   setText("liveConnectionValue", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
   setText("liveBatteryValue", state.connected ? `${state.battery}%` : "—");
   setText("liveSignalValue", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
@@ -830,14 +883,10 @@ function updateLiveMeasurementDom() {
   setText("sidebarSignalLabel", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
   setText("sidebarDeviceLabel", state.ble.device?.name || "Kein Gerät");
   setText("topChipLabel", state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden");
-  const currentName = getLiveParticipantDisplayName().trim().toLowerCase();
-  const existingAttempts = currentName
-    ? state.results.filter((entry) => ((entry.participantName || entry.name || "").trim().toLowerCase() === currentName)).length
-    : 0;
-  const nextAttempt = currentName
-    ? Math.min(Math.max(existingAttempts + 1, state.currentAttempt), state.event.attempts)
-    : Math.min(state.currentAttempt, state.event.attempts);
+  const nextAttempt = getLiveAttemptNumber();
   setText("liveAttemptDisplay", `Versuch ${nextAttempt} / ${state.event.attempts}`);
+  setText("liveCapturedAttempts", `${state.liveEntry.attempts.length} / ${state.event.attempts}`);
+  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Startet automatisch bei über 2 kg.");
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -892,28 +941,22 @@ function template(page) {
           ${Object.keys(pageMeta).map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")}
         </nav>
         <div class="panel">
-          <div class="panel-label">Gerätestatus</div>
-          <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</span></div><strong id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong></div>
-          <div class="status-row"><span class="muted">Signal</span><strong id="sidebarSignalLabel">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div>
-          <div class="status-row"><span class="muted">Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "Kein Gerät"}</strong></div>
-          <div class="action-row"><button class="button" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
-        </div>
-        <div class="panel">
-          <div class="panel-label">Organisator</div>
-          <div class="status-row"><span class="muted">Status</span><strong>${state.authLoading ? "Prüfe..." : state.user ? "Angemeldet" : "Nicht angemeldet"}</strong></div>
-          <div class="status-row"><span class="muted">Account</span><strong>${state.user?.email || "—"}</strong></div>
-          ${state.user ? `<div class="action-row"><button class="button" id="logoutButton">Abmelden</button></div>` : ""}
+          <div class="panel-label">Event Status</div>
+          <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div><strong id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong></div>
+          <div class="status-row"><span class="muted">Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
+          <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
+          ${state.user ? `<div class="action-row" style="margin-top:10px;"><button class="button" id="logoutButton">Abmelden</button></div>` : ""}
         </div>
         <div class="sidebar-footer">
-          <strong>Firebase aktiv</strong>
-          Public und Display lesen live aus Firestore. Organizer-Seiten sind an Firebase Auth gekoppelt. Branding-Dateien werden in Firebase Storage abgelegt.
+          <strong>DynoForce Event</strong>
+          Professioneller Live-Betrieb für Wettkampf, Boulderhalle und Eventfläche.
         </div>
       </aside>
       <main class="content">
         <div class="content-inner">
           <div class="topbar">
-            <div><div class="eyebrow">DynoGrip Event System</div><h2>${pageMeta[page][0]}</h2><p>${pageMeta[page][1]}</p></div>
-            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden"}</span></div>
+            <div><div class="eyebrow">DynoForce Event System</div><h2>${pageMeta[page][0]}</h2><p>${pageMeta[page][1]}</p></div>
+            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div>
           </div>
           ${(state.lastError || state.flashMessage) ? `<div class="notice ${state.lastError || state.flashType === "error" ? "error" : ""}">${state.lastError || state.flashMessage}</div>` : ""}
           ${lockedPage ? loginCard() : ""}
@@ -989,14 +1032,15 @@ function template(page) {
               <div class="grid">
                 <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
                 <div class="card">
-                  <div class="card-header"><div><h3>Live-Messung</h3><p>Grosse zentrale Anzeige für aktuelle Kraft, Peak, Zeit und den gespeicherten Wert.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
+                  <div class="card-header"><div><h3>Live-Messung</h3><p>Startet automatisch, sobald die Kraftschwelle von 2 kg überschritten wird.</p></div><span id="liveAttemptDisplay">Versuch ${getLiveAttemptNumber()} / ${state.event.attempts}</span></div>
                   <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${state.currentForce.toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, state.currentForce))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktueller Rekord</span><strong id="liveRecordValue">${Number(record).toFixed(1)}</strong></div><div class="metric-line"><span>Platzierung</span><strong>${placement > 0 ? `#${placement}` : "Neu"}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${state.forceDirection === "pull" ? "Ziehen" : state.forceDirection === "push" ? "Drücken" : "Neutral"}</strong></div><div class="metric-line"><span>Speicherwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
-                  <div class="action-row"><button class="button primary" id="resetPeak" ${!state.connected ? "disabled" : ""}>Peak zurücksetzen</button><button class="button" id="tareButton" ${!state.connected ? "disabled" : ""}>Tare senden</button><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
-                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong id="livePeakDirectionValue">${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Zeit</small><strong id="liveElapsedValue">00:${String(state.elapsedSeconds).padStart(2, "0")}</strong></div><div class="mini-card"><small>Punktzahl</small><strong id="liveScoreValue">${Math.round(state.peak * 10)}</strong></div></div>
+                  <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
+                  <div class="mini-stats"><div class="mini-card"><small>Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Peak Richtung</small><strong id="livePeakDirectionValue">${state.peakDirection === "pull" ? "Ziehen" : state.peakDirection === "push" ? "Drücken" : "—"}</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div></div>
+                  <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Startet automatisch bei über 2 kg."}</p>
                 </div>
                 <div class="grid two">
-                  <div class="card"><div class="card-header"><div><h3>Gerätebereich</h3><p>Web Bluetooth Status, Akku und Signal.</p></div></div><div class="metric-list"><div class="metric-line"><span>Verbindung</span><strong id="liveConnectionValue">${state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong id="liveBatteryValue">${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong id="liveSignalValue">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
-                  <div class="card"><div class="card-header"><div><h3>Teilnehmerbereich</h3><p>Kein Login erforderlich.</p></div></div><div class="field-grid"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Nächster Versuch</span><strong>${getLiveAttemptNumber()} / ${state.event.attempts}</strong></div></div></div>
+                  <div class="card"><div class="card-header"><div><h3>Messgerät</h3><p>Verbindung und Bereitschaft für den nächsten Durchgang.</p></div></div><div class="metric-list"><div class="metric-line"><span>Status</span><strong id="liveConnectionValue">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</strong></div><div class="metric-line"><span>Akkustand</span><strong id="liveBatteryValue">${state.connected ? `${state.battery}%` : "—"}</strong></div><div class="metric-line"><span>Signal</span><strong id="liveSignalValue">${state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal}</strong></div></div></div>
+                  <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Nächster Versuch</span><strong>${getLiveAttemptNumber()} / ${state.event.attempts}</strong></div></div></div>
                 </div>
               </div>
               <div class="grid">
@@ -1100,7 +1144,7 @@ function bindDashboardActions() {
     state.liveEntry = {
       firstName: "",
       lastName: "",
-      attemptNumber: 1,
+      attempts: [],
     };
     await saveEvent();
     syncUrl("setup");
@@ -1171,16 +1215,6 @@ function bindLiveActions() {
     state.liveEntry.lastName = event.target.value;
     updateLiveMeasurementDom();
   });
-  root.querySelector("#tareButton")?.addEventListener("click", () => sendCommand(new Uint8Array([BLE.cmdTare])));
-  root.querySelector("#resetPeak")?.addEventListener("click", () => {
-    state.peak = 0;
-    state.currentForce = 0;
-    state.rawPeak = 0;
-    state.peakDirection = "neutral";
-    state.lockedMode = null;
-    state.isInAttempt = false;
-    sendCommand(new Uint8Array([BLE.cmdResetPeak]));
-  });
   root.querySelector("#saveResult")?.addEventListener("click", saveLiveResult);
   root.querySelector("#closeEvent")?.addEventListener("click", async () => {
     state.event.status = "Abgeschlossen";
@@ -1195,9 +1229,6 @@ function bindPublicActions() {
 
 function render() {
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
-  if (!state.liveEntry.attemptNumber) {
-    state.liveEntry.attemptNumber = state.currentAttempt || 1;
-  }
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
 
