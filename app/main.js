@@ -32,7 +32,7 @@ const BLE = {
 const FORCE_DIRECTION_THRESHOLD = 0.5;
 const MODE_LOCK_THRESHOLD = 1.0;
 const PEAK_MINIMUM_THRESHOLD = 2.0;
-const ATTEMPT_THRESHOLD = 5.0;
+const ATTEMPT_THRESHOLD = 2.0;
 
 const emptyBranding = {
   eventLogo: "",
@@ -877,7 +877,7 @@ function updateLiveMeasurementDom() {
   setText("liveAttemptDisplay", `Versuch ${nextAttempt} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${state.liveEntry.attempts.length} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
-  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird.");
+  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch über 2 kg und zählt beim Rückfall unter 2 kg.");
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -899,7 +899,6 @@ function processAttemptDetectionTick() {
 
   if (!state.isInAttempt && absForce > ATTEMPT_THRESHOLD && canTrackAttempt) {
     state.isInAttempt = true;
-    state.wentBelowThreshold = false;
     if (absForce > state.peak) {
       state.peak = absForce;
       state.peakDirection = direction;
@@ -907,12 +906,8 @@ function processAttemptDetectionTick() {
     updateLiveMeasurementDom();
   }
 
-  if (state.isInAttempt && absForce < ATTEMPT_THRESHOLD) {
-    state.wentBelowThreshold = true;
-  }
-
-  if (state.isInAttempt && state.wentBelowThreshold && absForce > prevForce) {
-    if (state.peak > ATTEMPT_THRESHOLD) {
+  if (state.isInAttempt && absForce <= ATTEMPT_THRESHOLD && prevForce > absForce) {
+    if (state.peak >= PEAK_MINIMUM_THRESHOLD) {
       state.liveEntry.attempts = [
         ...(state.liveEntry.attempts || []),
         {
@@ -925,7 +920,6 @@ function processAttemptDetectionTick() {
 
     state.isInAttempt = false;
     state.lockedMode = null;
-    state.wentBelowThreshold = false;
     state.peak = 0;
     state.rawPeak = 0;
     state.peakDirection = "neutral";
