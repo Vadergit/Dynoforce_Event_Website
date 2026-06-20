@@ -1222,5 +1222,5 @@ await routeAndLoad();
 setInterval(() => {
   if (!state.connected || state.event.status !== "Live") return;
   state.elapsedSeconds = (state.elapsedSeconds + 1) % 60;
-  render();
+  updateLiveMeasurementDom();
 }, 1000);
