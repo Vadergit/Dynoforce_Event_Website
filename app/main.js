@@ -878,15 +878,12 @@ async function downloadPdf() {
   previewWindow.document.close();
 
   try {
-    const [{ default: QRCode }, headerBanner, eventLogo, venueLogo, sponsorBanner] = await withTimeout(Promise.all([
-      import("qrcode"),
-      getPdfAssetData("headerBanner", state.event.headerBanner, state.event.headerBannerPdfData),
-      getPdfAssetData("eventLogo", state.event.eventLogo, state.event.eventLogoPdfData),
-      getPdfAssetData("venueLogo", state.event.venueLogo, state.event.venueLogoPdfData),
-      getPdfAssetData("sponsorBanner", state.event.sponsorBanner, state.event.sponsorBannerPdfData),
-    ]), 8000);
-
+    const { default: QRCode } = await import("qrcode");
     const qrCodeDataUrl = await QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 220 });
+    const headerBanner = state.event.headerBannerPdfData || state.event.headerBanner || "";
+    const eventLogo = state.event.eventLogoPdfData || state.event.eventLogo || "";
+    const venueLogo = state.event.venueLogoPdfData || state.event.venueLogo || "";
+    const sponsorBanner = state.event.sponsorBannerPdfData || state.event.sponsorBanner || "";
     const primary = state.event.primaryColor || "#1f4f46";
     const summaryRows = [
       ["Veranstalter", state.event.organiser || "DynoForce"],
