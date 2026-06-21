@@ -919,6 +919,10 @@ async function downloadPdf() {
           <meta charset="utf-8" />
           <title>${escapeHtml(getEventDisplayName())} PDF</title>
           <style>
+            @page {
+              size: A4;
+              margin: 14mm;
+            }
             :root {
               --primary: ${primary};
               --line: #ddd8cf;
@@ -945,6 +949,8 @@ async function downloadPdf() {
               border-radius: 20px;
               overflow: hidden;
               margin-bottom: 18px;
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
             .hero-banner {
               width: 100%;
@@ -1009,6 +1015,12 @@ async function downloadPdf() {
               gap: 18px;
               align-items: start;
               margin-bottom: 18px;
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+            .card {
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
             .card h2 {
               margin: 0 0 12px;
@@ -1054,6 +1066,13 @@ async function downloadPdf() {
               width: 100%;
               border-collapse: collapse;
             }
+            thead {
+              display: table-header-group;
+            }
+            tbody, tr {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
             th, td {
               text-align: left;
               padding: 9px 6px;
@@ -1082,8 +1101,20 @@ async function downloadPdf() {
             }
             @media print {
               .actions { display: none; }
-              .page { width: auto; min-height: auto; padding: 0; }
+              .page {
+                width: auto;
+                min-height: auto;
+                padding: 0;
+              }
               body { margin: 0; }
+              .top-grid {
+                grid-template-columns: 1fr 72mm;
+                align-items: start;
+              }
+              .qr-card {
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
             }
           </style>
         </head>
