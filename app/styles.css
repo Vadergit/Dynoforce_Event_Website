@@ -371,6 +371,31 @@ a {
   resize: vertical;
 }
 
+.upload-hint {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf9f5;
+}
+
+.upload-hint strong,
+.upload-hint p,
+.upload-hint span {
+  display: block;
+}
+
+.upload-hint p {
+  margin: 6px 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.upload-hint span {
+  font-size: 13px;
+  color: var(--text);
+}
+
 .upload-box,
 .color-box {
   padding: 18px;
@@ -526,6 +551,99 @@ a {
   min-height: 240px;
   display: flex;
   align-items: center;
+}
+
+.branding-live-preview {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.branding-live-hero {
+  border-top: 6px solid var(--primary);
+}
+
+.branding-live-banner {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.branding-live-banner.placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.branding-live-content {
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.branding-live-logos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.branding-live-logo-box {
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #faf9f5;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 8px;
+}
+
+.branding-live-logo-box img,
+.branding-live-sponsor img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.branding-live-copy h3,
+.branding-live-copy p {
+  margin: 0;
+}
+
+.branding-live-copy p {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.branding-live-footer {
+  padding: 0 22px 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.branding-live-sponsor {
+  min-height: 92px;
+  border: 1px dashed #c8c0b4;
+  border-radius: 18px;
+  background: #faf9f5;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--muted);
+  padding: 10px;
+}
+
+.branding-live-meta {
+  display: grid;
+  gap: 12px;
 }
 
 .public-event-item {

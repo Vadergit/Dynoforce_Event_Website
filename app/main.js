@@ -1145,6 +1145,46 @@ function brandingPreviewImage(url, label) {
     : `${label}<br/>Noch kein Upload`;
 }
 
+function brandingInputHint(title, description, recommendation) {
+  return `
+    <div class="upload-hint">
+      <strong>${title}</strong>
+      <p>${description}</p>
+      <span>${recommendation}</span>
+    </div>
+  `;
+}
+
+function brandingLivePreview() {
+  return `
+    <div class="branding-live-preview">
+      <div class="branding-live-hero" style="border-color:${state.event.primaryColor || "#1f4f46"};">
+        ${state.event.headerBanner ? `<img class="branding-live-banner" src="${state.event.headerBanner}" alt="Header Banner Vorschau" />` : `<div class="branding-live-banner placeholder">Header Banner</div>`}
+        <div class="branding-live-content">
+          <div class="branding-live-logos">
+            <div class="branding-live-logo-box">${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Eventlogo Vorschau" />` : `<span>Eventlogo</span>`}</div>
+            <div class="branding-live-logo-box">${state.event.venueLogo ? `<img src="${state.event.venueLogo}" alt="Hallenlogo Vorschau" />` : `<span>Hallenlogo</span>`}</div>
+          </div>
+          <div class="branding-live-copy">
+            <div class="eyebrow">Vorschau öffentliche Eventseite</div>
+            <h3>${getEventDisplayName()}</h3>
+            <p>${getEventSummaryLine() || "Datum · Ort · Challenge"}</p>
+          </div>
+        </div>
+      </div>
+      <div class="branding-live-footer">
+        <div class="branding-live-sponsor">
+          ${state.event.sponsorBanner ? `<img src="${state.event.sponsorBanner}" alt="Sponsor Banner Vorschau" />` : `<span>Sponsor Banner erscheint hier</span>`}
+        </div>
+        <div class="branding-live-meta">
+          <div class="metric-line"><span>Primärfarbe</span><strong>${state.event.primaryColor || "#1f4f46"}</strong></div>
+          <div class="metric-line"><span>Wirkung</span><strong>Klar und professionell</strong></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function publicBrandingSection() {
   return `
     <div class="card brand-hero">
@@ -1235,7 +1275,7 @@ function template(page) {
               ? `<div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div>`
               : `<button class="button" id="openLoginModal">Anmelden</button>`}
           </div>
-          ${(state.lastError || state.flashMessage) ? `<div class="notice ${state.lastError || state.flashType === "error" ? "error" : ""}">${state.lastError || state.flashMessage}</div>` : ""}
+          ${state.lastError ? `<div class="notice error">${state.lastError}</div>` : ""}
           ${page === "dashboard" && !state.user ? `
             ${publicHomeCard()}
             <div style="margin-top:18px;">
@@ -1285,14 +1325,15 @@ function template(page) {
           ${!lockedPage && page === "branding" ? `
             <div class="grid two">
               <div class="card">
-                <div class="card-header"><div><h3>Branding</h3><p>Uploads landen direkt in Firebase Storage.</p></div></div>
+                <div class="card-header"><div><h3>Branding</h3><p>Logos und Banner werden direkt eingesetzt und rechts sofort in der Vorschau dargestellt.</p></div></div>
                 <div class="field-grid">
-                  <div class="field"><label>Eventlogo</label><input type="file" id="eventLogoInput" accept="image/*" /></div>
-                  <div class="field"><label>Hallenlogo</label><input type="file" id="venueLogoInput" accept="image/*" /></div>
-                  <div class="field"><label>Header Banner</label><input type="file" id="headerBannerInput" accept="image/*" /></div>
-                  <div class="field"><label>Sponsor Banner</label><input type="file" id="sponsorBannerInput" accept="image/*" /></div>
+                  <div class="field"><label>Eventlogo</label><input type="file" id="eventLogoInput" accept="image/*" />${brandingInputHint("Einsatz", "Wird im Kopfbereich und im PDF als zentrales Eventlogo gezeigt.", "Empfohlen: PNG oder SVG mit transparentem Hintergrund, quadratisch, mindestens 800 × 800 px.")}</div>
+                  <div class="field"><label>Hallenlogo</label><input type="file" id="venueLogoInput" accept="image/*" />${brandingInputHint("Einsatz", "Zeigt die Boulderhalle oder den Veranstaltungsort direkt neben dem Eventlogo.", "Empfohlen: PNG oder SVG mit transparentem Hintergrund, gerne horizontal, mindestens 1000 px Breite.")}</div>
+                  <div class="field"><label>Header Banner</label><input type="file" id="headerBannerInput" accept="image/*" />${brandingInputHint("Einsatz", "Grosses Titelbild für öffentliche Eventseite und PDF.", "Empfohlen: JPG oder PNG im Querformat, ideal 2400 × 900 px oder breiter.")}</div>
+                  <div class="field"><label>Sponsor Banner</label><input type="file" id="sponsorBannerInput" accept="image/*" />${brandingInputHint("Einsatz", "Wird unterhalb des Hauptbereichs für Sponsoren oder Partner eingeblendet.", "Empfohlen: JPG oder PNG im Querformat, ideal 2400 × 500 px.")}</div>
                   <div class="color-box">
                     <div class="panel-label">Primärfarbe</div>
+                    <p class="muted" style="margin:10px 0 14px;">Die Primärfarbe steuert Akzente, Buttons und Hervorhebungen in der Eventdarstellung.</p>
                     <div class="swatches">
                       ${["#1f4f46", "#345d7e", "#8c5a21", "#4f4f4f"].map((color) => `<button class="swatch" data-color="${color}" style="background:${color}"></button>`).join("")}
                     </div>
@@ -1300,8 +1341,9 @@ function template(page) {
                 </div>
               </div>
               <div class="card">
-                <div class="card-header"><div><h3>Branding Vorschau</h3><p>${state.uploading ? `Upload läuft: ${state.uploading}` : "Minimalistisch, professionell, viel Weissraum."}</p></div></div>
-                <div class="grid">
+                <div class="card-header"><div><h3>Live Vorschau</h3><p>${state.uploading ? `Upload läuft: ${state.uploading}` : "So wirkt das Branding später auf Eventseite und PDF."}</p></div></div>
+                ${brandingLivePreview()}
+                <div class="grid" style="margin-top:18px;">
                   <div class="brand-preview">${brandingPreviewImage(state.event.eventLogo, "Event Logo")}</div>
                   <div class="brand-preview">${brandingPreviewImage(state.event.venueLogo, "Venue Logo")}</div>
                   <div class="brand-preview">${brandingPreviewImage(state.event.headerBanner, "Header Banner")}</div>
