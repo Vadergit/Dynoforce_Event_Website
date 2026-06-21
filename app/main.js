@@ -76,6 +76,7 @@ const state = {
   publicEventsLoaded: false,
   eventLoaded: false,
   currentPage: "dashboard",
+  escapeListenerBound: false,
   unsubscribers: {
     auth: null,
     dashboard: null,
@@ -1073,20 +1074,24 @@ function processAttemptDetectionTick() {
 
 function loginCard() {
   return `
-    <div class="card" style="max-width:420px;margin:60px auto;">
-      <div class="card-header">
-        <div>
-          <h3>Organisator Login</h3>
-          <p>Mit bestehendem DynoForce Firebase-Account anmelden.</p>
+    <div class="login-modal-backdrop" id="loginModalBackdrop">
+      <div class="login-modal">
+        <div class="card-header">
+          <div>
+            <div class="eyebrow">Organisator Login</div>
+            <h3>Anmelden</h3>
+            <p>Mit bestehendem DynoForce Account anmelden und alle Funktionen freischalten.</p>
+          </div>
+          <button class="icon-button" id="closeLoginModal" aria-label="Login schliessen">×</button>
         </div>
-      </div>
-      <div class="field-grid">
-        <div class="field"><label>E-Mail</label><input id="loginEmail" type="email" placeholder="name@domain.ch" /></div>
-        <div class="field"><label>Passwort</label><input id="loginPassword" type="password" placeholder="Passwort" /></div>
-      </div>
-      <div class="action-row">
-        <button class="button primary" id="loginButton">Anmelden</button>
-        <button class="button" id="googleLoginButton">Google</button>
+        <div class="field-grid">
+          <div class="field"><label>E-Mail</label><input id="loginEmail" type="email" placeholder="name@domain.ch" /></div>
+          <div class="field"><label>Passwort</label><input id="loginPassword" type="password" placeholder="Passwort" /></div>
+        </div>
+        <div class="action-row">
+          <button class="button primary" id="loginButton">Mit E-Mail anmelden</button>
+          <button class="button" id="googleLoginButton">Mit Google anmelden</button>
+        </div>
       </div>
     </div>
   `;
@@ -1097,13 +1102,10 @@ function publicHomeCard() {
     <div class="card public-home-card">
       <div class="card-header">
         <div>
-          <div class="eyebrow">Organisator Login</div>
-          <h3>Event verwalten</h3>
-          <p>Nach dem Login werden Event Setup, Branding, Live-Messung, öffentliche Eventseite, Display-Modus und die DynoGrip Verbindung freigeschaltet.</p>
+          <div class="eyebrow">DynoForce Event</div>
+          <h3>Aktuelle Events live verfolgen</h3>
+          <p>Hier sehen Besucher laufende Veranstaltungen, Ranglisten und die öffentliche Eventseite. Die Verwaltungsfunktionen bleiben bewusst nur für Organisatoren sichtbar.</p>
         </div>
-      </div>
-      <div class="action-row">
-        <button class="button primary" id="publicLoginButton">Anmelden</button>
       </div>
     </div>
   `;
@@ -1219,16 +1221,7 @@ function template(page) {
             <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
             <div class="action-row" style="margin-top:10px;"><button class="button" id="logoutButton">Abmelden</button></div>
           </div>
-        ` : `
-          <div class="panel">
-            <div class="panel-label">Für Organisatoren</div>
-            <div class="metric-list">
-              <div class="metric-line"><span>Event Setup</span><strong>nach Login</strong></div>
-              <div class="metric-line"><span>Branding</span><strong>nach Login</strong></div>
-              <div class="metric-line"><span>Live Messung</span><strong>nach Login</strong></div>
-            </div>
-          </div>
-        `}
+        ` : ""}
         <div class="sidebar-footer">
           <strong>DynoForce Event</strong>
           Professioneller Live-Betrieb für Wettkampf, Boulderhalle und Eventfläche.
@@ -1238,17 +1231,17 @@ function template(page) {
         <div class="content-inner">
           <div class="topbar">
             <div><div class="eyebrow">DynoForce Event System</div><h2>${page === "dashboard" ? dashboardTitle : pageMeta[page][0]}</h2><p>${page === "dashboard" ? dashboardText : pageMeta[page][1]}</p></div>
-            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.user ? (state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden") : "Öffentlicher Modus"}</span></div>
+            ${state.user
+              ? `<div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div>`
+              : `<button class="button" id="openLoginModal">Anmelden</button>`}
           </div>
           ${(state.lastError || state.flashMessage) ? `<div class="notice ${state.lastError || state.flashType === "error" ? "error" : ""}">${state.lastError || state.flashMessage}</div>` : ""}
           ${page === "dashboard" && !state.user ? `
-            <div class="grid two">
-              ${publicHomeCard()}
-              ${loginCard()}
-            </div>
+            ${publicHomeCard()}
             <div style="margin-top:18px;">
               ${publicEventsSection()}
             </div>
+            ${loginCard()}
           ` : ""}
           ${!lockedPage && state.user && page === "dashboard" ? `
             <div class="grid two">
@@ -1402,8 +1395,41 @@ function bindGeneralUi() {
     }
   });
 
-  root.querySelector("#publicLoginButton")?.addEventListener("click", async () => {
-    root.querySelector("#loginEmail")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const openLoginModal = () => {
+    root.querySelector("#loginModalBackdrop")?.classList.add("open");
+    window.setTimeout(() => {
+      root.querySelector("#loginEmail")?.focus();
+    }, 20);
+  };
+
+  const closeLoginModal = () => {
+    root.querySelector("#loginModalBackdrop")?.classList.remove("open");
+  };
+
+  root.querySelector("#openLoginModal")?.addEventListener("click", openLoginModal);
+  root.querySelector("#closeLoginModal")?.addEventListener("click", closeLoginModal);
+  root.querySelector("#loginModalBackdrop")?.addEventListener("click", (event) => {
+    if (event.target.id === "loginModalBackdrop") closeLoginModal();
+  });
+
+  if (!state.escapeListenerBound) {
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        root.querySelector("#loginModalBackdrop")?.classList.remove("open");
+      }
+    });
+    state.escapeListenerBound = true;
+  }
+
+  if (state.user) {
+    closeLoginModal();
+  }
+
+  root.querySelector("#loginPassword")?.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      root.querySelector("#loginButton")?.click();
+    }
   });
 }
 

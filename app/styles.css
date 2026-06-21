@@ -219,6 +219,17 @@ a {
   align-items: center;
 }
 
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+}
+
 .notice {
   margin-bottom: 18px;
   padding: 14px 16px;
@@ -512,11 +523,37 @@ a {
 }
 
 .public-home-card {
-  min-height: 100%;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
 }
 
 .public-event-item {
   align-items: center;
+}
+
+.login-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 23, 23, 0.28);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 40;
+}
+
+.login-modal-backdrop.open {
+  display: flex;
+}
+
+.login-modal {
+  width: min(460px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(23, 23, 23, 0.16);
+  padding: 24px;
 }
 
 .event-item h4,
