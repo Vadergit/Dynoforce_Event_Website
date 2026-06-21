@@ -856,67 +856,42 @@ async function signInGoogle() {
   }
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function downloadPdf() {
   const previewWindow = window.open("", "_blank");
 
-  if (previewWindow) {
-    previewWindow.document.write("<!doctype html><title>PDF wird erstellt</title><body style=\"font-family:Arial,sans-serif;padding:24px;color:#171717;\">PDF wird erstellt...</body>");
-    previewWindow.document.close();
+  if (!previewWindow) {
+    setError("Die PDF-Ansicht konnte nicht geöffnet werden. Bitte Popups für diese Seite erlauben.");
+    render();
+    return;
   }
 
+  previewWindow.document.write("<!doctype html><title>PDF wird erstellt</title><body style=\"font-family:Arial,sans-serif;padding:24px;color:#171717;\">PDF wird erstellt...</body>");
+  previewWindow.document.close();
+
   try {
-    const [{ jsPDF }, { default: QRCode }] = await Promise.all([
-      import("jspdf"),
+    const [{ default: QRCode }, headerBanner, eventLogo, venueLogo, sponsorBanner] = await withTimeout(Promise.all([
       import("qrcode"),
-    ]);
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 40;
-    let y = margin;
-    const primary = state.event.primaryColor || "#1f4f46";
-    const [headerBanner, eventLogo, venueLogo, sponsorBanner, qrCodeDataUrl] = await withTimeout(Promise.all([
       getPdfAssetData("headerBanner", state.event.headerBanner, state.event.headerBannerPdfData),
       getPdfAssetData("eventLogo", state.event.eventLogo, state.event.eventLogoPdfData),
       getPdfAssetData("venueLogo", state.event.venueLogo, state.event.venueLogoPdfData),
       getPdfAssetData("sponsorBanner", state.event.sponsorBanner, state.event.sponsorBannerPdfData),
-      QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 180 }),
     ]), 8000);
 
-    if (headerBanner) {
-      pdf.addImage(headerBanner, imageFormatFromDataUrl(headerBanner), margin, y, pageWidth - margin * 2, 120);
-      y += 140;
-    }
-
-    pdf.setFillColor(primary);
-    pdf.roundedRect(margin, y, pageWidth - margin * 2, 92, 18, 18, "F");
-    pdf.setTextColor("#ffffff");
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(28);
-    pdf.text(getEventDisplayName(), margin + 24, y + 34);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(12);
-    pdf.text(getEventSummaryLine() || "DynoForce Event", margin + 24, y + 58);
-    pdf.text(state.event.organiser ? `Veranstalter: ${state.event.organiser}` : "Powered by DynoForce", margin + 24, y + 76);
-
-    if (eventLogo) {
-      pdf.addImage(eventLogo, imageFormatFromDataUrl(eventLogo), pageWidth - margin - 132, y + 14, 54, 54);
-    }
-    if (venueLogo) {
-      pdf.addImage(venueLogo, imageFormatFromDataUrl(venueLogo), pageWidth - margin - 68, y + 14, 54, 54);
-    }
-
-    y += 120;
-    pdf.setTextColor("#171717");
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(15);
-    pdf.text("Eventübersicht", margin, y);
-    y += 18;
-
+    const qrCodeDataUrl = await QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 220 });
+    const primary = state.event.primaryColor || "#1f4f46";
     const summaryRows = [
-      ["Veranstalter", state.event.organiser],
+      ["Veranstalter", state.event.organiser || "DynoForce"],
       ["Beschreibung", state.event.description || "Professionelles Event mit Live-Rangliste und DynoForce Messung."],
-      ["Griff", state.event.gripType],
+      ["Griff", state.event.gripType || "Freie Challenge"],
       ["Richtung", normalizeForceMode(state.event.forceMode)],
       ["Wertung", state.event.scoringMode],
       ["Teilnehmer", String(state.results.length)],
@@ -924,83 +899,264 @@ async function downloadPdf() {
       ["Durchschnitt", `${averageValue().toFixed(1)} kg`],
     ];
 
-    summaryRows.forEach(([label, value]) => {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.text(`${label}:`, margin, y);
-      pdf.setFont("helvetica", "normal");
-      const lines = pdf.splitTextToSize(String(value), 280);
-      pdf.text(lines, margin + 90, y);
-      y += Math.max(18, lines.length * 14);
-    });
+    const rowsMarkup = state.results.map((entry, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${escapeHtml(entry.participantName || entry.name || "—")}</td>
+        <td>${escapeHtml(formatEntryDirection(entry))}</td>
+        <td>${Number(entry.value || 0).toFixed(1)} kg</td>
+      </tr>
+    `).join("");
 
-    if (qrCodeDataUrl) {
-      pdf.addImage(qrCodeDataUrl, "PNG", pageWidth - margin - 120, 210, 120, 120);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.text("Live verfolgen", pageWidth - margin - 120, 344);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.text("event.dynoforce.ch", pageWidth - margin - 120, 360);
-      pdf.text("QR-Code mit Smartphone scannen", pageWidth - margin - 120, 374);
-    }
+    const summaryMarkup = summaryRows.map(([label, value]) => `
+      <div class="summary-row">
+        <div class="summary-label">${escapeHtml(label)}</div>
+        <div class="summary-value">${escapeHtml(value)}</div>
+      </div>
+    `).join("");
 
-    if (sponsorBanner) {
-      y += 8;
-      pdf.addImage(sponsorBanner, imageFormatFromDataUrl(sponsorBanner), margin, y, pageWidth - margin * 2, 64);
-      y += 84;
-    } else {
-      y += 26;
-    }
+    const html = `
+      <!doctype html>
+      <html lang="de">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(getEventDisplayName())} PDF</title>
+          <style>
+            :root {
+              --primary: ${primary};
+              --line: #ddd8cf;
+              --muted: #666055;
+              --surface-muted: #f5f3ed;
+              --text: #171717;
+            }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              font-family: Arial, sans-serif;
+              color: var(--text);
+              background: #ffffff;
+            }
+            .page {
+              width: 210mm;
+              min-height: 297mm;
+              margin: 0 auto;
+              padding: 16mm;
+              background: #ffffff;
+            }
+            .hero {
+              border: 1px solid var(--line);
+              border-radius: 20px;
+              overflow: hidden;
+              margin-bottom: 18px;
+            }
+            .hero-banner {
+              width: 100%;
+              height: 56mm;
+              object-fit: cover;
+              display: block;
+              background: var(--surface-muted);
+            }
+            .hero-content {
+              padding: 14px 16px 16px;
+              display: grid;
+              gap: 12px;
+            }
+            .logo-row {
+              display: flex;
+              gap: 12px;
+              align-items: center;
+            }
+            .logo-box {
+              width: 22mm;
+              height: 22mm;
+              border: 1px solid var(--line);
+              border-radius: 10px;
+              background: #fff;
+              display: grid;
+              place-items: center;
+              overflow: hidden;
+            }
+            .logo-box img {
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
+            }
+            .hero-copy small {
+              display: block;
+              color: var(--muted);
+              text-transform: uppercase;
+              letter-spacing: 0.12em;
+              font-size: 10px;
+              margin-bottom: 6px;
+            }
+            .hero-copy h1 {
+              margin: 0;
+              font-size: 28px;
+            }
+            .hero-copy p {
+              margin: 8px 0 0;
+              color: var(--muted);
+              line-height: 1.4;
+            }
+            .sponsor-banner {
+              width: 100%;
+              max-height: 28mm;
+              object-fit: cover;
+              display: block;
+              margin-top: 10px;
+              border-radius: 12px;
+            }
+            .top-grid {
+              display: grid;
+              grid-template-columns: 1.2fr 0.8fr;
+              gap: 18px;
+              align-items: start;
+              margin-bottom: 18px;
+            }
+            .card h2 {
+              margin: 0 0 12px;
+              font-size: 20px;
+            }
+            .summary-row {
+              display: grid;
+              grid-template-columns: 110px 1fr;
+              gap: 12px;
+              padding: 7px 0;
+              border-bottom: 1px solid var(--line);
+            }
+            .summary-row:last-child {
+              border-bottom: 0;
+            }
+            .summary-label {
+              font-weight: 700;
+            }
+            .summary-value {
+              line-height: 1.4;
+            }
+            .qr-card {
+              border: 1px solid var(--line);
+              border-radius: 18px;
+              padding: 16px;
+            }
+            .qr-card img {
+              width: 44mm;
+              height: 44mm;
+              display: block;
+              margin-bottom: 12px;
+            }
+            .qr-card strong {
+              display: block;
+              margin-bottom: 6px;
+            }
+            .qr-card p {
+              margin: 0;
+              color: var(--muted);
+              line-height: 1.4;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th, td {
+              text-align: left;
+              padding: 9px 6px;
+              border-bottom: 1px solid var(--line);
+            }
+            th {
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              color: var(--muted);
+            }
+            .actions {
+              margin-top: 16px;
+              display: flex;
+              justify-content: flex-end;
+              gap: 10px;
+            }
+            .print-button {
+              border: 0;
+              border-radius: 999px;
+              background: var(--primary);
+              color: #fff;
+              padding: 10px 16px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+            @media print {
+              .actions { display: none; }
+              .page { width: auto; min-height: auto; padding: 0; }
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="hero">
+              ${headerBanner ? `<img class="hero-banner" src="${headerBanner}" alt="Header Banner" />` : ""}
+              <div class="hero-content">
+                <div class="logo-row">
+                  ${eventLogo ? `<div class="logo-box"><img src="${eventLogo}" alt="Eventlogo" /></div>` : ""}
+                  ${venueLogo ? `<div class="logo-box"><img src="${venueLogo}" alt="Hallenlogo" /></div>` : ""}
+                </div>
+                <div class="hero-copy">
+                  <small>DynoForce Event</small>
+                  <h1>${escapeHtml(getEventDisplayName())}</h1>
+                  <p>${escapeHtml(getEventSummaryLine() || "Live Event")}</p>
+                  <p>${escapeHtml(state.event.description || `${state.event.organiser || "Veranstalter"} präsentiert dieses Event.`)}</p>
+                </div>
+                ${sponsorBanner ? `<img class="sponsor-banner" src="${sponsorBanner}" alt="Sponsor Banner" />` : ""}
+              </div>
+            </div>
 
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(15);
-    pdf.text("Rangliste", margin, y);
-    y += 20;
+            <div class="top-grid">
+              <div class="card">
+                <h2>Eventübersicht</h2>
+                ${summaryMarkup}
+              </div>
+              <div class="qr-card">
+                <img src="${qrCodeDataUrl}" alt="QR-Code" />
+                <strong>Live verfolgen</strong>
+                <p>${escapeHtml(getPublicUrl())}</p>
+                <p>QR-Code mit Smartphone scannen</p>
+              </div>
+            </div>
 
-    const tableTop = y;
-    const columns = [margin, margin + 34, margin + 250, margin + 360, pageWidth - margin];
-    pdf.setDrawColor(221, 216, 207);
-    pdf.line(margin, tableTop, pageWidth - margin, tableTop);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.text("#", columns[0], tableTop + 14);
-    pdf.text("Name", columns[1], tableTop + 14);
-    pdf.text("Richtung", columns[2], tableTop + 14);
-    pdf.text("Resultat", columns[3], tableTop + 14);
-    y = tableTop + 28;
+            <div class="card">
+              <h2>Rangliste</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Richtung</th>
+                    <th>Resultat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsMarkup || `<tr><td colspan="4">Noch keine Resultate vorhanden.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
 
-    state.results.forEach((entry, index) => {
-      if (y > pageHeight - 60) {
-        pdf.addPage();
-        y = margin;
-      }
-      pdf.setDrawColor(221, 216, 207);
-      pdf.line(margin, y + 8, pageWidth - margin, y + 8);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      pdf.text(String(index + 1), columns[0], y);
-      pdf.text(entry.participantName || entry.name || "—", columns[1], y);
-      pdf.text(formatEntryDirection(entry), columns[2], y);
-      pdf.text(`${Number(entry.value || 0).toFixed(1)} kg`, columns[3], y);
-      y += 24;
-    });
+            <div class="actions">
+              <button class="print-button" onclick="window.print()">Als PDF sichern</button>
+            </div>
+          </div>
+          <script>
+            window.setTimeout(() => {
+              try { window.print(); } catch (error) {}
+            }, 300);
+          </script>
+        </body>
+      </html>
+    `;
 
-    const blob = pdf.output("blob");
-    const blobUrl = URL.createObjectURL(blob);
-
-    if (previewWindow) {
-      previewWindow.location.href = blobUrl;
-    } else {
-      const downloadLink = document.createElement("a");
-      downloadLink.href = blobUrl;
-      downloadLink.download = `${state.event.id}.pdf`;
-      downloadLink.click();
-    }
-
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    previewWindow.document.open();
+    previewWindow.document.write(html);
+    previewWindow.document.close();
   } catch (error) {
-    if (previewWindow && !previewWindow.closed) {
+    if (!previewWindow.closed) {
       previewWindow.close();
     }
     setError(`PDF konnte nicht erstellt werden: ${error instanceof Error ? error.message : String(error)}`);
