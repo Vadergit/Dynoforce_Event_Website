@@ -73,11 +73,13 @@ const state = {
     attempts: [],
   },
   dashboardLoaded: false,
+  publicEventsLoaded: false,
   eventLoaded: false,
   currentPage: "dashboard",
   unsubscribers: {
     auth: null,
     dashboard: null,
+    publicEvents: null,
     event: null,
     results: null,
   },
@@ -108,6 +110,7 @@ const state = {
     ...emptyBranding,
   },
   events: [],
+  publicEvents: [],
   results: [],
 };
 
@@ -133,6 +136,10 @@ function formatDate(dateString) {
   if (!dateString) return "—";
   const [year, month, day] = dateString.split("-");
   return `${day}.${month}.${year}`;
+}
+
+function formatLongDate(dateString) {
+  return formatDate(dateString);
 }
 
 function averageValue() {
@@ -217,6 +224,14 @@ function getEventSummaryLine() {
   return [formatDate(state.event.date), state.event.location, state.event.challengeType]
     .filter(Boolean)
     .join(" · ");
+}
+
+function getDashboardMeta() {
+  if (state.user) return pageMeta.dashboard;
+  return [
+    "DynoForce Event",
+    "Aktuelle Events entdecken und als Organisator nach dem Login eigene Veranstaltungen verwalten.",
+  ];
 }
 
 function formatEntryDirection(entry) {
@@ -689,6 +704,34 @@ function subscribeToDashboard() {
   );
 }
 
+function subscribeToPublicEvents() {
+  safeUnsub("publicEvents");
+  state.publicEventsLoaded = false;
+  state.unsubscribers.publicEvents = onSnapshot(
+    query(collection(db, "events"), where("status", "==", "Live")),
+    (snapshot) => {
+      state.publicEvents = snapshot.docs.map((eventDoc) => {
+        const data = eventDoc.data();
+        return {
+          id: eventDoc.id,
+          name: data.name || "Event",
+          date: formatLongDate(data.date),
+          sortDate: data.date || "",
+          location: data.location || "",
+          challengeType: data.challengeType || "Challenge",
+        };
+      }).sort((a, b) => String(b.sortDate).localeCompare(String(a.sortDate)));
+      state.publicEventsLoaded = true;
+      render();
+    },
+    (error) => {
+      setError(`Live Events konnten nicht geladen werden: ${error.message}`);
+      state.publicEventsLoaded = true;
+      render();
+    },
+  );
+}
+
 async function saveEvent(overrides = {}) {
   if (!state.user) {
     setError("Bitte zuerst als Organisator anmelden.");
@@ -1049,6 +1092,51 @@ function loginCard() {
   `;
 }
 
+function publicHomeCard() {
+  return `
+    <div class="card public-home-card">
+      <div class="card-header">
+        <div>
+          <div class="eyebrow">Organisator Login</div>
+          <h3>Event verwalten</h3>
+          <p>Nach dem Login werden Event Setup, Branding, Live-Messung, öffentliche Eventseite, Display-Modus und die DynoGrip Verbindung freigeschaltet.</p>
+        </div>
+      </div>
+      <div class="action-row">
+        <button class="button primary" id="publicLoginButton">Anmelden</button>
+      </div>
+    </div>
+  `;
+}
+
+function publicEventsSection() {
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="eyebrow">Live Events</div>
+          <h3>Aktuelle Veranstaltungen</h3>
+          <p>${state.publicEventsLoaded ? "Alle aktuell laufenden Events auf einen Blick." : "Lade laufende Events..."}</p>
+        </div>
+      </div>
+      <div class="event-list">
+        ${state.publicEvents.map((event) => `
+          <div class="event-item public-event-item">
+            <div>
+              <h4>${event.name}</h4>
+              <p>${event.date} · ${event.location || "Ort offen"} · ${event.challengeType}</p>
+            </div>
+            <div class="action-row" style="margin-top:0;">
+              <a class="button" href="${APP_BASE}/#/e/${event.id}">Eventseite öffnen</a>
+              <a class="button" href="${APP_BASE}/#/display/${event.id}">Display</a>
+            </div>
+          </div>
+        `).join("") || `<div class="event-item"><div><h4>Zurzeit keine Live Events</h4><p>Sobald ein Event läuft, erscheint es hier automatisch.</p></div></div>`}
+      </div>
+    </div>
+  `;
+}
+
 function brandingPreviewImage(url, label) {
   return url
     ? `<img src="${url}" alt="${label}" style="max-width:100%;border-radius:12px;border:1px solid var(--line);" />`
@@ -1108,6 +1196,10 @@ function template(page) {
   const average = averageValue();
   const last = state.results[state.results.length - 1];
   const lockedPage = !state.user && ["dashboard", "setup", "branding", "live"].includes(page);
+  const navItems = state.user
+    ? Object.keys(pageMeta).map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")
+    : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button>`;
+  const [dashboardTitle, dashboardText] = getDashboardMeta();
 
   return `
     <div class="app-shell">
@@ -1117,15 +1209,26 @@ function template(page) {
           <div><h1>DynoForce Event</h1><p>Powered by DynoForce</p></div>
         </div>
         <nav class="nav">
-          ${Object.keys(pageMeta).map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")}
+          ${navItems}
         </nav>
-        <div class="panel">
-          <div class="panel-label">Event Status</div>
-          <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div><strong id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong></div>
-          <div class="status-row"><span class="muted">Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
-          <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
-          ${state.user ? `<div class="action-row" style="margin-top:10px;"><button class="button" id="logoutButton">Abmelden</button></div>` : ""}
-        </div>
+        ${state.user ? `
+          <div class="panel">
+            <div class="panel-label">Event Status</div>
+            <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div><strong id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong></div>
+            <div class="status-row"><span class="muted">Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
+            <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
+            <div class="action-row" style="margin-top:10px;"><button class="button" id="logoutButton">Abmelden</button></div>
+          </div>
+        ` : `
+          <div class="panel">
+            <div class="panel-label">Für Organisatoren</div>
+            <div class="metric-list">
+              <div class="metric-line"><span>Event Setup</span><strong>nach Login</strong></div>
+              <div class="metric-line"><span>Branding</span><strong>nach Login</strong></div>
+              <div class="metric-line"><span>Live Messung</span><strong>nach Login</strong></div>
+            </div>
+          </div>
+        `}
         <div class="sidebar-footer">
           <strong>DynoForce Event</strong>
           Professioneller Live-Betrieb für Wettkampf, Boulderhalle und Eventfläche.
@@ -1134,12 +1237,20 @@ function template(page) {
       <main class="content">
         <div class="content-inner">
           <div class="topbar">
-            <div><div class="eyebrow">DynoForce Event System</div><h2>${pageMeta[page][0]}</h2><p>${pageMeta[page][1]}</p></div>
-            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div>
+            <div><div class="eyebrow">DynoForce Event System</div><h2>${page === "dashboard" ? dashboardTitle : pageMeta[page][0]}</h2><p>${page === "dashboard" ? dashboardText : pageMeta[page][1]}</p></div>
+            <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.user ? (state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden") : "Öffentlicher Modus"}</span></div>
           </div>
           ${(state.lastError || state.flashMessage) ? `<div class="notice ${state.lastError || state.flashType === "error" ? "error" : ""}">${state.lastError || state.flashMessage}</div>` : ""}
-          ${lockedPage ? loginCard() : ""}
-          ${!lockedPage && page === "dashboard" ? `
+          ${page === "dashboard" && !state.user ? `
+            <div class="grid two">
+              ${publicHomeCard()}
+              ${loginCard()}
+            </div>
+            <div style="margin-top:18px;">
+              ${publicEventsSection()}
+            </div>
+          ` : ""}
+          ${!lockedPage && state.user && page === "dashboard" ? `
             <div class="grid two">
               <div class="card">
                 <div class="card-header"><div><h3>Meine Events</h3><p>${state.dashboardLoaded ? "Übersicht aller eigenen Veranstaltungen mit Status und Teilnehmerzahl." : "Lade Events aus Firestore..."}</p></div><button class="button primary" id="createEvent">Neues Event</button></div>
@@ -1290,6 +1401,10 @@ function bindGeneralUi() {
       render();
     }
   });
+
+  root.querySelector("#publicLoginButton")?.addEventListener("click", async () => {
+    root.querySelector("#loginEmail")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
 }
 
 function bindDashboardActions() {
@@ -1408,13 +1523,11 @@ function render() {
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
 
-  if (state.user || ["public", "display"].includes(state.currentPage)) {
-    if (state.currentPage === "dashboard") bindDashboardActions();
-    if (state.currentPage === "setup") bindSetupActions();
-    if (state.currentPage === "branding") bindBrandingActions();
-    if (state.currentPage === "live") bindLiveActions();
-    if (state.currentPage === "public") bindPublicActions();
-  }
+  if (state.currentPage === "dashboard") bindDashboardActions();
+  if (state.user && state.currentPage === "setup") bindSetupActions();
+  if (state.user && state.currentPage === "branding") bindBrandingActions();
+  if (state.user && state.currentPage === "live") bindLiveActions();
+  if (state.currentPage === "public") bindPublicActions();
 }
 
 if (!attemptDetectionTimer) {
@@ -1426,16 +1539,24 @@ async function routeAndLoad() {
   state.currentPage = route.page;
 
   if (route.page === "public" || route.page === "display") {
+    safeUnsub("publicEvents");
     subscribeToEvent(route.eventId);
     render();
     return;
   }
 
   if (route.page === "dashboard") {
-    subscribeToDashboard();
+    if (state.user) {
+      safeUnsub("publicEvents");
+      subscribeToDashboard();
+    } else {
+      safeUnsub("dashboard");
+      subscribeToPublicEvents();
+    }
   }
 
   if (route.page === "setup" || route.page === "branding" || route.page === "live") {
+    safeUnsub("publicEvents");
     if (state.event.id) {
       subscribeToEvent(state.event.id);
     }
@@ -1450,9 +1571,11 @@ state.unsubscribers.auth = onAuthStateChanged(auth, async (user) => {
   state.authLoading = false;
   clearError();
   if (user) {
+    safeUnsub("publicEvents");
     subscribeToDashboard();
   } else {
     safeUnsub("dashboard");
+    subscribeToPublicEvents();
   }
   await routeAndLoad();
 });

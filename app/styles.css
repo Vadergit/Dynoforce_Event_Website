@@ -511,6 +511,14 @@ a {
   background: var(--surface);
 }
 
+.public-home-card {
+  min-height: 100%;
+}
+
+.public-event-item {
+  align-items: center;
+}
+
 .event-item h4,
 .event-item p {
   margin: 0;
