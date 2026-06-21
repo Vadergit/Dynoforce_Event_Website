@@ -857,6 +857,13 @@ async function signInGoogle() {
 }
 
 async function downloadPdf() {
+  const previewWindow = window.open("", "_blank");
+
+  if (previewWindow) {
+    previewWindow.document.write("<!doctype html><title>PDF wird erstellt</title><body style=\"font-family:Arial,sans-serif;padding:24px;color:#171717;\">PDF wird erstellt...</body>");
+    previewWindow.document.close();
+  }
+
   try {
     const [{ jsPDF }, { default: QRCode }] = await Promise.all([
       import("jspdf"),
@@ -981,9 +988,10 @@ async function downloadPdf() {
 
     const blob = pdf.output("blob");
     const blobUrl = URL.createObjectURL(blob);
-    const previewWindow = window.open(blobUrl, "_blank", "noopener,noreferrer");
 
-    if (!previewWindow) {
+    if (previewWindow) {
+      previewWindow.location.href = blobUrl;
+    } else {
       const downloadLink = document.createElement("a");
       downloadLink.href = blobUrl;
       downloadLink.download = `${state.event.id}.pdf`;
@@ -992,6 +1000,9 @@ async function downloadPdf() {
 
     window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (error) {
+    if (previewWindow && !previewWindow.closed) {
+      previewWindow.close();
+    }
     setError(`PDF konnte nicht erstellt werden: ${error instanceof Error ? error.message : String(error)}`);
     render();
   }
