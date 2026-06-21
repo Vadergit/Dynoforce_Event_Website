@@ -198,6 +198,14 @@ function getTodayWinnersByDirection() {
   };
 }
 
+function getOverallWinnersByDirection() {
+  return {
+    all: state.results[0] || null,
+    pull: getResultsForDirection("pull")[0] || null,
+    push: getResultsForDirection("push")[0] || null,
+  };
+}
+
 function leaderboardSections(limit = 10) {
   const mode = normalizeForceMode(state.event.forceMode);
   if (mode === "Beide") {
@@ -961,19 +969,22 @@ async function downloadPdf() {
       ["Bestwert", `${Number(state.results[0]?.value || 0).toFixed(1)} kg`],
       ["Durchschnitt", `${averageValue().toFixed(1)} kg`],
     ];
+    const overall = getOverallWinnersByDirection();
     const winners = getTodayWinnersByDirection();
     const mode = normalizeForceMode(state.event.forceMode);
     const printWinnerCards = (
       mode === "Beide"
         ? [
+            { title: "Gesamtsieger Ziehen", winner: overall.pull },
+            { title: "Gesamtsieger Drücken", winner: overall.push },
             { title: "Tagessieger Ziehen", winner: winners.pull },
             { title: "Tagessieger Drücken", winner: winners.push },
           ]
         : mode === "Ziehen"
-          ? [{ title: "Tagessieger Ziehen", winner: winners.pull }]
+          ? [{ title: "Gesamtsieger Ziehen", winner: overall.pull }, { title: "Tagessieger Ziehen", winner: winners.pull }]
           : mode === "Drücken"
-            ? [{ title: "Tagessieger Drücken", winner: winners.push }]
-            : [{ title: "Tagessieger", winner: winners.all }]
+            ? [{ title: "Gesamtsieger Drücken", winner: overall.push }, { title: "Tagessieger Drücken", winner: winners.push }]
+            : [{ title: "Gesamtsieger", winner: overall.all }, { title: "Tagessieger", winner: winners.all }]
     ).map(({ title, winner }) => `
       <div class="winner-card">
         <small>${escapeHtml(title)}</small>
@@ -1328,18 +1339,24 @@ function leaderboardTable(items, limit) {
 }
 
 function dailyWinnerCardsMarkup() {
+  const overall = getOverallWinnersByDirection();
   const winners = getTodayWinnersByDirection();
   const mode = normalizeForceMode(state.event.forceMode);
   const cards = [];
 
   if (mode === "Beide") {
+    cards.push({ title: "Gesamtsieger Ziehen", winner: overall.pull });
+    cards.push({ title: "Gesamtsieger Drücken", winner: overall.push });
     cards.push({ title: "Tagessieger Ziehen", winner: winners.pull });
     cards.push({ title: "Tagessieger Drücken", winner: winners.push });
   } else if (mode === "Ziehen") {
+    cards.push({ title: "Gesamtsieger Ziehen", winner: overall.pull });
     cards.push({ title: "Tagessieger Ziehen", winner: winners.pull });
   } else if (mode === "Drücken") {
+    cards.push({ title: "Gesamtsieger Drücken", winner: overall.push });
     cards.push({ title: "Tagessieger Drücken", winner: winners.push });
   } else {
+    cards.push({ title: "Gesamtsieger", winner: overall.all });
     cards.push({ title: "Tagessieger", winner: winners.all });
   }
 
