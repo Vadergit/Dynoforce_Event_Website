@@ -153,6 +153,64 @@ function averageValue() {
   return state.results.reduce((sum, item) => sum + item.value, 0) / state.results.length;
 }
 
+function resultCreatedAtDate(result) {
+  const value = result?.createdAt;
+  if (!value) return null;
+  if (typeof value?.toDate === "function") return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function toLocalDayKey(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function resultDirectionKey(result) {
+  const direction = result?.forceMode || result?.direction || "neutral";
+  if (direction === "pull" || direction === "push") return direction;
+  return "neutral";
+}
+
+function getResultsForDirection(direction = "all") {
+  if (direction === "all") return [...state.results];
+  return state.results.filter((entry) => resultDirectionKey(entry) === direction);
+}
+
+function getTodayWinnersByDirection() {
+  const todayKey = toLocalDayKey(new Date());
+  const todaysResults = state.results.filter((entry) => toLocalDayKey(resultCreatedAtDate(entry)) === todayKey);
+  return {
+    all: todaysResults[0] || null,
+    pull: todaysResults.find((entry) => resultDirectionKey(entry) === "pull") || null,
+    push: todaysResults.find((entry) => resultDirectionKey(entry) === "push") || null,
+  };
+}
+
+function leaderboardSections(limit = 10) {
+  const mode = normalizeForceMode(state.event.forceMode);
+  if (mode === "Beide") {
+    return [
+      { key: "pull", title: "Rangliste Ziehen", items: getResultsForDirection("pull").slice(0, limit) },
+      { key: "push", title: "Rangliste Drücken", items: getResultsForDirection("push").slice(0, limit) },
+    ];
+  }
+  if (mode === "Ziehen") {
+    return [{ key: "pull", title: "Rangliste Ziehen", items: getResultsForDirection("pull").slice(0, limit) }];
+  }
+  if (mode === "Drücken") {
+    return [{ key: "push", title: "Rangliste Drücken", items: getResultsForDirection("push").slice(0, limit) }];
+  }
+  return [{ key: "all", title: "Rangliste", items: state.results.slice(0, limit) }];
+}
+
 function normalizeForceMode(value) {
   if (value === "Ziehen" || value === "pull") return "Ziehen";
   if (value === "Drücken" || value === "push") return "Drücken";
@@ -899,14 +957,49 @@ async function downloadPdf() {
       ["Bestwert", `${Number(state.results[0]?.value || 0).toFixed(1)} kg`],
       ["Durchschnitt", `${averageValue().toFixed(1)} kg`],
     ];
-
-    const rowsMarkup = state.results.map((entry, index) => `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${escapeHtml(entry.participantName || entry.name || "—")}</td>
-        <td>${escapeHtml(formatEntryDirection(entry))}</td>
-        <td>${Number(entry.value || 0).toFixed(1)} kg</td>
-      </tr>
+    const winners = getTodayWinnersByDirection();
+    const mode = normalizeForceMode(state.event.forceMode);
+    const printWinnerCards = (
+      mode === "Beide"
+        ? [
+            { title: "Tagessieger Ziehen", winner: winners.pull },
+            { title: "Tagessieger Drücken", winner: winners.push },
+          ]
+        : mode === "Ziehen"
+          ? [{ title: "Tagessieger Ziehen", winner: winners.pull }]
+          : mode === "Drücken"
+            ? [{ title: "Tagessieger Drücken", winner: winners.push }]
+            : [{ title: "Tagessieger", winner: winners.all }]
+    ).map(({ title, winner }) => `
+      <div class="winner-card">
+        <small>${escapeHtml(title)}</small>
+        <strong>${winner ? `${escapeHtml(winner.participantName || winner.name || "—")} · ${Number(winner.value || 0).toFixed(1)} kg` : "Heute noch kein Resultat"}</strong>
+      </div>
+    `).join("");
+    const printLeaderboardSections = leaderboardSections(state.results.length || 1).map((section) => `
+      <div class="leaderboard-section">
+        <h3>${escapeHtml(section.title)}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Richtung</th>
+              <th>Resultat</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(section.items || []).map((entry, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(entry.participantName || entry.name || "—")}</td>
+                <td>${escapeHtml(formatEntryDirection(entry))}</td>
+                <td>${Number(entry.value || 0).toFixed(1)} kg</td>
+              </tr>
+            `).join("") || `<tr><td colspan="4">Noch keine Resultate vorhanden.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
     `).join("");
 
     const summaryMarkup = summaryRows.map(([label, value]) => `
@@ -1066,6 +1159,37 @@ async function downloadPdf() {
               color: var(--muted);
               line-height: 1.4;
             }
+            .winner-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+              gap: 12px;
+              margin-bottom: 18px;
+            }
+            .winner-card {
+              border: 1px solid var(--line);
+              border-radius: 16px;
+              padding: 14px;
+              background: var(--surface-muted);
+            }
+            .winner-card small {
+              display: block;
+              color: var(--muted);
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              font-size: 10px;
+            }
+            .winner-card strong {
+              display: block;
+              line-height: 1.35;
+            }
+            .leaderboard-section + .leaderboard-section {
+              margin-top: 16px;
+            }
+            .leaderboard-section h3 {
+              margin: 0 0 10px;
+              font-size: 16px;
+            }
             table {
               width: 100%;
               border-collapse: collapse;
@@ -1155,20 +1279,9 @@ async function downloadPdf() {
             </div>
 
             <div class="card">
-              <h2>Rangliste</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Richtung</th>
-                    <th>Resultat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rowsMarkup || `<tr><td colspan="4">Noch keine Resultate vorhanden.</td></tr>`}
-                </tbody>
-              </table>
+              <h2>${mode === "Beide" ? "Ranglisten" : "Rangliste"}</h2>
+              ${state.event.challengeType === "Freie Challenge" ? `<div class="winner-grid">${printWinnerCards}</div>` : ""}
+              ${printLeaderboardSections}
             </div>
 
             <div class="actions">
@@ -1208,6 +1321,30 @@ function leaderboardTable(items, limit) {
       </tr>
     `).join("")}
   `;
+}
+
+function dailyWinnerCardsMarkup() {
+  const winners = getTodayWinnersByDirection();
+  const mode = normalizeForceMode(state.event.forceMode);
+  const cards = [];
+
+  if (mode === "Beide") {
+    cards.push({ title: "Tagessieger Ziehen", winner: winners.pull });
+    cards.push({ title: "Tagessieger Drücken", winner: winners.push });
+  } else if (mode === "Ziehen") {
+    cards.push({ title: "Tagessieger Ziehen", winner: winners.pull });
+  } else if (mode === "Drücken") {
+    cards.push({ title: "Tagessieger Drücken", winner: winners.push });
+  } else {
+    cards.push({ title: "Tagessieger", winner: winners.all });
+  }
+
+  return cards.map(({ title, winner }) => `
+    <div class="mini-card">
+      <small>${title}</small>
+      <strong>${winner ? `${winner.participantName || winner.name || "—"} · ${Number(winner.value || 0).toFixed(1)} kg` : "Heute noch kein Resultat"}</strong>
+    </div>
+  `).join("");
 }
 
 function qrImage(url) {
@@ -1676,11 +1813,12 @@ function template(page) {
                   <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
                   <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
+                  ${state.event.challengeType === "Freie Challenge" ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
                   <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird."}</p>
                 </div>
               </div>
               <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>Top 10 permanent sichtbar und automatisch aktualisiert.</p></div></div><table>${leaderboardTable(state.results, 10)}</table></div>
+                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Getrennte Ranglisten für Ziehen und Drücken." : "Top 10 permanent sichtbar und automatisch aktualisiert."}</p></div></div><div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
                 <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
               </div>
             </div>
@@ -1691,13 +1829,14 @@ function template(page) {
               <div class="card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div>${state.event.organiserEmail ? `<div class="metric-line"><span>Kontakt</span><strong>${state.event.organiserEmail}</strong></div>` : ""}<div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
               <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">PDF herunterladen</button></div></div>
             </div>
+            ${state.event.challengeType === "Freie Challenge" ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
             <div class="grid" style="margin-top:18px;">
-              <div class="card"><div class="card-header"><div><h3>Komplette Rangliste</h3><p>Automatische Aktualisierung während des Events.</p></div></div><table>${leaderboardTable(state.results, state.results.length)}</table></div>
+              <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
             </div>
           ` : ""}
           ${page === "display" ? `
             <div class="grid two">
-              <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 10 · ${state.event.challengeType} · Letztes Resultat live</p><table class="display-board">${leaderboardTable(state.results, 10)}</table></div>
+              <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 10 · ${state.event.challengeType} · Letztes Resultat live</p>${state.event.challengeType === "Freie Challenge" ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}<div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="display-board">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
               <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
             </div>
           ` : ""}
