@@ -868,76 +868,38 @@ async function downloadPdf() {
     const margin = 40;
     let y = margin;
     const primary = state.event.primaryColor || "#1f4f46";
-    const needsRenderedBrandingFallback = state.currentPage === "public"
-      && (
-        (!state.event.headerBannerPdfData && Boolean(state.event.headerBanner))
-        || (!state.event.eventLogoPdfData && Boolean(state.event.eventLogo))
-        || (!state.event.venueLogoPdfData && Boolean(state.event.venueLogo))
-        || (!state.event.sponsorBannerPdfData && Boolean(state.event.sponsorBanner))
-      );
-    let renderedBrandingDataUrl = null;
-
-    if (needsRenderedBrandingFallback) {
-      try {
-        const { default: html2canvas } = await import("html2canvas");
-        const heroNode = document.getElementById("publicBrandHero");
-        if (heroNode) {
-          const canvas = await html2canvas(heroNode, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            foreignObjectRendering: true,
-            backgroundColor: "#ffffff",
-            imageTimeout: 0,
-          });
-          renderedBrandingDataUrl = canvas.toDataURL("image/jpeg", 0.92);
-        }
-      } catch (error) {
-        console.warn("Branding-Fallback fuer PDF konnte nicht gerendert werden", error);
-      }
-    }
-
-    const [headerBanner, eventLogo, venueLogo, sponsorBanner, qrCodeDataUrl] = await Promise.all([
+    const [headerBanner, eventLogo, venueLogo, sponsorBanner, qrCodeDataUrl] = await withTimeout(Promise.all([
       assetToDataUrl(state.event.headerBanner, state.event.headerBannerPdfData),
       assetToDataUrl(state.event.eventLogo, state.event.eventLogoPdfData),
       assetToDataUrl(state.event.venueLogo, state.event.venueLogoPdfData),
       assetToDataUrl(state.event.sponsorBanner, state.event.sponsorBannerPdfData),
       QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 180 }),
-    ]);
+    ]), 8000);
 
-    if (renderedBrandingDataUrl) {
-      const renderedBrandingImage = await loadImage(renderedBrandingDataUrl);
-      const renderedHeight = Math.min(220, ((pageWidth - margin * 2) / renderedBrandingImage.width) * renderedBrandingImage.height);
-      pdf.addImage(renderedBrandingDataUrl, "JPEG", margin, y, pageWidth - margin * 2, renderedHeight);
-      y += renderedHeight + 24;
-    } else if (headerBanner) {
+    if (headerBanner) {
       pdf.addImage(headerBanner, imageFormatFromDataUrl(headerBanner), margin, y, pageWidth - margin * 2, 120);
       y += 140;
     }
 
-    if (!renderedBrandingDataUrl) {
-      pdf.setFillColor(primary);
-      pdf.roundedRect(margin, y, pageWidth - margin * 2, 92, 18, 18, "F");
-      pdf.setTextColor("#ffffff");
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(28);
-      pdf.text(getEventDisplayName(), margin + 24, y + 34);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(12);
-      pdf.text(getEventSummaryLine() || "DynoForce Event", margin + 24, y + 58);
-      pdf.text(state.event.organiser ? `Veranstalter: ${state.event.organiser}` : "Powered by DynoForce", margin + 24, y + 76);
+    pdf.setFillColor(primary);
+    pdf.roundedRect(margin, y, pageWidth - margin * 2, 92, 18, 18, "F");
+    pdf.setTextColor("#ffffff");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(28);
+    pdf.text(getEventDisplayName(), margin + 24, y + 34);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(12);
+    pdf.text(getEventSummaryLine() || "DynoForce Event", margin + 24, y + 58);
+    pdf.text(state.event.organiser ? `Veranstalter: ${state.event.organiser}` : "Powered by DynoForce", margin + 24, y + 76);
 
-      if (eventLogo) {
-        pdf.addImage(eventLogo, imageFormatFromDataUrl(eventLogo), pageWidth - margin - 132, y + 14, 54, 54);
-      }
-      if (venueLogo) {
-        pdf.addImage(venueLogo, imageFormatFromDataUrl(venueLogo), pageWidth - margin - 68, y + 14, 54, 54);
-      }
-
-      y += 120;
-    } else {
-      y += 8;
+    if (eventLogo) {
+      pdf.addImage(eventLogo, imageFormatFromDataUrl(eventLogo), pageWidth - margin - 132, y + 14, 54, 54);
     }
+    if (venueLogo) {
+      pdf.addImage(venueLogo, imageFormatFromDataUrl(venueLogo), pageWidth - margin - 68, y + 14, 54, 54);
+    }
+
+    y += 120;
     pdf.setTextColor("#171717");
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
@@ -1314,6 +1276,15 @@ async function loadImage(src) {
     image.onerror = reject;
     image.src = src;
   });
+}
+
+async function withTimeout(promise, timeoutMs = 8000) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error("Zeitüberschreitung beim PDF-Export.")), timeoutMs);
+    }),
+  ]);
 }
 
 async function createEmbeddedBrandingDataUrl(file, fieldName) {
