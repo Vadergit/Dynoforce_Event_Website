@@ -17,7 +17,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "./firebase.js";
 
 const BLE = {
@@ -1271,8 +1271,19 @@ async function assetToDataUrl(url, embeddedDataUrl = "") {
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.warn("Branding-Asset konnte nicht für PDF geladen werden", url, error);
-    return null;
+    try {
+      const storageRef = ref(storage, url);
+      const blob = await getBlob(storageRef);
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (storageError) {
+      console.warn("Branding-Asset konnte nicht für PDF geladen werden", url, error, storageError);
+      return null;
+    }
   }
 }
 
