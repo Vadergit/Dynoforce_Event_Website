@@ -869,10 +869,10 @@ async function downloadPdf() {
     let y = margin;
     const primary = state.event.primaryColor || "#1f4f46";
     const [headerBanner, eventLogo, venueLogo, sponsorBanner, qrCodeDataUrl] = await withTimeout(Promise.all([
-      assetToDataUrl(state.event.headerBanner, state.event.headerBannerPdfData),
-      assetToDataUrl(state.event.eventLogo, state.event.eventLogoPdfData),
-      assetToDataUrl(state.event.venueLogo, state.event.venueLogoPdfData),
-      assetToDataUrl(state.event.sponsorBanner, state.event.sponsorBannerPdfData),
+      getPdfAssetData("headerBanner", state.event.headerBanner, state.event.headerBannerPdfData),
+      getPdfAssetData("eventLogo", state.event.eventLogo, state.event.eventLogoPdfData),
+      getPdfAssetData("venueLogo", state.event.venueLogo, state.event.venueLogoPdfData),
+      getPdfAssetData("sponsorBanner", state.event.sponsorBanner, state.event.sponsorBannerPdfData),
       QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 180 }),
     ]), 8000);
 
@@ -1239,7 +1239,7 @@ async function assetToDataUrl(url, embeddedDataUrl = "") {
     const blob = await response.blob();
     return await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
+      reader.onloadend = () => resolve(String(reader.result || ""));
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
@@ -1249,7 +1249,7 @@ async function assetToDataUrl(url, embeddedDataUrl = "") {
       const blob = await getBlob(storageRef);
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
+        reader.onloadend = () => resolve(String(reader.result || ""));
         reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
@@ -1269,6 +1269,16 @@ function imageFormatFromDataUrl(dataUrl) {
 
 function getPdfBrandingFieldName(fieldName) {
   return `${fieldName}PdfData`;
+}
+
+function getPdfImagePreset(fieldName) {
+  const presets = {
+    eventLogo: { maxWidth: 320, maxHeight: 320, mimeType: "image/png", quality: 0.92, fill: false },
+    venueLogo: { maxWidth: 520, maxHeight: 240, mimeType: "image/png", quality: 0.92, fill: false },
+    headerBanner: { maxWidth: 1200, maxHeight: 420, mimeType: "image/jpeg", quality: 0.8, fill: true },
+    sponsorBanner: { maxWidth: 1200, maxHeight: 260, mimeType: "image/jpeg", quality: 0.8, fill: true },
+  };
+  return presets[fieldName] || presets.eventLogo;
 }
 
 async function readFileAsDataUrl(file) {
@@ -1298,16 +1308,9 @@ async function withTimeout(promise, timeoutMs = 8000) {
   ]);
 }
 
-async function createEmbeddedBrandingDataUrl(file, fieldName) {
-  const sourceDataUrl = await readFileAsDataUrl(file);
+async function normalizePdfImageDataUrl(sourceDataUrl, fieldName) {
   const image = await loadImage(sourceDataUrl);
-  const presets = {
-    eventLogo: { maxWidth: 320, maxHeight: 320, mimeType: "image/png", quality: 0.92, fill: false },
-    venueLogo: { maxWidth: 520, maxHeight: 240, mimeType: "image/png", quality: 0.92, fill: false },
-    headerBanner: { maxWidth: 1200, maxHeight: 420, mimeType: "image/jpeg", quality: 0.8, fill: true },
-    sponsorBanner: { maxWidth: 1200, maxHeight: 260, mimeType: "image/jpeg", quality: 0.8, fill: true },
-  };
-  const preset = presets[fieldName] || presets.eventLogo;
+  const preset = getPdfImagePreset(fieldName);
   const scale = Math.min(1, preset.maxWidth / image.width, preset.maxHeight / image.height);
   const width = Math.max(1, Math.round(image.width * scale));
   const height = Math.max(1, Math.round(image.height * scale));
@@ -1324,6 +1327,22 @@ async function createEmbeddedBrandingDataUrl(file, fieldName) {
 
   context.drawImage(image, 0, 0, width, height);
   return canvas.toDataURL(preset.mimeType, preset.quality);
+}
+
+async function createEmbeddedBrandingDataUrl(file, fieldName) {
+  const sourceDataUrl = await readFileAsDataUrl(file);
+  return await normalizePdfImageDataUrl(sourceDataUrl, fieldName);
+}
+
+async function getPdfAssetData(fieldName, url, embeddedDataUrl = "") {
+  const rawDataUrl = await assetToDataUrl(url, embeddedDataUrl);
+  if (!rawDataUrl) return null;
+  try {
+    return await normalizePdfImageDataUrl(rawDataUrl, fieldName);
+  } catch (error) {
+    console.warn("PDF-Bild konnte nicht normalisiert werden", fieldName, error);
+    return rawDataUrl;
+  }
 }
 
 function template(page) {
