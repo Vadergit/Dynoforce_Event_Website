@@ -40,6 +40,10 @@ const emptyBranding = {
   venueLogo: "",
   headerBanner: "",
   sponsorBanner: "",
+  eventLogoPdfData: "",
+  venueLogoPdfData: "",
+  headerBannerPdfData: "",
+  sponsorBannerPdfData: "",
 };
 
 const state = {
@@ -628,6 +632,10 @@ function eventDocToState(id, data) {
     venueLogo: data.venueLogo || "",
     headerBanner: data.headerBanner || "",
     sponsorBanner: data.sponsorBanner || "",
+    eventLogoPdfData: data.eventLogoPdfData || "",
+    venueLogoPdfData: data.venueLogoPdfData || "",
+    headerBannerPdfData: data.headerBannerPdfData || "",
+    sponsorBannerPdfData: data.sponsorBannerPdfData || "",
   };
 }
 
@@ -763,6 +771,10 @@ async function saveEvent(overrides = {}) {
       venueLogo: state.event.venueLogo,
       headerBanner: state.event.headerBanner,
       sponsorBanner: state.event.sponsorBanner,
+      eventLogoPdfData: state.event.eventLogoPdfData || "",
+      venueLogoPdfData: state.event.venueLogoPdfData || "",
+      headerBannerPdfData: state.event.headerBannerPdfData || "",
+      sponsorBannerPdfData: state.event.sponsorBannerPdfData || "",
       participantCount: state.results.length,
       updatedAt: serverTimestamp(),
       ...overrides,
@@ -801,9 +813,11 @@ async function uploadBrandingFile(fieldName, file) {
     const extension = file.name.split(".").pop() || "bin";
     const path = `event-branding/${state.user.uid}/${state.event.id}/${fieldName}.${extension}`;
     const storageRef = ref(storage, path);
+    const embeddedDataUrl = await createEmbeddedBrandingDataUrl(file, fieldName);
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
     state.event[fieldName] = url;
+    state.event[getPdfBrandingFieldName(fieldName)] = embeddedDataUrl;
     await saveEvent();
     setFlash(`${fieldName} hochgeladen.`);
   } catch (error) {
@@ -856,10 +870,10 @@ async function downloadPdf() {
     const primary = state.event.primaryColor || "#1f4f46";
 
     const [headerBanner, eventLogo, venueLogo, sponsorBanner, qrCodeDataUrl] = await Promise.all([
-      assetToDataUrl(state.event.headerBanner),
-      assetToDataUrl(state.event.eventLogo),
-      assetToDataUrl(state.event.venueLogo),
-      assetToDataUrl(state.event.sponsorBanner),
+      assetToDataUrl(state.event.headerBanner, state.event.headerBannerPdfData),
+      assetToDataUrl(state.event.eventLogo, state.event.eventLogoPdfData),
+      assetToDataUrl(state.event.venueLogo, state.event.venueLogoPdfData),
+      assetToDataUrl(state.event.sponsorBanner, state.event.sponsorBannerPdfData),
       QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 180 }),
     ]);
 
@@ -1206,7 +1220,8 @@ function publicBrandingSection() {
   `;
 }
 
-async function assetToDataUrl(url) {
+async function assetToDataUrl(url, embeddedDataUrl = "") {
+  if (embeddedDataUrl) return embeddedDataUrl;
   if (!url) return null;
   try {
     const response = await fetch(url, { mode: "cors" });
@@ -1229,6 +1244,56 @@ function imageFormatFromDataUrl(dataUrl) {
   if (dataUrl.startsWith("data:image/jpeg") || dataUrl.startsWith("data:image/jpg")) return "JPEG";
   if (dataUrl.startsWith("data:image/webp")) return "WEBP";
   return "PNG";
+}
+
+function getPdfBrandingFieldName(fieldName) {
+  return `${fieldName}PdfData`;
+}
+
+async function readFileAsDataUrl(file) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadImage(src) {
+  return await new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+async function createEmbeddedBrandingDataUrl(file, fieldName) {
+  const sourceDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(sourceDataUrl);
+  const presets = {
+    eventLogo: { maxWidth: 320, maxHeight: 320, mimeType: "image/png", quality: 0.92, fill: false },
+    venueLogo: { maxWidth: 520, maxHeight: 240, mimeType: "image/png", quality: 0.92, fill: false },
+    headerBanner: { maxWidth: 1200, maxHeight: 420, mimeType: "image/jpeg", quality: 0.8, fill: true },
+    sponsorBanner: { maxWidth: 1200, maxHeight: 260, mimeType: "image/jpeg", quality: 0.8, fill: true },
+  };
+  const preset = presets[fieldName] || presets.eventLogo;
+  const scale = Math.min(1, preset.maxWidth / image.width, preset.maxHeight / image.height);
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return sourceDataUrl;
+
+  if (preset.fill) {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL(preset.mimeType, preset.quality);
 }
 
 function template(page) {
