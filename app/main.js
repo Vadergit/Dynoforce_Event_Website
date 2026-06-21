@@ -979,7 +979,18 @@ async function downloadPdf() {
       y += 24;
     });
 
-    pdf.save(`${state.event.id}.pdf`);
+    const blob = pdf.output("blob");
+    const blobUrl = URL.createObjectURL(blob);
+    const previewWindow = window.open(blobUrl, "_blank", "noopener,noreferrer");
+
+    if (!previewWindow) {
+      const downloadLink = document.createElement("a");
+      downloadLink.href = blobUrl;
+      downloadLink.download = `${state.event.id}.pdf`;
+      downloadLink.click();
+    }
+
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (error) {
     setError(`PDF konnte nicht erstellt werden: ${error instanceof Error ? error.message : String(error)}`);
     render();
