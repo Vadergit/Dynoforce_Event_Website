@@ -885,7 +885,10 @@ async function downloadPdf() {
           const canvas = await html2canvas(heroNode, {
             scale: 2,
             useCORS: true,
+            allowTaint: true,
+            foreignObjectRendering: true,
             backgroundColor: "#ffffff",
+            imageTimeout: 0,
           });
           renderedBrandingDataUrl = canvas.toDataURL("image/jpeg", 0.92);
         }
