@@ -100,6 +100,7 @@ const state = {
     name: "Boulder Jam 2027",
     description: "Offene Publikumschallenge für maximale Fingerkraft mit DynoGrip.",
     organiser: "Boulderhalle Zürich",
+    organiserEmail: "",
     location: "Zürich",
     date: "2027-03-18",
     challengeType: "Maximalkraft",
@@ -616,6 +617,7 @@ function eventDocToState(id, data) {
     name: data.name || "Event",
     description: data.description || "",
     organiser: data.organiser || "",
+    organiserEmail: data.organiserEmail || "",
     location: data.location || "",
     date: data.date || new Date().toISOString().slice(0, 10),
     challengeType: data.challengeType || "Maximalkraft",
@@ -757,6 +759,7 @@ async function saveEvent(overrides = {}) {
       name: state.event.name,
       description: state.event.description,
       organiser: state.event.organiser,
+      organiserEmail: state.event.organiserEmail || "",
       location: state.event.location,
       date: state.event.date,
       challengeType: state.event.challengeType,
@@ -887,6 +890,7 @@ async function downloadPdf() {
     const primary = state.event.primaryColor || "#1f4f46";
     const summaryRows = [
       ["Veranstalter", state.event.organiser || "DynoForce"],
+      ...(state.event.organiserEmail ? [["Kontakt E-Mail", state.event.organiserEmail]] : []),
       ["Beschreibung", state.event.description || "Professionelles Event mit Live-Rangliste und DynoForce Messung."],
       ["Griff", state.event.gripType || "Freie Challenge"],
       ["Richtung", normalizeForceMode(state.event.forceMode)],
@@ -1614,6 +1618,7 @@ function template(page) {
                   <div class="field"><label>Eventname</label><input id="eventNameInput" value="${state.event.name}" /></div>
                   <div class="field"><label>Datum</label><input id="eventDateInput" type="date" value="${state.event.date}" /></div>
                   <div class="field"><label>Veranstalter</label><input id="organiserInput" value="${state.event.organiser}" /></div>
+                  <div class="field"><label>Kontakt E-Mail</label><input id="organiserEmailInput" type="email" value="${state.event.organiserEmail || ""}" placeholder="kontakt@veranstalter.ch" /></div>
                   <div class="field"><label>Ort</label><input id="locationInput" value="${state.event.location}" /></div>
                 </div>
                 <div class="field-grid" style="margin-top:14px;"><div class="field"><label>Beschreibung</label><textarea id="descriptionInput">${state.event.description}</textarea></div></div>
@@ -1683,7 +1688,7 @@ function template(page) {
           ${page === "public" ? `
             ${publicBrandingSection()}
             <div class="grid two">
-              <div class="card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div><div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
+              <div class="card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div>${state.event.organiserEmail ? `<div class="metric-line"><span>Kontakt</span><strong>${state.event.organiserEmail}</strong></div>` : ""}<div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
               <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">PDF herunterladen</button></div></div>
             </div>
             <div class="grid" style="margin-top:18px;">
@@ -1796,7 +1801,8 @@ function bindDashboardActions() {
       id: `event-${Date.now()}`,
       name: "Neues DynoForce Event",
       description: "Neue Challenge ohne App und ohne Login.",
-      organiser: state.user.displayName || state.user.email || "Veranstalter",
+      organiser: "Veranstalter",
+      organiserEmail: "",
       location: "Ort",
       date: new Date().toISOString().slice(0, 10),
       challengeType: "Maximalkraft",
@@ -1835,6 +1841,7 @@ function bindSetupActions() {
     state.event.name = root.querySelector("#eventNameInput").value.trim() || state.event.name;
     state.event.date = root.querySelector("#eventDateInput").value || state.event.date;
     state.event.organiser = root.querySelector("#organiserInput").value.trim() || state.event.organiser;
+    state.event.organiserEmail = root.querySelector("#organiserEmailInput").value.trim();
     state.event.location = root.querySelector("#locationInput").value.trim() || state.event.location;
     state.event.description = root.querySelector("#descriptionInput").value.trim() || state.event.description;
     state.event.challengeType = root.querySelector("#challengeTypeInput").value;
