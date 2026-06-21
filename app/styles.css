@@ -436,6 +436,13 @@ a {
   font-weight: 700;
 }
 
+.button.danger {
+  border-color: #dcb7b3;
+  background: #fbefee;
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -446,6 +453,11 @@ a {
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 20px;
+}
+
+.action-row.compact {
+  margin-top: 0;
+  justify-content: flex-end;
 }
 
 .metric-list {
@@ -545,6 +557,42 @@ a {
   gap: 18px;
   align-items: center;
   background: var(--surface);
+}
+
+.event-item-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.moderation-list {
+  gap: 12px;
+}
+
+.moderation-item {
+  align-items: stretch;
+}
+
+.moderation-fields {
+  flex: 1;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-stack {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.metric-stack strong {
+  font-size: 24px;
+}
+
+.metric-stack span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .public-home-card {
@@ -833,7 +881,8 @@ th {
   .measure-wrap,
   .field-grid.two,
   .hero,
-  .brand-hero-content {
+  .brand-hero-content,
+  .moderation-fields {
     grid-template-columns: 1fr;
     display: grid;
   }

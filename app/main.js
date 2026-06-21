@@ -10,11 +10,14 @@ import {
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -27,6 +30,10 @@ const BLE = {
   infoCharacteristicUuid: "6e400004-b5a3-f393-e0a9-e50e24dcca9e",
   cmdTare: 0x01,
   cmdResetPeak: 0x09,
+};
+
+const BLE_STORAGE_KEYS = {
+  preferredDeviceId: "dynoforce.event.preferredBleDeviceId",
 };
 
 const FORCE_DIRECTION_THRESHOLD = 0.5;
@@ -94,6 +101,9 @@ const state = {
     stateCharacteristic: null,
     commandCharacteristic: null,
     infoCharacteristic: null,
+    reconnectTimer: null,
+    autoReconnectEnabled: true,
+    reconnectAttempted: false,
   },
   event: {
     id: "boulder-jam-2027",
@@ -127,7 +137,7 @@ const pageMeta = {
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
   live: ["Live-Messseite", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
-  public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und PDF Download für Teilnehmer und Zuschauer."],
+  public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
 
@@ -362,6 +372,93 @@ async function ensureEventWritable() {
   );
 }
 
+async function syncEventParticipantCount(participantCount = state.results.length) {
+  await setDoc(
+    doc(db, "events", state.event.id),
+    {
+      ownerUid: state.user?.uid || state.event.ownerUid,
+      participantCount,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+function getEditableResultNameParts(entry) {
+  const firstName = (entry.firstName || "").trim();
+  const lastName = (entry.lastName || "").trim();
+  if (firstName || lastName) {
+    return { firstName, lastName };
+  }
+  const combined = String(entry.participantName || "").trim();
+  if (!combined) return { firstName: "", lastName: "" };
+  const parts = combined.split(/\s+/);
+  return {
+    firstName: parts.shift() || "",
+    lastName: parts.join(" "),
+  };
+}
+
+async function updateResultParticipantName(resultId, firstName, lastName) {
+  const cleanFirstName = firstName.trim();
+  const cleanLastName = lastName.trim();
+  if (!cleanFirstName || !cleanLastName) {
+    setError("Vorname und Name müssen beide ausgefüllt sein.");
+    render();
+    return;
+  }
+
+  const participantName = `${cleanFirstName} ${cleanLastName}`.trim();
+  try {
+    await updateDoc(doc(db, "results", resultId), {
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      participantName,
+      updatedAt: serverTimestamp(),
+    });
+    clearError();
+    setFlash(`Teilnehmername aktualisiert: ${participantName}`);
+    render();
+  } catch (error) {
+    setError(`Teilnehmername konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
+}
+
+async function deleteResultEntry(resultId) {
+  try {
+    await deleteDoc(doc(db, "results", resultId));
+    await syncEventParticipantCount(Math.max(0, state.results.length - 1));
+    clearError();
+    setFlash("Resultat wurde aus der Rangliste entfernt.");
+    render();
+  } catch (error) {
+    setError(`Resultat konnte nicht gelöscht werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
+}
+
+async function deleteEventWithResults(eventId) {
+  try {
+    const resultsSnapshot = await getDocs(query(collection(db, "results"), where("eventId", "==", eventId)));
+    await Promise.all(resultsSnapshot.docs.map((resultDoc) => deleteDoc(resultDoc.ref)));
+    await deleteDoc(doc(db, "events", eventId));
+
+    if (state.event.id === eventId) {
+      state.results = [];
+      resetLiveEntryState();
+    }
+
+    clearError();
+    setFlash("Event und zugehörige Resultate wurden gelöscht.");
+    syncUrl("dashboard");
+    await routeAndLoad();
+  } catch (error) {
+    setError(`Event konnte nicht gelöscht werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
+}
+
 async function finalizeParticipantResult(forceManualSave = false) {
   if (!state.user) {
     setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
@@ -579,9 +676,41 @@ function disconnectCleanup() {
   state.ble.infoCharacteristic = null;
 }
 
+function getPreferredBleDeviceId() {
+  try {
+    return window.localStorage.getItem(BLE_STORAGE_KEYS.preferredDeviceId) || "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberPreferredBleDevice(device) {
+  if (!device?.id) return;
+  try {
+    window.localStorage.setItem(BLE_STORAGE_KEYS.preferredDeviceId, device.id);
+  } catch {}
+}
+
+function clearReconnectTimer() {
+  if (state.ble.reconnectTimer) {
+    window.clearTimeout(state.ble.reconnectTimer);
+    state.ble.reconnectTimer = null;
+  }
+}
+
+function scheduleAutoReconnect(delay = 1500) {
+  if (!state.ble.autoReconnectEnabled || state.connecting || state.connected) return;
+  clearReconnectTimer();
+  state.ble.reconnectTimer = window.setTimeout(async () => {
+    state.ble.reconnectTimer = null;
+    await attemptAutoReconnect();
+  }, delay);
+}
+
 function onBluetoothDisconnected() {
   disconnectCleanup();
   setFlash("DynoGrip Verbindung getrennt.");
+  scheduleAutoReconnect();
   render();
 }
 
@@ -614,44 +743,86 @@ function onStateCharacteristicChanged(event) {
   updateLiveMeasurementDom();
 }
 
-async function connectToDevice() {
+async function openBleConnection(device, { silent = false } = {}) {
+  device.addEventListener("gattserverdisconnected", onBluetoothDisconnected);
+  const server = await device.gatt.connect();
+  const service = await server.getPrimaryService(BLE.serviceUuid);
+  const stateCharacteristic = await service.getCharacteristic(BLE.stateCharacteristicUuid);
+  const commandCharacteristic = await service.getCharacteristic(BLE.commandCharacteristicUuid);
+  const infoCharacteristic = await service.getCharacteristic(BLE.infoCharacteristicUuid);
+  state.ble.device = device;
+  state.ble.server = server;
+  state.ble.stateCharacteristic = stateCharacteristic;
+  state.ble.commandCharacteristic = commandCharacteristic;
+  state.ble.infoCharacteristic = infoCharacteristic;
+  await stateCharacteristic.startNotifications();
+  stateCharacteristic.addEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
+  try {
+    state.deviceInfo = parseDeviceInfo(await infoCharacteristic.readValue());
+  } catch {}
+  state.connected = true;
+  state.connecting = false;
+  state.signal = "Stabil";
+  state.ble.autoReconnectEnabled = true;
+  state.ble.reconnectAttempted = true;
+  clearReconnectTimer();
+  rememberPreferredBleDevice(device);
+  if (!silent) {
+    setFlash(`DynoGrip verbunden${device.name ? `: ${device.name}` : ""}.`);
+  }
+}
+
+async function connectToDevice(deviceOverride = null, options = {}) {
   if (!navigator.bluetooth) {
     setError("Web Bluetooth ist in diesem Browser nicht verfügbar. Bitte Chrome oder Edge verwenden.");
     render();
     return;
   }
   try {
+    clearReconnectTimer();
     state.connecting = true;
+    state.ble.autoReconnectEnabled = true;
     state.signal = "Verbinde...";
     clearError();
     render();
-    const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE.serviceUuid] }] });
-    device.addEventListener("gattserverdisconnected", onBluetoothDisconnected);
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(BLE.serviceUuid);
-    const stateCharacteristic = await service.getCharacteristic(BLE.stateCharacteristicUuid);
-    const commandCharacteristic = await service.getCharacteristic(BLE.commandCharacteristicUuid);
-    const infoCharacteristic = await service.getCharacteristic(BLE.infoCharacteristicUuid);
-    state.ble = { device, server, stateCharacteristic, commandCharacteristic, infoCharacteristic };
-    await stateCharacteristic.startNotifications();
-    stateCharacteristic.addEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
-    try {
-      state.deviceInfo = parseDeviceInfo(await infoCharacteristic.readValue());
-    } catch {}
-    state.connected = true;
-    state.connecting = false;
-    state.signal = "Stabil";
-    setFlash(`DynoGrip verbunden${device.name ? `: ${device.name}` : ""}.`);
+    const device = deviceOverride || await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE.serviceUuid] }] });
+    await openBleConnection(device, options);
     render();
   } catch (error) {
     disconnectCleanup();
-    setError(error instanceof Error ? error.message : String(error));
+    if (!options.silent) {
+      setError(error instanceof Error ? error.message : String(error));
+    }
     render();
+  }
+}
+
+async function attemptAutoReconnect() {
+  if (!state.ble.autoReconnectEnabled || !navigator.bluetooth?.getDevices || state.connected || state.connecting) return;
+  try {
+    const devices = await navigator.bluetooth.getDevices();
+    const preferredDeviceId = getPreferredBleDeviceId();
+    const candidate =
+      devices.find((device) => device.id && device.id === preferredDeviceId) ||
+      devices.find((device) => (device.name || "").toLowerCase().includes("dyno"));
+    if (!candidate) {
+      scheduleAutoReconnect(5000);
+      return;
+    }
+    await connectToDevice(candidate, { silent: true });
+    if (state.connected) {
+      setFlash(`DynoGrip automatisch verbunden${candidate.name ? `: ${candidate.name}` : ""}.`);
+      render();
+    }
+  } catch {
+    scheduleAutoReconnect(5000);
   }
 }
 
 function disconnectDevice() {
   try {
+    state.ble.autoReconnectEnabled = false;
+    clearReconnectTimer();
     if (state.ble.stateCharacteristic) {
       state.ble.stateCharacteristic.removeEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
     }
@@ -1759,7 +1930,7 @@ function template(page) {
               <div class="card">
                 <div class="card-header"><div><h3>Meine Events</h3><p>${state.dashboardLoaded ? "Übersicht aller eigenen Veranstaltungen mit Status und Teilnehmerzahl." : "Lade Events aus Firestore..."}</p></div><button class="button primary" id="createEvent">Neues Event</button></div>
                 <div class="event-list">
-                  ${state.events.map((event) => `<div class="event-item" data-open-event="${event.id}"><div><h4>${event.name}</h4><p>${event.date} · ${event.participants} Teilnehmer · ${event.status}</p></div><div class="status-badge">${event.status}</div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
+                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-badge">${escapeHtml(event.status)}</div><div class="action-row compact"><button class="button" data-open-event="${event.id}">Live</button><button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
                 </div>
               </div>
               <div class="grid">
@@ -1784,13 +1955,39 @@ function template(page) {
               <div class="card">
                 <div class="card-header"><div><h3>Challenge & Wertung</h3><p>Optimiert für schnelles Aufsetzen vor Ort.</p></div></div>
                 <div class="field-grid two">
-                  <div class="field"><label>Challenge</label><select id="challengeTypeInput"><option ${state.event.challengeType === "Maximalkraft" ? "selected" : ""}>Maximalkraft</option><option ${isDailyChallengeType(state.event.challengeType) ? "selected" : ""}>Tageschallenge</option></select><div class="upload-hint"><strong>Bedeutung</strong><p>Die Tageschallenge ist für frei zugängliche Stationen gedacht, zum Beispiel beim Eingang einer Boulderhalle. Teilnehmer können laufend mitmachen, Resultate werden automatisch gesammelt und es gibt einen Tagessieger.</p><span>Wenn bei Richtung "Beide" gewählt ist, werden Ziehen und Drücken separat als eigene Ranglisten geführt.</span></div></div>
+                  <div class="field"><label>Challenge</label><select id="challengeTypeInput"><option ${state.event.challengeType === "Maximalkraft" ? "selected" : ""}>Maximalkraft</option><option ${isDailyChallengeType(state.event.challengeType) ? "selected" : ""}>Tageschallenge</option></select></div>
                   <div class="field"><label>Richtung</label><select id="forceModeInput"><option ${normalizeForceMode(state.event.forceMode) === "Beide" ? "selected" : ""}>Beide</option><option ${normalizeForceMode(state.event.forceMode) === "Ziehen" ? "selected" : ""}>Ziehen</option><option ${normalizeForceMode(state.event.forceMode) === "Drücken" ? "selected" : ""}>Drücken</option></select></div>
                   <div class="field"><label>Griff</label><input id="gripTypeInput" value="${state.event.gripType}" /></div>
                   <div class="field"><label>Versuche</label><select id="attemptsInput"><option ${state.event.attempts === 1 ? "selected" : ""}>1 Versuch</option><option ${state.event.attempts === 3 ? "selected" : ""}>3 Versuche</option><option ${state.event.attempts === 5 ? "selected" : ""}>5 Versuche</option></select></div>
                   <div class="field"><label>Wertung</label><select id="scoringModeInput"><option ${state.event.scoringMode === "Bester Versuch" ? "selected" : ""}>Bester Versuch</option><option ${state.event.scoringMode === "Durchschnitt" ? "selected" : ""}>Durchschnitt</option><option ${state.event.scoringMode === "Letzter Versuch" ? "selected" : ""}>Letzter Versuch</option></select></div>
                 </div>
                 <div class="action-row"><button class="button primary" id="saveSetup">${state.saving ? "Speichert..." : "Event speichern"}</button><button class="button" id="startEvent">Event starten</button><button class="button" id="archiveEvent">Event archivieren</button></div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:18px;">
+              <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen korrigieren oder einzelne Einträge aus der Rangliste entfernen.</p></div></div>
+              <div class="event-list moderation-list">
+                ${state.results.map((entry) => {
+                  const nameParts = getEditableResultNameParts(entry);
+                  return `
+                    <div class="event-item moderation-item">
+                      <div class="moderation-fields">
+                        <div class="field"><label>Vorname</label><input data-result-first-name="${entry.id}" value="${escapeHtml(nameParts.firstName)}" /></div>
+                        <div class="field"><label>Name</label><input data-result-last-name="${entry.id}" value="${escapeHtml(nameParts.lastName)}" /></div>
+                      </div>
+                      <div class="event-item-actions">
+                        <div class="metric-stack">
+                          <strong>${Number(entry.value || 0).toFixed(1)} kg</strong>
+                          <span>${escapeHtml(formatEntryDirection(entry))} · ${escapeHtml(formatDate(resultCreatedAtDate(entry)) || "ohne Datum")}</span>
+                        </div>
+                        <div class="action-row compact">
+                          <button class="button" data-update-result="${entry.id}">Name speichern</button>
+                          <button class="button danger" data-delete-result="${entry.id}">Resultat entfernen</button>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join("") || `<div class="event-item"><div><h4>Noch keine Resultate</h4><p>Sobald Teilnehmer gespeichert werden, können sie hier korrigiert oder entfernt werden.</p></div></div>`}
               </div>
             </div>
           ` : ""}
@@ -1848,7 +2045,7 @@ function template(page) {
             ${publicBrandingSection()}
             <div class="grid two">
               <div class="card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div>${state.event.organiserEmail ? `<div class="metric-line"><span>Kontakt</span><strong>${state.event.organiserEmail}</strong></div>` : ""}<div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
-              <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">PDF herunterladen</button></div></div>
+              <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
             </div>
             ${isDailyChallengeType() ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
             <div class="grid" style="margin-top:18px;">
@@ -1994,6 +2191,26 @@ function bindDashboardActions() {
       render();
     });
   });
+
+  root.querySelectorAll("[data-edit-event]").forEach((item) => {
+    item.addEventListener("click", async () => {
+      const eventId = item.dataset.editEvent;
+      state.event.id = eventId;
+      syncUrl("setup");
+      subscribeToEvent(eventId);
+      render();
+    });
+  });
+
+  root.querySelectorAll("[data-delete-event]").forEach((item) => {
+    item.addEventListener("click", async () => {
+      const eventId = item.dataset.deleteEvent;
+      if (!window.confirm("Event wirklich löschen?\n\nAlle Resultate dieses Events werden ebenfalls entfernt.")) {
+        return;
+      }
+      await deleteEventWithResults(eventId);
+    });
+  });
 }
 
 function bindSetupActions() {
@@ -2009,7 +2226,6 @@ function bindSetupActions() {
     state.event.gripType = root.querySelector("#gripTypeInput").value.trim() || state.event.gripType;
     state.event.attempts = Number(root.querySelector("#attemptsInput").value.split(" ")[0]);
     state.event.scoringMode = root.querySelector("#scoringModeInput").value;
-    state.event.id = slugify(state.event.name);
     state.event.ownerUid = state.user?.uid || state.event.ownerUid;
     await saveEvent();
   });
@@ -2022,6 +2238,25 @@ function bindSetupActions() {
   root.querySelector("#archiveEvent")?.addEventListener("click", async () => {
     state.event.status = "Archiviert";
     await saveEvent();
+  });
+
+  root.querySelectorAll("[data-update-result]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const resultId = button.dataset.updateResult;
+      const firstName = root.querySelector(`[data-result-first-name="${resultId}"]`)?.value || "";
+      const lastName = root.querySelector(`[data-result-last-name="${resultId}"]`)?.value || "";
+      await updateResultParticipantName(resultId, firstName, lastName);
+    });
+  });
+
+  root.querySelectorAll("[data-delete-result]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const resultId = button.dataset.deleteResult;
+      if (!window.confirm("Resultat wirklich aus der Rangliste entfernen?")) {
+        return;
+      }
+      await deleteResultEntry(resultId);
+    });
   });
 }
 
@@ -2107,6 +2342,10 @@ async function routeAndLoad() {
   }
 
   render();
+
+  if (state.user && (route.page === "dashboard" || route.page === "setup" || route.page === "branding" || route.page === "live")) {
+    await attemptAutoReconnect();
+  }
 }
 
 safeUnsub("auth");
