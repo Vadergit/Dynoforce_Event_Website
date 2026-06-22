@@ -368,6 +368,28 @@ function resultEditorMarkup() {
   `;
 }
 
+function organizerEventPickerMarkup(page) {
+  if (!state.user || page === "dashboard" || page === "public" || page === "display" || !state.events.length) {
+    return "";
+  }
+
+  return `
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-header">
+        <div>
+          <h3>Ausgewähltes Event</h3>
+          <p>Wechsle direkt zwischen deinen Events, damit Setup, Branding und Resultate sicher zum richtigen Event gehören.</p>
+        </div>
+      </div>
+      <div class="action-row" style="margin-top:0;">
+        <select id="organizerEventPicker">
+          ${state.events.map((event) => `<option value="${event.id}" ${event.id === state.event.id ? "selected" : ""}>${escapeHtml(event.name || "Event")} · ${escapeHtml(event.status)} · ${event.participants} Resultate</option>`).join("")}
+        </select>
+      </div>
+    </div>
+  `;
+}
+
 function formatEntryDirection(entry) {
   return formatDirectionLabel(entry.forceMode || entry.direction || "neutral");
 }
@@ -2092,6 +2114,7 @@ function template(page) {
               : `<button class="button" id="openLoginModal">Anmelden</button>`}
           </div>
           ${state.lastError ? `<div class="notice error">${state.lastError}</div>` : ""}
+          ${organizerEventPickerMarkup(page)}
           ${page === "dashboard" && !state.user ? `
             ${publicHomeCard()}
             <div style="margin-top:18px;">
@@ -2290,6 +2313,14 @@ function bindGeneralUi() {
   if (state.user) {
     closeLoginModal();
   }
+
+  root.querySelector("#organizerEventPicker")?.addEventListener("change", async (event) => {
+    const eventId = event.target.value;
+    if (!eventId) return;
+    rememberActiveEventId(eventId);
+    const targetPage = ["setup", "branding", "live"].includes(state.currentPage) ? state.currentPage : "setup";
+    window.location.assign(getOrganizerPageUrl(targetPage, eventId));
+  });
 
   root.querySelector("#loginPassword")?.addEventListener("keydown", async (event) => {
     if (event.key === "Enter") {
