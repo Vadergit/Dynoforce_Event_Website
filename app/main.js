@@ -633,7 +633,8 @@ function getRouteInfo() {
   }
 
   const page = pageMeta[segments[0]] ? segments[0] : "dashboard";
-  return { page, eventId: state.event.id };
+  const routedEventPage = ["setup", "branding", "live"].includes(page);
+  return { page, eventId: routedEventPage ? (segments[1] || state.event.id) : state.event.id };
 }
 
 function getPublicUrl() {
@@ -644,13 +645,17 @@ function getDisplayUrl() {
   return `${window.location.origin}${APP_BASE}/#/display/${state.event.id}`;
 }
 
-function syncUrl(page) {
+function syncUrl(page, eventId = state.event.id) {
   if (page === "public") {
-    history.replaceState(null, "", `${APP_BASE}/#/e/${state.event.id}`);
+    history.replaceState(null, "", `${APP_BASE}/#/e/${eventId}`);
     return;
   }
   if (page === "display") {
-    history.replaceState(null, "", `${APP_BASE}/#/display/${state.event.id}`);
+    history.replaceState(null, "", `${APP_BASE}/#/display/${eventId}`);
+    return;
+  }
+  if (["setup", "branding", "live"].includes(page)) {
+    history.replaceState(null, "", `${APP_BASE}/#/${page}/${eventId}`);
     return;
   }
   history.replaceState(null, "", page === "dashboard" ? `${APP_BASE}/` : `${APP_BASE}/#/${page}`);
@@ -2218,7 +2223,7 @@ function bindDashboardActions() {
       attempts: [],
     };
     await saveEvent();
-    syncUrl("setup");
+    syncUrl("setup", state.event.id);
     await routeAndLoad();
   });
 
@@ -2226,7 +2231,7 @@ function bindDashboardActions() {
     item.addEventListener("click", async () => {
       const eventId = item.dataset.openEvent;
       state.event.id = eventId;
-      syncUrl("live");
+      syncUrl("live", eventId);
       await routeAndLoad();
     });
   });
@@ -2235,7 +2240,7 @@ function bindDashboardActions() {
     item.addEventListener("click", async () => {
       const eventId = item.dataset.editEvent;
       state.event.id = eventId;
-      syncUrl("setup");
+      syncUrl("setup", eventId);
       await routeAndLoad();
     });
   });
@@ -2396,8 +2401,9 @@ async function routeAndLoad() {
 
   if (route.page === "setup" || route.page === "branding" || route.page === "live") {
     safeUnsub("publicEvents");
-    if (state.event.id) {
-      subscribeToEvent(state.event.id);
+    if (route.eventId) {
+      state.event.id = route.eventId;
+      subscribeToEvent(route.eventId);
     }
   }
 
