@@ -2189,8 +2189,7 @@ function bindDashboardActions() {
       const eventId = item.dataset.openEvent;
       state.event.id = eventId;
       syncUrl("live");
-      subscribeToEvent(eventId);
-      render();
+      await routeAndLoad();
     });
   });
 
@@ -2199,8 +2198,7 @@ function bindDashboardActions() {
       const eventId = item.dataset.editEvent;
       state.event.id = eventId;
       syncUrl("setup");
-      subscribeToEvent(eventId);
-      render();
+      await routeAndLoad();
     });
   });
 
