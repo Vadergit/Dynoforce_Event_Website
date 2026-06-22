@@ -2520,14 +2520,17 @@ function bindBrandingActions() {
 }
 
 function bindLiveActions() {
-  root.querySelector("#participantFirstNameInput")?.addEventListener("input", (event) => {
-    state.liveEntry.firstName = event.target.value;
+  const syncParticipantInputs = () => {
+    state.liveEntry.firstName = root.querySelector("#participantFirstNameInput")?.value || "";
+    state.liveEntry.lastName = root.querySelector("#participantLastNameInput")?.value || "";
     updateLiveMeasurementDom();
-  });
-  root.querySelector("#participantLastNameInput")?.addEventListener("input", (event) => {
-    state.liveEntry.lastName = event.target.value;
-    updateLiveMeasurementDom();
-  });
+  };
+
+  root.querySelector("#participantFirstNameInput")?.addEventListener("input", syncParticipantInputs);
+  root.querySelector("#participantFirstNameInput")?.addEventListener("change", syncParticipantInputs);
+  root.querySelector("#participantLastNameInput")?.addEventListener("input", syncParticipantInputs);
+  root.querySelector("#participantLastNameInput")?.addEventListener("change", syncParticipantInputs);
+  syncParticipantInputs();
   root.querySelector("#saveResult")?.addEventListener("click", saveLiveResult);
   root.querySelector("#closeEvent")?.addEventListener("click", async () => {
     state.event.status = "Abgeschlossen";
