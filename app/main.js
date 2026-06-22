@@ -128,6 +128,7 @@ const state = {
     status: "Inaktiv",
     primaryColor: "#1f4f46",
     ownerUid: "",
+    participantCount: 0,
     createdAt: null,
     closedAt: null,
     ...emptyBranding,
@@ -1107,6 +1108,7 @@ function eventDocToState(id, data) {
     status: normalizeEventStatus(data.status),
     primaryColor: data.primaryColor || "#1f4f46",
     ownerUid: data.ownerUid || "",
+    participantCount: Number(data.participantCount || 0),
     createdAt: data.createdAt || null,
     closedAt: data.closedAt || null,
     eventLogo: data.eventLogo || "",
@@ -1142,6 +1144,7 @@ function subscribeToEvent(eventId) {
     attempts: 3,
     scoringMode: "Bester Versuch",
     status: "Inaktiv",
+    participantCount: 0,
     createdAt: null,
     closedAt: null,
   };
@@ -2450,6 +2453,7 @@ function bindDashboardActions() {
       scoringMode: "Bester Versuch",
       status: "Inaktiv",
       ownerUid: state.user.uid,
+      participantCount: 0,
       ...emptyBranding,
     };
     setResults([]);
