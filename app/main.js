@@ -1178,6 +1178,13 @@ function subscribeToEvent(eventId) {
     query(collection(db, "results"), where("eventId", "==", eventId)),
     (snapshot) => {
       if (state.loadingEventId !== eventId) return;
+      if (snapshot.empty && Number(state.event.participantCount || 0) > 0) {
+        if (!state.results.length) {
+          void primeEventState(eventId);
+        }
+        render();
+        return;
+      }
       setResults(snapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
