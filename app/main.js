@@ -97,16 +97,6 @@ const state = {
   escapeListenerBound: false,
   resultRefreshInFlight: {},
   resultRefreshCompleted: {},
-  debug: {
-    routeEventId: "",
-    loadEventId: "",
-    directResultsCount: null,
-    snapshotResultsCount: null,
-    renderResultsCount: 0,
-    cacheResultsCount: 0,
-    lastResultSource: "",
-    lastResultError: "",
-  },
   unsubscribers: {
     auth: null,
     dashboard: null,
@@ -157,7 +147,7 @@ const pageMeta = {
   dashboard: ["Dashboard", "Alle eigenen Events auf einen Blick mit Status, Teilnehmerzahl und Schnellzugriff."],
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
-  live: ["Live-Messseite 6", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
+  live: ["Live-Messseite", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
@@ -204,11 +194,8 @@ function setResults(results, { loaded = true, eventId = state.event.id, cache = 
   const sortedResults = sortResults(results);
   state.results = sortedResults;
   state.resultsLoaded = loaded;
-  state.debug.renderResultsCount = sortedResults.length;
-  state.debug.cacheResultsCount = eventId && state.resultCache[eventId] ? state.resultCache[eventId].length : 0;
   if (cache && eventId) {
     state.resultCache[eventId] = sortedResults;
-    state.debug.cacheResultsCount = sortedResults.length;
   }
 }
 
@@ -234,10 +221,6 @@ async function refreshResultsForEvent(eventId, { force = false } = {}) {
       id: resultDoc.id,
       ...resultDoc.data(),
     }));
-    state.debug.loadEventId = eventId;
-    state.debug.directResultsCount = results.length;
-    state.debug.lastResultSource = "direct-refresh";
-    state.debug.lastResultError = "";
     state.resultRefreshCompleted[eventId] = true;
     if (state.event.id === eventId || state.loadingEventId === eventId) {
       setResults(results, { eventId });
@@ -247,7 +230,6 @@ async function refreshResultsForEvent(eventId, { force = false } = {}) {
       render();
     }
   } catch (error) {
-    state.debug.lastResultError = error instanceof Error ? error.message : String(error);
     if (state.event.id === eventId || state.loadingEventId === eventId) {
       setError(`Resultate konnten nicht direkt geladen werden: ${error instanceof Error ? error.message : String(error)}`);
       render();
@@ -496,25 +478,7 @@ function resultEditorMarkup() {
 }
 
 function organizerEventPickerMarkup(page) {
-  if (!state.user || page === "dashboard" || page === "public" || page === "display" || !state.events.length) {
-    return "";
-  }
-
-  return `
-    <div class="card" style="margin-bottom:18px;">
-      <div class="card-header">
-        <div>
-          <h3>Ausgewähltes Event</h3>
-          <p>Wechsle direkt zwischen deinen Events, damit Setup, Branding und Resultate sicher zum richtigen Event gehören.</p>
-        </div>
-      </div>
-      <div class="action-row" style="margin-top:0;">
-        <select id="organizerEventPicker">
-          ${state.events.map((event) => `<option value="${event.id}" ${event.id === state.event.id ? "selected" : ""}>${escapeHtml(event.name || "Event")} · ${escapeHtml(event.status)} · ${event.participants} Resultate</option>`).join("")}
-        </select>
-      </div>
-    </div>
-  `;
+  return "";
 }
 
 function formatEntryDirection(entry) {
@@ -773,10 +737,6 @@ async function loadEventState(eventId) {
     id: resultDoc.id,
     ...resultDoc.data(),
   })), { eventId });
-  state.debug.loadEventId = eventId;
-  state.debug.directResultsCount = resultsSnapshot.size;
-  state.debug.lastResultSource = "initial-load";
-  state.debug.lastResultError = "";
   state.eventLoaded = true;
   state.loadingEventId = eventId;
   rememberActiveEventId(eventId);
@@ -2449,7 +2409,6 @@ function template(page) {
                 <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
               </div>
             </div>
-            ${resultEditorMarkup()}
           ` : ""}
           ${page === "public" ? `
             ${publicBrandingSection()}
