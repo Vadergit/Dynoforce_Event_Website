@@ -644,6 +644,8 @@ async function primeEventState(eventId) {
       getDocs(query(collection(db, "results"), where("eventId", "==", eventId))),
     ]);
 
+    if (state.loadingEventId !== eventId) return;
+
     if (eventSnapshot.exists()) {
       state.event = eventDocToState(eventSnapshot.id, eventSnapshot.data());
       setResults(resultsSnapshot.docs.map((resultDoc) => ({
@@ -653,9 +655,15 @@ async function primeEventState(eventId) {
       state.eventLoaded = true;
       state.loadingEventId = eventId;
       rememberActiveEventId(eventId);
+      if (state.user && Number(state.event.participantCount || 0) !== state.results.length) {
+        state.event.participantCount = state.results.length;
+        void syncEventParticipantCount(state.results.length);
+      }
+      render();
     }
   } catch (error) {
     setError(`Event konnte nicht vorbereitet werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
   }
 }
 
@@ -1138,6 +1146,7 @@ function subscribeToEvent(eventId) {
     closedAt: null,
   };
   render();
+  void primeEventState(eventId);
 
   state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), (snapshot) => {
     if (state.loadingEventId !== eventId) return;
