@@ -399,11 +399,18 @@ function getEditableResultNameParts(entry) {
   };
 }
 
-async function updateResultParticipantName(resultId, firstName, lastName) {
+async function updateResultEntry(resultId, firstName, lastName, value) {
   const cleanFirstName = firstName.trim();
   const cleanLastName = lastName.trim();
   if (!cleanFirstName || !cleanLastName) {
     setError("Vorname und Name müssen beide ausgefüllt sein.");
+    render();
+    return;
+  }
+
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    setError("Der Resultatwert muss eine gültige positive Zahl sein.");
     render();
     return;
   }
@@ -414,13 +421,14 @@ async function updateResultParticipantName(resultId, firstName, lastName) {
       firstName: cleanFirstName,
       lastName: cleanLastName,
       participantName,
+      value: Number(numericValue.toFixed(1)),
       updatedAt: serverTimestamp(),
     });
     clearError();
-    setFlash(`Teilnehmername aktualisiert: ${participantName}`);
+    setFlash(`Resultat aktualisiert: ${participantName} · ${numericValue.toFixed(1)} kg`);
     render();
   } catch (error) {
-    setError(`Teilnehmername konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`);
+    setError(`Resultat konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`);
     render();
   }
 }
@@ -1967,7 +1975,7 @@ function template(page) {
               </div>
             </div>
             <div class="card" style="margin-top:18px;">
-              <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen korrigieren oder einzelne Einträge aus der Rangliste entfernen.</p></div></div>
+              <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen, Resultatwerte und einzelne Einträge direkt korrigieren.</p></div></div>
               <div class="event-list moderation-list">
                 ${state.results.map((entry) => {
                   const nameParts = getEditableResultNameParts(entry);
@@ -1976,6 +1984,7 @@ function template(page) {
                       <div class="moderation-fields">
                         <div class="field"><label>Vorname</label><input data-result-first-name="${entry.id}" value="${escapeHtml(nameParts.firstName)}" /></div>
                         <div class="field"><label>Name</label><input data-result-last-name="${entry.id}" value="${escapeHtml(nameParts.lastName)}" /></div>
+                        <div class="field"><label>Resultat in kg</label><input data-result-value="${entry.id}" type="number" min="0" step="0.1" value="${Number(entry.value || 0).toFixed(1)}" /></div>
                       </div>
                       <div class="event-item-actions">
                         <div class="metric-stack">
@@ -1983,7 +1992,7 @@ function template(page) {
                           <span>${escapeHtml(formatEntryDirection(entry))} · ${escapeHtml(formatDate(resultCreatedAtDate(entry)) || "ohne Datum")}</span>
                         </div>
                         <div class="action-row compact">
-                          <button class="button" data-update-result="${entry.id}">Name speichern</button>
+                          <button class="button" data-update-result="${entry.id}">Änderungen speichern</button>
                           <button class="button danger" data-delete-result="${entry.id}">Resultat entfernen</button>
                         </div>
                       </div>
@@ -2245,7 +2254,8 @@ function bindSetupActions() {
       const resultId = button.dataset.updateResult;
       const firstName = root.querySelector(`[data-result-first-name="${resultId}"]`)?.value || "";
       const lastName = root.querySelector(`[data-result-last-name="${resultId}"]`)?.value || "";
-      await updateResultParticipantName(resultId, firstName, lastName);
+      const value = root.querySelector(`[data-result-value="${resultId}"]`)?.value || "";
+      await updateResultEntry(resultId, firstName, lastName, value);
     });
   });
 
