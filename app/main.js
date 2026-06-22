@@ -97,6 +97,16 @@ const state = {
   escapeListenerBound: false,
   resultRefreshInFlight: {},
   resultRefreshCompleted: {},
+  debug: {
+    routeEventId: "",
+    loadEventId: "",
+    directResultsCount: null,
+    snapshotResultsCount: null,
+    renderResultsCount: 0,
+    cacheResultsCount: 0,
+    lastResultSource: "",
+    lastResultError: "",
+  },
   unsubscribers: {
     auth: null,
     dashboard: null,
@@ -147,7 +157,7 @@ const pageMeta = {
   dashboard: ["Dashboard", "Alle eigenen Events auf einen Blick mit Status, Teilnehmerzahl und Schnellzugriff."],
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
-  live: ["Live-Messseite 4", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
+  live: ["Live-Messseite 6", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
@@ -159,9 +169,21 @@ function slugify(value) {
   return String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "event";
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "—";
+function formatDate(dateValue) {
+  if (!dateValue) return "—";
+  if (typeof dateValue?.toDate === "function") {
+    return formatDate(dateValue.toDate());
+  }
+  if (dateValue instanceof Date) {
+    if (Number.isNaN(dateValue.getTime())) return "—";
+    const day = String(dateValue.getDate()).padStart(2, "0");
+    const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+    const year = dateValue.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
+  const dateString = String(dateValue);
   const [year, month, day] = dateString.split("-");
+  if (!year || !month || !day) return dateString;
   return `${day}.${month}.${year}`;
 }
 
@@ -182,8 +204,11 @@ function setResults(results, { loaded = true, eventId = state.event.id, cache = 
   const sortedResults = sortResults(results);
   state.results = sortedResults;
   state.resultsLoaded = loaded;
+  state.debug.renderResultsCount = sortedResults.length;
+  state.debug.cacheResultsCount = eventId && state.resultCache[eventId] ? state.resultCache[eventId].length : 0;
   if (cache && eventId) {
     state.resultCache[eventId] = sortedResults;
+    state.debug.cacheResultsCount = sortedResults.length;
   }
 }
 
@@ -209,6 +234,10 @@ async function refreshResultsForEvent(eventId, { force = false } = {}) {
       id: resultDoc.id,
       ...resultDoc.data(),
     }));
+    state.debug.loadEventId = eventId;
+    state.debug.directResultsCount = results.length;
+    state.debug.lastResultSource = "direct-refresh";
+    state.debug.lastResultError = "";
     state.resultRefreshCompleted[eventId] = true;
     if (state.event.id === eventId || state.loadingEventId === eventId) {
       setResults(results, { eventId });
@@ -218,6 +247,7 @@ async function refreshResultsForEvent(eventId, { force = false } = {}) {
       render();
     }
   } catch (error) {
+    state.debug.lastResultError = error instanceof Error ? error.message : String(error);
     if (state.event.id === eventId || state.loadingEventId === eventId) {
       setError(`Resultate konnten nicht direkt geladen werden: ${error instanceof Error ? error.message : String(error)}`);
       render();
@@ -743,6 +773,10 @@ async function loadEventState(eventId) {
     id: resultDoc.id,
     ...resultDoc.data(),
   })), { eventId });
+  state.debug.loadEventId = eventId;
+  state.debug.directResultsCount = resultsSnapshot.size;
+  state.debug.lastResultSource = "initial-load";
+  state.debug.lastResultError = "";
   state.eventLoaded = true;
   state.loadingEventId = eventId;
   rememberActiveEventId(eventId);
