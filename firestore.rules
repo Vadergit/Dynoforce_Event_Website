@@ -36,7 +36,15 @@ service cloud.firestore {
         && request.resource.data.participantName.size() > 0
         && request.resource.data.participantName.size() <= 80
         && request.resource.data.value is number;
-      allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if signedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        ownsEvent(resource.data.eventId) ||
+        (
+          request.resource.data.eventId is string &&
+          ownsEvent(request.resource.data.eventId) &&
+          request.resource.data.ownerUid == request.auth.uid
+        )
+      );
     }
   }
 }

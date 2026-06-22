@@ -466,6 +466,8 @@ async function updateResultEntry(resultId, firstName, lastName, value) {
   const participantName = `${cleanFirstName} ${cleanLastName}`.trim();
   try {
     await updateDoc(doc(db, "results", resultId), {
+      ownerUid: state.user?.uid || state.event.ownerUid || "",
+      eventId: state.event.id,
       firstName: cleanFirstName,
       lastName: cleanLastName,
       participantName,
