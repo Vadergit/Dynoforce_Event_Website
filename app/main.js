@@ -1161,6 +1161,9 @@ function subscribeToEvent(eventId) {
       } else {
         clearError();
       }
+      if (!state.results.length && Number(state.event.participantCount || 0) > 0) {
+        void primeEventState(eventId);
+      }
       render();
     } else {
       setError(`Event ${eventId} wurde nicht gefunden.`);
@@ -1178,10 +1181,15 @@ function subscribeToEvent(eventId) {
     query(collection(db, "results"), where("eventId", "==", eventId)),
     (snapshot) => {
       if (state.loadingEventId !== eventId) return;
-      if (snapshot.empty && Number(state.event.participantCount || 0) > 0) {
-        if (!state.results.length) {
+      if (snapshot.empty) {
+        const shouldVerifyEmptyResults = !state.eventLoaded || state.results.length > 0 || Number(state.event.participantCount || 0) > 0;
+        state.resultsLoaded = true;
+        if (shouldVerifyEmptyResults) {
           void primeEventState(eventId);
+          render();
+          return;
         }
+        setResults([]);
         render();
         return;
       }
