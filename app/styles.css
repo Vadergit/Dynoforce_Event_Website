@@ -491,6 +491,19 @@ a {
   font-weight: 700;
 }
 
+.button.subtle {
+  background: #f6f4ee;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.button.subtle.is-active {
+  background: var(--primary-soft);
+  border-color: rgba(31, 79, 70, 0.18);
+  color: var(--primary);
+  font-weight: 700;
+}
+
 .button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -611,6 +624,13 @@ a {
   display: grid;
   gap: 12px;
   justify-items: end;
+}
+
+.status-switches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .moderation-list {

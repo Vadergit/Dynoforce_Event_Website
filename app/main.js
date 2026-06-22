@@ -467,6 +467,35 @@ async function deleteEventWithResults(eventId) {
   }
 }
 
+async function updateEventStatus(eventId, status) {
+  try {
+    const payload = {
+      status,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (status === "Abgeschlossen") {
+      payload.closedAt = serverTimestamp();
+    } else {
+      payload.closedAt = null;
+    }
+
+    await setDoc(doc(db, "events", eventId), payload, { merge: true });
+
+    if (state.event.id === eventId) {
+      state.event.status = status;
+      state.event.closedAt = status === "Abgeschlossen" ? new Date().toISOString() : null;
+    }
+
+    clearError();
+    setFlash(`Eventstatus aktualisiert: ${status}`);
+    render();
+  } catch (error) {
+    setError(`Eventstatus konnte nicht geändert werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
+}
+
 async function finalizeParticipantResult(forceManualSave = false) {
   if (!state.user) {
     setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
@@ -1940,7 +1969,7 @@ function template(page) {
               <div class="card">
                 <div class="card-header"><div><h3>Meine Events</h3><p>${state.dashboardLoaded ? "Übersicht aller eigenen Veranstaltungen mit Status und Teilnehmerzahl." : "Lade Events aus Firestore..."}</p></div><button class="button primary" id="createEvent">Neues Event</button></div>
                 <div class="event-list">
-                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-badge">${escapeHtml(event.status)}</div><div class="action-row compact"><button class="button" data-open-event="${event.id}">Live</button><button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
+                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-badge">${escapeHtml(event.status)}</div><div class="status-switches"><button class="button subtle ${event.status === "Live" ? "is-active" : ""}" data-set-status="${event.id}" data-status-value="Live">Live</button><button class="button subtle ${event.status === "Inaktiv" || event.status === "Geplant" || event.status === "Archiviert" ? "is-active" : ""}" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button><button class="button subtle ${event.status === "Abgeschlossen" ? "is-active" : ""}" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button></div><div class="action-row compact"><button class="button" data-open-event="${event.id}">Live Ansicht</button><button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
                 </div>
               </div>
               <div class="grid">
@@ -2218,6 +2247,14 @@ function bindDashboardActions() {
         return;
       }
       await deleteEventWithResults(eventId);
+    });
+  });
+
+  root.querySelectorAll("[data-set-status]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const eventId = button.dataset.setStatus;
+      const status = button.dataset.statusValue;
+      await updateEventStatus(eventId, status);
     });
   });
 }
