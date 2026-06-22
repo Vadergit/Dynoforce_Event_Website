@@ -147,7 +147,7 @@ const pageMeta = {
   dashboard: ["Dashboard", "Alle eigenen Events auf einen Blick mit Status, Teilnehmerzahl und Schnellzugriff."],
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
-  live: ["Live-Messseite 2", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
+  live: ["Live-Messseite 3", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
@@ -2667,7 +2667,6 @@ function bindPublicActions() {
 
 function render() {
   hydrateResultsFromCache();
-  ensureOrganizerResults();
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
@@ -2713,6 +2712,9 @@ async function routeAndLoad() {
         syncUrl(route.page, organizerEventId);
       }
       subscribeToEvent(organizerEventId);
+      if (route.page === "setup" || route.page === "live") {
+        void refreshResultsForEvent(organizerEventId, { force: true });
+      }
     } else {
       state.currentPage = "dashboard";
       syncUrl("dashboard");
