@@ -91,6 +91,7 @@ const state = {
   dashboardLoaded: false,
   publicEventsLoaded: false,
   eventLoaded: false,
+  resultsLoaded: false,
   loadingEventId: "",
   currentPage: "dashboard",
   escapeListenerBound: false,
@@ -167,6 +168,27 @@ function formatLongDate(dateString) {
 function averageValue() {
   if (!state.results.length) return 0;
   return state.results.reduce((sum, item) => sum + item.value, 0) / state.results.length;
+}
+
+function sortResults(results) {
+  return [...results].sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+}
+
+function setResults(results, { loaded = true } = {}) {
+  state.results = sortResults(results);
+  state.resultsLoaded = loaded;
+}
+
+function getParticipantCountLabel() {
+  return state.resultsLoaded ? String(state.results.length) : "Wird geladen...";
+}
+
+function getBestResultLabel() {
+  return state.resultsLoaded ? `${Number(state.results[0]?.value || 0).toFixed(1)} kg` : "Wird geladen...";
+}
+
+function getAverageLabel() {
+  return state.resultsLoaded ? `${averageValue().toFixed(1)} kg` : "Wird geladen...";
 }
 
 function isDailyChallengeType(value = state.event.challengeType) {
@@ -337,6 +359,17 @@ function getDashboardMeta() {
 }
 
 function resultEditorMarkup() {
+  if (!state.resultsLoaded) {
+    return `
+      <div class="card" style="margin-top:18px;">
+        <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Resultate werden aus Firestore geladen.</p></div></div>
+        <div class="event-list moderation-list">
+          <div class="event-item"><div><h4>Resultate werden geladen</h4><p>Bitte kurz warten, bis alle Einträge vollständig synchronisiert sind.</p></div></div>
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="card" style="margin-top:18px;">
       <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen, Resultatwerte und einzelne Einträge direkt korrigieren.</p></div></div>
@@ -496,6 +529,20 @@ async function updateResultEntry(resultId, firstName, lastName, value) {
       value: Number(numericValue.toFixed(1)),
       updatedAt: serverTimestamp(),
     });
+    setResults(
+      state.results.map((entry) => (entry.id === resultId
+        ? {
+            ...entry,
+            ownerUid: state.user?.uid || state.event.ownerUid || "",
+            eventId: state.event.id,
+            firstName: cleanFirstName,
+            lastName: cleanLastName,
+            participantName,
+            value: Number(numericValue.toFixed(1)),
+            updatedAt: new Date(),
+          }
+        : entry)),
+    );
     clearError();
     setFlash(`Resultat aktualisiert: ${participantName} · ${numericValue.toFixed(1)} kg`);
     render();
@@ -506,13 +553,19 @@ async function updateResultEntry(resultId, firstName, lastName, value) {
 }
 
 async function deleteResultEntry(resultId) {
+  const previousResults = [...state.results];
+  const previousParticipantCount = Number(state.event.participantCount || state.results.length);
   try {
+    setResults(state.results.filter((entry) => entry.id !== resultId));
+    state.event.participantCount = state.results.length;
     await deleteDoc(doc(db, "results", resultId));
-    await syncEventParticipantCount(Math.max(0, state.results.length - 1));
+    await syncEventParticipantCount(state.results.length);
     clearError();
     setFlash("Resultat wurde aus der Rangliste entfernt.");
     render();
   } catch (error) {
+    setResults(previousResults);
+    state.event.participantCount = previousParticipantCount;
     setError(`Resultat konnte nicht gelöscht werden: ${error instanceof Error ? error.message : String(error)}`);
     render();
   }
@@ -525,7 +578,7 @@ async function deleteEventWithResults(eventId) {
     await deleteDoc(doc(db, "events", eventId));
 
     if (state.event.id === eventId) {
-      state.results = [];
+      setResults([]);
       resetLiveEntryState();
     }
 
@@ -579,10 +632,10 @@ async function primeEventState(eventId) {
 
     if (eventSnapshot.exists()) {
       state.event = eventDocToState(eventSnapshot.id, eventSnapshot.data());
-      state.results = resultsSnapshot.docs.map((resultDoc) => ({
+      setResults(resultsSnapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
-      })).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+      })));
       state.eventLoaded = true;
       state.loadingEventId = eventId;
       rememberActiveEventId(eventId);
@@ -632,7 +685,7 @@ async function finalizeParticipantResult(forceManualSave = false) {
     await ensureEventWritable();
 
     const finalValue = Number(getFinalAttemptValue(attempts).toFixed(1));
-    await addDoc(collection(db, "results"), {
+    const resultPayload = {
       eventId: state.event.id,
       ownerUid: state.user.uid,
       firstName,
@@ -646,17 +699,18 @@ async function finalizeParticipantResult(forceManualSave = false) {
       attemptsValues: attempts.map((attempt) => Number(attempt.value.toFixed(1))),
       scoringMode: state.event.scoringMode,
       createdAt: serverTimestamp(),
-    });
-
-    await setDoc(
-      doc(db, "events", state.event.id),
+    };
+    const resultRef = await addDoc(collection(db, "results"), resultPayload);
+    setResults([
+      ...state.results,
       {
-        ownerUid: state.user.uid,
-        participantCount: state.results.length + 1,
-        updatedAt: serverTimestamp(),
+        id: resultRef.id,
+        ...resultPayload,
+        createdAt: new Date(),
       },
-      { merge: true },
-    );
+    ]);
+    state.event.participantCount = state.results.length;
+    await syncEventParticipantCount(state.results.length);
 
     const savedName = participantName;
     resetLiveEntryState();
@@ -1049,7 +1103,7 @@ function subscribeToEvent(eventId) {
   safeUnsub("results");
   state.eventLoaded = false;
   state.loadingEventId = eventId;
-  state.results = [];
+  setResults([], { loaded: false });
   rememberActiveEventId(eventId);
   state.event = {
     ...state.event,
@@ -1101,14 +1155,19 @@ function subscribeToEvent(eventId) {
     query(collection(db, "results"), where("eventId", "==", eventId)),
     (snapshot) => {
       if (state.loadingEventId !== eventId) return;
-      state.results = snapshot.docs.map((resultDoc) => ({
+      setResults(snapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
-      })).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+      })));
+      if (state.user && state.event.id === eventId && Number(state.event.participantCount || 0) !== state.results.length) {
+        state.event.participantCount = state.results.length;
+        void syncEventParticipantCount(state.results.length);
+      }
       render();
     },
     (error) => {
       if (state.loadingEventId !== eventId) return;
+      state.resultsLoaded = true;
       setError(`Resultate konnten nicht geladen werden: ${error.message}`);
       render();
     },
@@ -1746,7 +1805,7 @@ function updateLiveMeasurementDom() {
   };
 
   setText("liveForceValue", getDisplayForceValue().toFixed(1));
-  setText("liveRecordValue", `${Number(state.results[0]?.value || 0).toFixed(1)} kg`);
+  setText("liveRecordValue", state.resultsLoaded ? `${Number(state.results[0]?.value || 0).toFixed(1)} kg` : "Wird geladen...");
   setText("livePlacementValue", getLivePlacement());
   setText("liveDirectionValue", formatDirectionLabel(state.forceDirection));
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
@@ -2131,7 +2190,7 @@ function template(page) {
                 </div>
               </div>
               <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>Schnellübersicht</h3><p>Live mit Firestore synchronisiert.</p></div></div><div class="metric-list"><div class="metric-line"><span>Aktives Event</span><strong>${state.event.name}</strong></div><div class="metric-line"><span>Challenge</span><strong>${state.event.challengeType}</strong></div><div class="metric-line"><span>Teilnehmer</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Status</span><strong>${state.event.status}</strong></div></div></div>
+                <div class="card"><div class="card-header"><div><h3>Schnellübersicht</h3><p>Live mit Firestore synchronisiert.</p></div></div><div class="metric-list"><div class="metric-line"><span>Aktives Event</span><strong>${state.event.name}</strong></div><div class="metric-line"><span>Challenge</span><strong>${state.event.challengeType}</strong></div><div class="metric-line"><span>Teilnehmer</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Status</span><strong>${state.event.status}</strong></div></div></div>
                 <div class="card"><div class="card-header"><div><h3>Direktlinks</h3><p>Öffentliche Ansichten für Tests.</p></div></div><div class="metric-list"><div class="metric-line"><span>Public URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div><div class="metric-line"><span>Display URL</span><strong><a href="${displayUrl}" target="_blank" rel="noopener noreferrer">${displayUrl}</a></strong></div></div></div>
               </div>
             </div>
@@ -2200,7 +2259,7 @@ function template(page) {
                 <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid two"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div></div></div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${state.resultsLoaded ? `${Number(record).toFixed(1)} kg` : "Wird geladen..."}</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
                   <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                   ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
@@ -2208,7 +2267,7 @@ function template(page) {
                 </div>
               </div>
               <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Getrennte Ranglisten für Ziehen und Drücken." : "Top 10 permanent sichtbar und automatisch aktualisiert."}</p></div></div><div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
+                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Getrennte Ranglisten für Ziehen und Drücken." : "Top 10 permanent sichtbar und automatisch aktualisiert."}</p></div></div><div class="grid">${state.resultsLoaded ? leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("") : `<div class="event-item"><div><h4>Leaderboard wird geladen</h4><p>Die Resultate werden gerade mit Firestore synchronisiert.</p></div></div>`}</div></div>
                 <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
               </div>
             </div>
@@ -2218,17 +2277,17 @@ function template(page) {
             ${publicBrandingSection()}
             <div class="grid two">
               <div class="card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div>${state.event.organiserEmail ? `<div class="metric-line"><span>Kontakt</span><strong>${state.event.organiserEmail}</strong></div>` : ""}<div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
-              <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${average.toFixed(1)} kg</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
+              <div class="card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${getBestResultLabel()}</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${getAverageLabel()}</strong></div></div><div class="action-row"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
             </div>
             ${isDailyChallengeType() ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
             <div class="grid" style="margin-top:18px;">
-              <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
+              <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${state.resultsLoaded ? leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("") : `<div class="event-item"><div><h4>Resultate werden geladen</h4><p>Die Ranglisten erscheinen, sobald Firestore vollständig synchronisiert ist.</p></div></div>`}</div></div>
             </div>
           ` : ""}
           ${page === "display" ? `
             <div class="grid two">
               <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 10 · ${state.event.challengeType} · Letztes Resultat live</p>${isDailyChallengeType() ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}<div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="display-board">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
-              <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${state.results.length}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
+              <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${state.resultsLoaded ? (last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat") : "Resultate werden geladen"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
             </div>
           ` : ""}
         </div>
@@ -2355,7 +2414,7 @@ function bindDashboardActions() {
       ownerUid: state.user.uid,
       ...emptyBranding,
     };
-    state.results = [];
+    setResults([]);
     state.liveEntry = {
       firstName: "",
       lastName: "",
