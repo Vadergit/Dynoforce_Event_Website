@@ -461,6 +461,11 @@ function resetLiveEntryState() {
   state.previousForce = 0;
   state.wentBelowThreshold = false;
   state.elapsedSeconds = 0;
+
+  const firstNameInput = document.getElementById("participantFirstNameInput");
+  const lastNameInput = document.getElementById("participantLastNameInput");
+  if (firstNameInput) firstNameInput.value = "";
+  if (lastNameInput) lastNameInput.value = "";
 }
 
 async function ensureEventWritable() {
