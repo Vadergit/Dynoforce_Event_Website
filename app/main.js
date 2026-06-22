@@ -512,6 +512,41 @@ async function updateEventStatus(eventId, status) {
   }
 }
 
+async function migrateResultsToCurrentEvent(sourceEventId) {
+  if (!state.user || !state.event.id || !sourceEventId || sourceEventId === state.event.id) return;
+  try {
+    const resultsSnapshot = await getDocs(query(collection(db, "results"), where("eventId", "==", sourceEventId)));
+    if (!resultsSnapshot.docs.length) {
+      setError("Im ausgewählten Quell-Event wurden keine Resultate gefunden.");
+      render();
+      return;
+    }
+
+    await Promise.all(resultsSnapshot.docs.map((resultDoc) => updateDoc(resultDoc.ref, {
+      eventId: state.event.id,
+      ownerUid: state.user.uid,
+      updatedAt: serverTimestamp(),
+    })));
+
+    await setDoc(doc(db, "events", sourceEventId), {
+      participantCount: 0,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    await setDoc(doc(db, "events", state.event.id), {
+      participantCount: state.results.length + resultsSnapshot.docs.length,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    clearError();
+    setFlash(`${resultsSnapshot.docs.length} Resultate wurden ins aktuelle Event übernommen.`);
+    render();
+  } catch (error) {
+    setError(`Resultate konnten nicht übernommen werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
+}
+
 async function finalizeParticipantResult(forceManualSave = false) {
   if (!state.user) {
     setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
@@ -1979,6 +2014,7 @@ function template(page) {
   const record = state.results[0]?.value || 0;
   const average = averageValue();
   const last = state.results[state.results.length - 1];
+  const migrationCandidates = state.events.filter((event) => event.id !== state.event.id && Number(event.participants || 0) > 0);
   const lockedPage = !state.user && ["dashboard", "setup", "branding", "live"].includes(page);
   const navItems = state.user
     ? Object.keys(pageMeta).map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")
@@ -2068,6 +2104,18 @@ function template(page) {
             </div>
             <div class="card" style="margin-top:18px;">
               <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen, Resultatwerte und einzelne Einträge direkt korrigieren.</p></div></div>
+              ${!state.results.length && migrationCandidates.length ? `
+                <div class="upload-hint" style="margin-bottom:16px;">
+                  <strong>Alte Resultate übernehmen</strong>
+                  <p>Falls Resultate vor den letzten Änderungen unter einem älteren Event-Datensatz gespeichert wurden, kannst du sie hier ins aktuelle Event übernehmen.</p>
+                  <div class="action-row" style="margin-top:12px;">
+                    <select id="resultMigrationSource">
+                      ${migrationCandidates.map((event) => `<option value="${event.id}">${escapeHtml(event.name || "Event")} · ${event.participants} Resultate</option>`).join("")}
+                    </select>
+                    <button class="button" id="migrateResultsButton">Resultate übernehmen</button>
+                  </div>
+                </div>
+              ` : ""}
               <div class="event-list moderation-list">
                 ${state.results.map((entry) => {
                   const nameParts = getEditableResultNameParts(entry);
@@ -2383,6 +2431,15 @@ function bindSetupActions() {
       }
       await deleteResultEntry(resultId);
     });
+  });
+
+  root.querySelector("#migrateResultsButton")?.addEventListener("click", async () => {
+    const sourceEventId = root.querySelector("#resultMigrationSource")?.value;
+    if (!sourceEventId) return;
+    if (!window.confirm("Resultate aus dem ausgewählten älteren Event in dieses Event übernehmen?")) {
+      return;
+    }
+    await migrateResultsToCurrentEvent(sourceEventId);
   });
 }
 
