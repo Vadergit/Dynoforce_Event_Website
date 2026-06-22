@@ -119,6 +119,50 @@ a {
   background: var(--surface);
 }
 
+.device-panel {
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff 0%, #fbfaf6 100%);
+  box-shadow: 0 14px 32px rgba(23, 23, 23, 0.05);
+}
+
+.device-panel-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.device-battery {
+  font-size: 22px;
+  letter-spacing: -0.04em;
+}
+
+.device-meta {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.device-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.device-meta-row span {
+  color: var(--muted);
+}
+
+.device-meta-row strong {
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
 .panel-label,
 .eyebrow {
   font-size: 11px;
@@ -217,6 +261,14 @@ a {
   display: inline-flex;
   gap: 10px;
   align-items: center;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .icon-button {
@@ -889,6 +941,11 @@ th {
 
   .topbar {
     flex-direction: column;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .force-value {

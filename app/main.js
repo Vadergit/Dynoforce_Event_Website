@@ -1896,12 +1896,17 @@ function template(page) {
           ${navItems}
         </nav>
         ${state.user ? `
-          <div class="panel">
-            <div class="panel-label">Event Status</div>
-            <div class="status-row"><div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div><strong id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong></div>
-            <div class="status-row"><span class="muted">Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
+          <div class="panel device-panel">
+            <div class="panel-label">Geräte Status</div>
+            <div class="device-panel-top">
+              <div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div>
+              <strong class="device-battery" id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong>
+            </div>
+            <div class="device-meta">
+              <div class="device-meta-row"><span>Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
+              <div class="device-meta-row"><span>Verbindung</span><strong>${state.connected ? "Aktiv" : "Warte auf Verbindung"}</strong></div>
+            </div>
             <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
-            <div class="action-row" style="margin-top:10px;"><button class="button" id="logoutButton">Abmelden</button></div>
           </div>
         ` : ""}
         <div class="sidebar-footer">
@@ -1914,7 +1919,7 @@ function template(page) {
           <div class="topbar">
             <div><div class="eyebrow">DynoForce Event System</div><h2>${page === "dashboard" ? dashboardTitle : pageMeta[page][0]}</h2><p>${page === "dashboard" ? dashboardText : pageMeta[page][1]}</p></div>
             ${state.user
-              ? `<div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div>`
+              ? `<div class="topbar-actions"><div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div><button class="button" id="logoutButton">Abmelden</button></div>`
               : `<button class="button" id="openLoginModal">Anmelden</button>`}
           </div>
           ${state.lastError ? `<div class="notice error">${state.lastError}</div>` : ""}
