@@ -734,6 +734,14 @@ function syncUrl(page, eventId = state.event.id) {
   history.replaceState(null, "", page === "dashboard" ? `${APP_BASE}/` : `${APP_BASE}/#/${page}`);
 }
 
+function getOrganizerPageUrl(page, eventId = state.event.id) {
+  if (page === "dashboard") return `${APP_BASE}/`;
+  if (page === "public") return `${APP_BASE}/#/e/${eventId}`;
+  if (page === "display") return `${APP_BASE}/#/display/${eventId}`;
+  if (["setup", "branding", "live"].includes(page)) return `${APP_BASE}/#/${page}/${eventId}`;
+  return `${APP_BASE}/#/${page}`;
+}
+
 function parseDeviceInfo(dataView) {
   if (!dataView || dataView.byteLength === 0) return null;
   try {
@@ -2328,18 +2336,16 @@ function bindDashboardActions() {
   root.querySelectorAll("[data-open-event]").forEach((item) => {
     item.addEventListener("click", async () => {
       const eventId = item.dataset.openEvent;
-      await primeEventState(eventId);
-      syncUrl("live", eventId);
-      await routeAndLoad();
+      rememberActiveEventId(eventId);
+      window.location.assign(getOrganizerPageUrl("live", eventId));
     });
   });
 
   root.querySelectorAll("[data-edit-event]").forEach((item) => {
     item.addEventListener("click", async () => {
       const eventId = item.dataset.editEvent;
-      await primeEventState(eventId);
-      syncUrl("setup", eventId);
-      await routeAndLoad();
+      rememberActiveEventId(eventId);
+      window.location.assign(getOrganizerPageUrl("setup", eventId));
     });
   });
 
