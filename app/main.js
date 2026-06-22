@@ -291,14 +291,32 @@ function isDirectionAllowed(direction) {
   return false;
 }
 
+function readLiveParticipantInputs() {
+  const firstNameInput = document.getElementById("participantFirstNameInput");
+  const lastNameInput = document.getElementById("participantLastNameInput");
+  const firstName = String(firstNameInput?.value ?? state.liveEntry.firstName ?? "").trim();
+  const lastName = String(lastNameInput?.value ?? state.liveEntry.lastName ?? "").trim();
+  return { firstName, lastName, participantName: [firstName, lastName].filter(Boolean).join(" ").trim() };
+}
+
+function syncLiveEntryFromInputs() {
+  const { firstName, lastName } = readLiveParticipantInputs();
+  state.liveEntry.firstName = firstName;
+  state.liveEntry.lastName = lastName;
+}
+
 function getLiveParticipantDisplayName() {
-  return [state.liveEntry.firstName, state.liveEntry.lastName].map((value) => value.trim()).filter(Boolean).join(" ");
+  syncLiveEntryFromInputs();
+  return [state.liveEntry.firstName, state.liveEntry.lastName].filter(Boolean).join(" ");
 }
 
 function getParticipantNameParts() {
-  const firstName = (state.liveEntry.firstName || "").trim();
-  const lastName = (state.liveEntry.lastName || "").trim();
-  return { firstName, lastName, participantName: [firstName, lastName].filter(Boolean).join(" ").trim() };
+  syncLiveEntryFromInputs();
+  return {
+    firstName: state.liveEntry.firstName,
+    lastName: state.liveEntry.lastName,
+    participantName: [state.liveEntry.firstName, state.liveEntry.lastName].filter(Boolean).join(" ").trim(),
+  };
 }
 
 function getCompletedAttemptsCount() {
@@ -2526,8 +2544,7 @@ function bindBrandingActions() {
 
 function bindLiveActions() {
   const syncParticipantInputs = () => {
-    state.liveEntry.firstName = root.querySelector("#participantFirstNameInput")?.value || "";
-    state.liveEntry.lastName = root.querySelector("#participantLastNameInput")?.value || "";
+    syncLiveEntryFromInputs();
     updateLiveMeasurementDom();
   };
 
