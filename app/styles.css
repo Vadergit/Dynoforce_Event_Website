@@ -626,11 +626,27 @@ a {
   justify-items: end;
 }
 
-.status-switches {
-  display: flex;
+.status-menu {
+  position: relative;
+}
+
+.status-menu-trigger {
+  min-width: 148px;
+}
+
+.status-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  min-width: 160px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px rgba(23, 23, 23, 0.08);
 }
 
 .moderation-list {
