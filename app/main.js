@@ -95,6 +95,8 @@ const state = {
   loadingEventId: "",
   currentPage: "dashboard",
   escapeListenerBound: false,
+  resultRefreshInFlight: {},
+  resultRefreshCompleted: {},
   unsubscribers: {
     auth: null,
     dashboard: null,
@@ -193,6 +195,43 @@ function hydrateResultsFromCache(eventId = state.event.id) {
     return true;
   }
   return false;
+}
+
+async function refreshResultsForEvent(eventId, { force = false } = {}) {
+  if (!eventId) return;
+  if (!force && state.resultRefreshInFlight[eventId]) return;
+  if (!force && state.resultRefreshCompleted[eventId] && state.results.length) return;
+
+  state.resultRefreshInFlight[eventId] = true;
+  try {
+    const resultsSnapshot = await getDocs(query(collection(db, "results"), where("eventId", "==", eventId)));
+    const results = resultsSnapshot.docs.map((resultDoc) => ({
+      id: resultDoc.id,
+      ...resultDoc.data(),
+    }));
+    state.resultRefreshCompleted[eventId] = true;
+    if (state.event.id === eventId || state.loadingEventId === eventId) {
+      setResults(results, { eventId });
+      if (Number(state.event.participantCount || 0) !== results.length) {
+        state.event.participantCount = results.length;
+      }
+      render();
+    }
+  } catch (error) {
+    if (state.event.id === eventId || state.loadingEventId === eventId) {
+      setError(`Resultate konnten nicht direkt geladen werden: ${error instanceof Error ? error.message : String(error)}`);
+      render();
+    }
+  } finally {
+    state.resultRefreshInFlight[eventId] = false;
+  }
+}
+
+function ensureOrganizerResults() {
+  const isOrganizerPage = state.user && (state.currentPage === "live" || state.currentPage === "setup");
+  if (!isOrganizerPage || !state.event.id || state.results.length) return;
+  if (hydrateResultsFromCache(state.event.id)) return;
+  void refreshResultsForEvent(state.event.id);
 }
 
 function getParticipantCountLabel() {
@@ -2628,6 +2667,7 @@ function bindPublicActions() {
 
 function render() {
   hydrateResultsFromCache();
+  ensureOrganizerResults();
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
