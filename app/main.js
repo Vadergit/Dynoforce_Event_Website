@@ -135,6 +135,7 @@ const state = {
   },
   events: [],
   publicEvents: [],
+  resultCache: {},
   results: [],
 };
 
@@ -144,7 +145,7 @@ const pageMeta = {
   dashboard: ["Dashboard", "Alle eigenen Events auf einen Blick mit Status, Teilnehmerzahl und Schnellzugriff."],
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
-  live: ["Live-Messseite 1", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
+  live: ["Live-Messseite 2", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
@@ -175,9 +176,23 @@ function sortResults(results) {
   return [...results].sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
 }
 
-function setResults(results, { loaded = true } = {}) {
-  state.results = sortResults(results);
+function setResults(results, { loaded = true, eventId = state.event.id, cache = true } = {}) {
+  const sortedResults = sortResults(results);
+  state.results = sortedResults;
   state.resultsLoaded = loaded;
+  if (cache && eventId) {
+    state.resultCache[eventId] = sortedResults;
+  }
+}
+
+function hydrateResultsFromCache(eventId = state.event.id) {
+  const cachedResults = eventId ? state.resultCache[eventId] : null;
+  if (!state.results.length && cachedResults?.length) {
+    state.results = [...cachedResults];
+    state.resultsLoaded = true;
+    return true;
+  }
+  return false;
 }
 
 function getParticipantCountLabel() {
@@ -652,7 +667,7 @@ async function primeEventState(eventId) {
       setResults(resultsSnapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
-      })));
+      })), { eventId });
       state.eventLoaded = true;
       state.loadingEventId = eventId;
       rememberActiveEventId(eventId);
@@ -1019,12 +1034,12 @@ async function connectToDevice(deviceOverride = null, options = {}) {
   }
   try {
     clearReconnectTimer();
+    const device = deviceOverride || await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE.serviceUuid] }] });
     state.connecting = true;
     state.ble.autoReconnectEnabled = true;
     state.signal = "Verbinde...";
     clearError();
     render();
-    const device = deviceOverride || await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE.serviceUuid] }] });
     await openBleConnection(device, options);
     render();
   } catch (error) {
@@ -1127,7 +1142,7 @@ function subscribeToEvent(eventId) {
   safeUnsub("results");
   state.eventLoaded = false;
   state.loadingEventId = eventId;
-  setResults([], { loaded: false });
+  setResults([], { loaded: false, eventId, cache: false });
   rememberActiveEventId(eventId);
   state.event = {
     ...state.event,
@@ -1187,6 +1202,10 @@ function subscribeToEvent(eventId) {
       if (snapshot.empty) {
         const shouldVerifyEmptyResults = !state.eventLoaded || state.results.length > 0 || Number(state.event.participantCount || 0) > 0;
         state.resultsLoaded = true;
+        if (hydrateResultsFromCache(eventId)) {
+          render();
+          return;
+        }
         if (shouldVerifyEmptyResults) {
           void primeEventState(eventId);
           render();
@@ -1199,7 +1218,7 @@ function subscribeToEvent(eventId) {
       setResults(snapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
-      })));
+      })), { eventId });
       if (state.user && state.event.id === eventId && Number(state.event.participantCount || 0) !== state.results.length) {
         state.event.participantCount = state.results.length;
         void syncEventParticipantCount(state.results.length);
@@ -2608,6 +2627,7 @@ function bindPublicActions() {
 }
 
 function render() {
+  hydrateResultsFromCache();
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
