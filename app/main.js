@@ -181,21 +181,16 @@ function setResults(results, { loaded = true } = {}) {
 
 function getParticipantCountLabel() {
   if (state.results.length > 0) return String(state.results.length);
-  return state.resultsLoaded ? "0" : "Wird geladen...";
+  if (Number.isFinite(Number(state.event.participantCount))) return String(Number(state.event.participantCount || 0));
+  return "0";
 }
 
 function getBestResultLabel() {
-  if (state.results.length > 0) return `${Number(state.results[0]?.value || 0).toFixed(1)} kg`;
-  return state.resultsLoaded ? "0.0 kg" : "Wird geladen...";
+  return `${Number(state.results[0]?.value || 0).toFixed(1)} kg`;
 }
 
 function getAverageLabel() {
-  if (state.results.length > 0) return `${averageValue().toFixed(1)} kg`;
-  return state.resultsLoaded ? "0.0 kg" : "Wird geladen...";
-}
-
-function hasUsableResults() {
-  return state.results.length > 0;
+  return `${averageValue().toFixed(1)} kg`;
 }
 
 function isDailyChallengeType(value = state.event.challengeType) {
@@ -384,20 +379,9 @@ function getDashboardMeta() {
 }
 
 function resultEditorMarkup() {
-  if (!state.resultsLoaded && !hasUsableResults()) {
-    return `
-      <div class="card" style="margin-top:18px;">
-        <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Resultate werden aus Firestore geladen.</p></div></div>
-        <div class="event-list moderation-list">
-          <div class="event-item"><div><h4>Resultate werden geladen</h4><p>Bitte kurz warten, bis alle Einträge vollständig synchronisiert sind.</p></div></div>
-        </div>
-      </div>
-    `;
-  }
-
   return `
     <div class="card" style="margin-top:18px;">
-      <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen, Resultatwerte und einzelne Einträge direkt korrigieren.</p></div></div>
+      <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>${state.results.length ? "Namen, Resultatwerte und einzelne Einträge direkt korrigieren." : state.resultsLoaded ? "Sobald Resultate vorhanden sind, können sie hier korrigiert oder entfernt werden." : "Resultate werden mit Firestore synchronisiert."}</p></div></div>
       <div class="event-list moderation-list">
         ${state.results.map((entry) => {
           const nameParts = getEditableResultNameParts(entry);
@@ -1835,7 +1819,7 @@ function updateLiveMeasurementDom() {
   };
 
   setText("liveForceValue", getDisplayForceValue().toFixed(1));
-  setText("liveRecordValue", hasUsableResults() ? `${Number(state.results[0]?.value || 0).toFixed(1)} kg` : (state.resultsLoaded ? "0.0 kg" : "Wird geladen..."));
+  setText("liveRecordValue", `${Number(state.results[0]?.value || 0).toFixed(1)} kg`);
   setText("livePlacementValue", getLivePlacement());
   setText("liveDirectionValue", formatDirectionLabel(state.forceDirection));
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
@@ -2289,7 +2273,7 @@ function template(page) {
                 <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid two"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div></div></div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
-                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${hasUsableResults() ? `${Number(record).toFixed(1)} kg` : (state.resultsLoaded ? "0.0 kg" : "Wird geladen...")}</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                  <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                   <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
                   <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                   ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
@@ -2297,7 +2281,7 @@ function template(page) {
                 </div>
               </div>
               <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Getrennte Ranglisten für Ziehen und Drücken." : "Top 10 permanent sichtbar und automatisch aktualisiert."}</p></div></div><div class="grid">${(state.resultsLoaded || hasUsableResults()) ? leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("") : `<div class="event-item"><div><h4>Leaderboard wird geladen</h4><p>Die Resultate werden gerade mit Firestore synchronisiert.</p></div></div>`}</div></div>
+                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Getrennte Ranglisten für Ziehen und Drücken." : "Top 10 permanent sichtbar und automatisch aktualisiert."}</p></div></div><div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
                 <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
               </div>
             </div>
@@ -2311,13 +2295,13 @@ function template(page) {
             </div>
             ${isDailyChallengeType() ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
             <div class="grid" style="margin-top:18px;">
-              <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${(state.resultsLoaded || hasUsableResults()) ? leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("") : `<div class="event-item"><div><h4>Resultate werden geladen</h4><p>Die Ranglisten erscheinen, sobald Firestore vollständig synchronisiert ist.</p></div></div>`}</div></div>
+              <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
             </div>
           ` : ""}
           ${page === "display" ? `
             <div class="grid two">
               <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 10 · ${state.event.challengeType} · Letztes Resultat live</p>${isDailyChallengeType() ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}<div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="display-board">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
-              <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${(state.resultsLoaded || hasUsableResults()) ? (last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat") : "Resultate werden geladen"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
+              <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
             </div>
           ` : ""}
         </div>
