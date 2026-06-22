@@ -1013,7 +1013,13 @@ function subscribeToEvent(eventId) {
       state.event = eventDocToState(snapshot.id, snapshot.data());
       state.eventLoaded = true;
       state.loadingEventId = snapshot.id;
-      clearError();
+      if (state.currentPage === "live" && !isActiveEventStatus(state.event.status)) {
+        setError("Die Aktive Ansicht ist nur für aktive Events verfügbar.");
+        state.currentPage = "setup";
+        syncUrl("setup", snapshot.id);
+      } else {
+        clearError();
+      }
       render();
     } else {
       setError(`Event ${eventId} wurde nicht gefunden.`);
@@ -2056,7 +2062,7 @@ function template(page) {
               <div class="card">
                 <div class="card-header"><div><h3>Meine Events</h3><p>${state.dashboardLoaded ? "Übersicht aller eigenen Veranstaltungen mit Status und Teilnehmerzahl." : "Lade Events aus Firestore..."}</p></div><button class="button primary" id="createEvent">Neues Event</button></div>
                 <div class="event-list">
-                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-menu"><button class="button subtle status-menu-trigger" data-toggle-status-menu="${event.id}">${escapeHtml(event.status)}</button><div class="status-menu-panel" data-status-menu="${event.id}" hidden><button class="button subtle" data-set-status="${event.id}" data-status-value="Aktiv">Aktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button></div></div><div class="action-row compact"><button class="button" data-open-event="${event.id}">Aktive Ansicht</button><button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
+                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-menu"><button class="button subtle status-menu-trigger" data-toggle-status-menu="${event.id}">${escapeHtml(event.status)}</button><div class="status-menu-panel" data-status-menu="${event.id}" hidden><button class="button subtle" data-set-status="${event.id}" data-status-value="Aktiv">Aktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button></div></div><div class="action-row compact">${isActiveEventStatus(event.status) ? `<button class="button" data-open-event="${event.id}">Aktive Ansicht</button>` : ""}<button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
                 </div>
               </div>
               <div class="grid">
