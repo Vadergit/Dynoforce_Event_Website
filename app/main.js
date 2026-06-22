@@ -1902,10 +1902,7 @@ function template(page) {
               <div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div>
               <strong class="device-battery" id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong>
             </div>
-            <div class="device-meta">
-              <div class="device-meta-row"><span>Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
-              <div class="device-meta-row"><span>Verbindung</span><strong>${state.connected ? "Aktiv" : "Warte auf Verbindung"}</strong></div>
-            </div>
+            <div class="device-subline"><span>Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
             <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
           </div>
         ` : ""}

@@ -139,27 +139,23 @@ a {
   letter-spacing: -0.04em;
 }
 
-.device-meta {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.device-meta-row {
+.device-subline {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
-.device-meta-row span {
+.device-subline span {
   color: var(--muted);
+  font-size: 14px;
 }
 
-.device-meta-row strong {
-  font-size: 18px;
+.device-subline strong {
+  font-size: 17px;
   letter-spacing: -0.03em;
 }
 
