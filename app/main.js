@@ -336,6 +336,38 @@ function getDashboardMeta() {
   ];
 }
 
+function resultEditorMarkup() {
+  return `
+    <div class="card" style="margin-top:18px;">
+      <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen, Resultatwerte und einzelne Einträge direkt korrigieren.</p></div></div>
+      <div class="event-list moderation-list">
+        ${state.results.map((entry) => {
+          const nameParts = getEditableResultNameParts(entry);
+          return `
+            <div class="event-item moderation-item">
+              <div class="moderation-fields">
+                <div class="field"><label>Vorname</label><input data-result-first-name="${entry.id}" value="${escapeHtml(nameParts.firstName)}" /></div>
+                <div class="field"><label>Name</label><input data-result-last-name="${entry.id}" value="${escapeHtml(nameParts.lastName)}" /></div>
+                <div class="field"><label>Resultat in kg</label><input data-result-value="${entry.id}" type="number" min="0" step="0.1" value="${Number(entry.value || 0).toFixed(1)}" /></div>
+              </div>
+              <div class="event-item-actions">
+                <div class="metric-stack">
+                  <strong>${Number(entry.value || 0).toFixed(1)} kg</strong>
+                  <span>${escapeHtml(formatEntryDirection(entry))} · ${escapeHtml(formatDate(resultCreatedAtDate(entry)) || "ohne Datum")}</span>
+                </div>
+                <div class="action-row compact">
+                  <button class="button" data-update-result="${entry.id}">Änderungen speichern</button>
+                  <button class="button danger" data-delete-result="${entry.id}">Resultat entfernen</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("") || `<div class="event-item"><div><h4>Noch keine Resultate</h4><p>Sobald Teilnehmer gespeichert werden, können sie hier korrigiert oder entfernt werden.</p></div></div>`}
+      </div>
+    </div>
+  `;
+}
+
 function formatEntryDirection(entry) {
   return formatDirectionLabel(entry.forceMode || entry.direction || "neutral");
 }
@@ -2096,33 +2128,7 @@ function template(page) {
                 <div class="action-row"><button class="button primary" id="saveSetup">${state.saving ? "Speichert..." : "Event speichern"}</button><button class="button" id="startEvent">Event starten</button><button class="button" id="archiveEvent">Event archivieren</button></div>
               </div>
             </div>
-            <div class="card" style="margin-top:18px;">
-              <div class="card-header"><div><h3>Resultate bearbeiten</h3><p>Namen, Resultatwerte und einzelne Einträge direkt korrigieren.</p></div></div>
-              <div class="event-list moderation-list">
-                ${state.results.map((entry) => {
-                  const nameParts = getEditableResultNameParts(entry);
-                  return `
-                    <div class="event-item moderation-item">
-                      <div class="moderation-fields">
-                        <div class="field"><label>Vorname</label><input data-result-first-name="${entry.id}" value="${escapeHtml(nameParts.firstName)}" /></div>
-                        <div class="field"><label>Name</label><input data-result-last-name="${entry.id}" value="${escapeHtml(nameParts.lastName)}" /></div>
-                        <div class="field"><label>Resultat in kg</label><input data-result-value="${entry.id}" type="number" min="0" step="0.1" value="${Number(entry.value || 0).toFixed(1)}" /></div>
-                      </div>
-                      <div class="event-item-actions">
-                        <div class="metric-stack">
-                          <strong>${Number(entry.value || 0).toFixed(1)} kg</strong>
-                          <span>${escapeHtml(formatEntryDirection(entry))} · ${escapeHtml(formatDate(resultCreatedAtDate(entry)) || "ohne Datum")}</span>
-                        </div>
-                        <div class="action-row compact">
-                          <button class="button" data-update-result="${entry.id}">Änderungen speichern</button>
-                          <button class="button danger" data-delete-result="${entry.id}">Resultat entfernen</button>
-                        </div>
-                      </div>
-                    </div>
-                  `;
-                }).join("") || `<div class="event-item"><div><h4>Noch keine Resultate</h4><p>Sobald Teilnehmer gespeichert werden, können sie hier korrigiert oder entfernt werden.</p></div></div>`}
-              </div>
-            </div>
+            ${resultEditorMarkup()}
           ` : ""}
           ${!lockedPage && page === "branding" ? `
             <div class="grid two">
@@ -2173,6 +2179,7 @@ function template(page) {
                 <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
               </div>
             </div>
+            ${resultEditorMarkup()}
           ` : ""}
           ${page === "public" ? `
             ${publicBrandingSection()}
@@ -2395,25 +2402,7 @@ function bindSetupActions() {
     await saveEvent();
   });
 
-  root.querySelectorAll("[data-update-result]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const resultId = button.dataset.updateResult;
-      const firstName = root.querySelector(`[data-result-first-name="${resultId}"]`)?.value || "";
-      const lastName = root.querySelector(`[data-result-last-name="${resultId}"]`)?.value || "";
-      const value = root.querySelector(`[data-result-value="${resultId}"]`)?.value || "";
-      await updateResultEntry(resultId, firstName, lastName, value);
-    });
-  });
-
-  root.querySelectorAll("[data-delete-result]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const resultId = button.dataset.deleteResult;
-      if (!window.confirm("Resultat wirklich aus der Rangliste entfernen?")) {
-        return;
-      }
-      await deleteResultEntry(resultId);
-    });
-  });
+  bindResultEditorActions();
 }
 
 function bindBrandingActions() {
@@ -2446,6 +2435,29 @@ function bindLiveActions() {
     state.event.status = "Abgeschlossen";
     state.event.closedAt = new Date().toISOString();
     await saveEvent({ closedAt: serverTimestamp() });
+  });
+  bindResultEditorActions();
+}
+
+function bindResultEditorActions() {
+  root.querySelectorAll("[data-update-result]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const resultId = button.dataset.updateResult;
+      const firstName = root.querySelector(`[data-result-first-name="${resultId}"]`)?.value || "";
+      const lastName = root.querySelector(`[data-result-last-name="${resultId}"]`)?.value || "";
+      const value = root.querySelector(`[data-result-value="${resultId}"]`)?.value || "";
+      await updateResultEntry(resultId, firstName, lastName, value);
+    });
+  });
+
+  root.querySelectorAll("[data-delete-result]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const resultId = button.dataset.deleteResult;
+      if (!window.confirm("Resultat wirklich aus der Rangliste entfernen?")) {
+        return;
+      }
+      await deleteResultEntry(resultId);
+    });
   });
 }
 
