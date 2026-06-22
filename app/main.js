@@ -36,6 +36,10 @@ const BLE_STORAGE_KEYS = {
   preferredDeviceId: "dynoforce.event.preferredBleDeviceId",
 };
 
+const EVENT_STORAGE_KEYS = {
+  activeEventId: "dynoforce.event.activeEventId",
+};
+
 const FORCE_DIRECTION_THRESHOLD = 0.5;
 const MODE_LOCK_THRESHOLD = 1.0;
 const PEAK_MINIMUM_THRESHOLD = 2.0;
@@ -623,18 +627,19 @@ function safeUnsub(key) {
 function getRouteInfo() {
   const hash = window.location.hash.replace(/^#/, "");
   const segments = hash.split("/").filter(Boolean);
+  const fallbackEventId = getActiveEventId() || state.event.id;
 
   if (segments[0] === "display") {
-    return { page: "display", eventId: segments[1] || state.event.id };
+    return { page: "display", eventId: segments[1] || fallbackEventId };
   }
 
   if (segments[0] === "e") {
-    return { page: "public", eventId: segments[1] || state.event.id };
+    return { page: "public", eventId: segments[1] || fallbackEventId };
   }
 
   const page = pageMeta[segments[0]] ? segments[0] : "dashboard";
   const routedEventPage = ["setup", "branding", "live"].includes(page);
-  return { page, eventId: routedEventPage ? (segments[1] || state.event.id) : state.event.id };
+  return { page, eventId: routedEventPage ? (segments[1] || fallbackEventId) : fallbackEventId };
 }
 
 function getPublicUrl() {
@@ -724,6 +729,21 @@ function getPreferredBleDeviceId() {
   } catch {
     return "";
   }
+}
+
+function getActiveEventId() {
+  try {
+    return window.localStorage.getItem(EVENT_STORAGE_KEYS.activeEventId) || "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberActiveEventId(eventId) {
+  if (!eventId) return;
+  try {
+    window.localStorage.setItem(EVENT_STORAGE_KEYS.activeEventId, eventId);
+  } catch {}
 }
 
 function rememberPreferredBleDevice(device) {
@@ -929,6 +949,7 @@ function subscribeToEvent(eventId) {
   safeUnsub("results");
   state.eventLoaded = false;
   state.results = [];
+  rememberActiveEventId(eventId);
 
   state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), (snapshot) => {
     if (snapshot.exists()) {
@@ -2113,7 +2134,10 @@ function bindGeneralUi() {
   root.querySelectorAll("[data-page]").forEach((button) => {
     button.addEventListener("click", async () => {
       const page = button.dataset.page;
-      syncUrl(page);
+      const targetEventId = ["setup", "branding", "live", "public", "display"].includes(page)
+        ? (getActiveEventId() || state.event.id)
+        : state.event.id;
+      syncUrl(page, targetEventId);
       await routeAndLoad();
     });
   });
