@@ -147,7 +147,7 @@ const pageMeta = {
   dashboard: ["Dashboard", "Alle eigenen Events auf einen Blick mit Status, Teilnehmerzahl und Schnellzugriff."],
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
-  live: ["Live-Messseite 3", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
+  live: ["Live-Messseite 4", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
@@ -722,6 +722,39 @@ async function primeEventState(eventId) {
   }
 }
 
+async function loadEventState(eventId) {
+  if (!eventId) return false;
+  const [eventSnapshot, resultsSnapshot] = await Promise.all([
+    getDoc(doc(db, "events", eventId)),
+    getDocs(query(collection(db, "results"), where("eventId", "==", eventId))),
+  ]);
+
+  if (state.loadingEventId !== eventId) return false;
+
+  if (!eventSnapshot.exists()) {
+    setError(`Event ${eventId} wurde nicht gefunden.`);
+    state.eventLoaded = true;
+    setResults([], { loaded: true, eventId, cache: false });
+    return false;
+  }
+
+  state.event = eventDocToState(eventSnapshot.id, eventSnapshot.data());
+  setResults(resultsSnapshot.docs.map((resultDoc) => ({
+    id: resultDoc.id,
+    ...resultDoc.data(),
+  })), { eventId });
+  state.eventLoaded = true;
+  state.loadingEventId = eventId;
+  rememberActiveEventId(eventId);
+
+  if (state.user && Number(state.event.participantCount || 0) !== state.results.length) {
+    state.event.participantCount = state.results.length;
+    void syncEventParticipantCount(state.results.length);
+  }
+
+  return true;
+}
+
 async function finalizeParticipantResult(forceManualSave = false) {
   if (!state.user) {
     setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
@@ -1176,12 +1209,14 @@ function eventDocToState(id, data) {
   };
 }
 
-function subscribeToEvent(eventId) {
+async function subscribeToEvent(eventId) {
   safeUnsub("event");
   safeUnsub("results");
   state.eventLoaded = false;
   state.loadingEventId = eventId;
-  setResults([], { loaded: false, eventId, cache: false });
+  if (!hydrateResultsFromCache(eventId)) {
+    setResults([], { loaded: false, eventId, cache: false });
+  }
   rememberActiveEventId(eventId);
   state.event = {
     ...state.event,
@@ -1203,7 +1238,17 @@ function subscribeToEvent(eventId) {
     closedAt: null,
   };
   render();
-  void primeEventState(eventId);
+
+  try {
+    await loadEventState(eventId);
+    render();
+  } catch (error) {
+    if (state.loadingEventId === eventId) {
+      setError(`Event und Resultate konnten nicht geladen werden: ${error instanceof Error ? error.message : String(error)}`);
+      state.eventLoaded = true;
+      render();
+    }
+  }
 
   state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), (snapshot) => {
     if (state.loadingEventId !== eventId) return;
@@ -2688,7 +2733,7 @@ async function routeAndLoad() {
 
   if (route.page === "public" || route.page === "display") {
     safeUnsub("publicEvents");
-    subscribeToEvent(route.eventId);
+    await subscribeToEvent(route.eventId);
     render();
     return;
   }
@@ -2711,7 +2756,7 @@ async function routeAndLoad() {
       if (!route.eventId) {
         syncUrl(route.page, organizerEventId);
       }
-      subscribeToEvent(organizerEventId);
+      await subscribeToEvent(organizerEventId);
       if (route.page === "setup" || route.page === "live") {
         void refreshResultsForEvent(organizerEventId, { force: true });
       }
