@@ -110,19 +110,19 @@ const state = {
     reconnectAttempted: false,
   },
   event: {
-    id: "boulder-jam-2027",
-    name: "Boulder Jam 2027",
-    description: "Offene Publikumschallenge für maximale Fingerkraft mit DynoGrip.",
-    organiser: "Boulderhalle Zürich",
+    id: "",
+    name: "DynoForce Event",
+    description: "",
+    organiser: "Veranstalter",
     organiserEmail: "",
-    location: "Zürich",
-    date: "2027-03-18",
+    location: "",
+    date: "",
     challengeType: "Maximalkraft",
     forceMode: "Beide",
     gripType: "Standard",
     attempts: 3,
     scoringMode: "Bester Versuch",
-    status: "Live",
+    status: "Inaktiv",
     primaryColor: "#1f4f46",
     ownerUid: "",
     createdAt: null,
@@ -169,6 +169,16 @@ function averageValue() {
 
 function isDailyChallengeType(value = state.event.challengeType) {
   return value === "Tageschallenge" || value === "Freie Challenge";
+}
+
+function normalizeEventStatus(status) {
+  if (status === "Live") return "Aktiv";
+  if (status === "Geplant" || status === "Archiviert") return "Inaktiv";
+  return status || "Inaktiv";
+}
+
+function isActiveEventStatus(status) {
+  return normalizeEventStatus(status) === "Aktiv";
 }
 
 function resultCreatedAtDate(result) {
@@ -473,12 +483,13 @@ async function deleteEventWithResults(eventId) {
 
 async function updateEventStatus(eventId, status) {
   try {
+    const nextStatus = normalizeEventStatus(status);
     const payload = {
-      status,
+      status: nextStatus,
       updatedAt: serverTimestamp(),
     };
 
-    if (status === "Abgeschlossen") {
+    if (nextStatus === "Abgeschlossen") {
       payload.closedAt = serverTimestamp();
     } else {
       payload.closedAt = null;
@@ -487,12 +498,12 @@ async function updateEventStatus(eventId, status) {
     await setDoc(doc(db, "events", eventId), payload, { merge: true });
 
     if (state.event.id === eventId) {
-      state.event.status = status;
-      state.event.closedAt = status === "Abgeschlossen" ? new Date().toISOString() : null;
+      state.event.status = nextStatus;
+      state.event.closedAt = nextStatus === "Abgeschlossen" ? new Date().toISOString() : null;
     }
 
     clearError();
-    setFlash(`Eventstatus aktualisiert: ${status}`);
+    setFlash(`Eventstatus aktualisiert: ${nextStatus}`);
     render();
   } catch (error) {
     setError(`Eventstatus konnte nicht geändert werden: ${error instanceof Error ? error.message : String(error)}`);
@@ -928,7 +939,7 @@ function eventDocToState(id, data) {
     gripType: data.gripType || "Standard",
     attempts: Number(data.attempts || 3),
     scoringMode: data.scoringMode || "Bester Versuch",
-    status: data.status || "Geplant",
+    status: normalizeEventStatus(data.status),
     primaryColor: data.primaryColor || "#1f4f46",
     ownerUid: data.ownerUid || "",
     createdAt: data.createdAt || null,
@@ -1004,7 +1015,7 @@ function subscribeToDashboard() {
           name: data.name,
           date: formatDate(data.date),
           sortDate: data.date || "",
-          status: data.status,
+          status: normalizeEventStatus(data.status),
           participants: Number(data.participantCount || 0),
         };
       }).sort((a, b) => String(b.sortDate).localeCompare(String(a.sortDate)));
@@ -1023,7 +1034,7 @@ function subscribeToPublicEvents() {
   safeUnsub("publicEvents");
   state.publicEventsLoaded = false;
   state.unsubscribers.publicEvents = onSnapshot(
-    query(collection(db, "events"), where("status", "==", "Live")),
+    query(collection(db, "events"), where("status", "in", ["Live", "Aktiv"])),
     (snapshot) => {
       state.publicEvents = snapshot.docs.map((eventDoc) => {
         const data = eventDoc.data();
@@ -1995,7 +2006,7 @@ function template(page) {
               <div class="card">
                 <div class="card-header"><div><h3>Meine Events</h3><p>${state.dashboardLoaded ? "Übersicht aller eigenen Veranstaltungen mit Status und Teilnehmerzahl." : "Lade Events aus Firestore..."}</p></div><button class="button primary" id="createEvent">Neues Event</button></div>
                 <div class="event-list">
-                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-menu"><button class="button subtle status-menu-trigger" data-toggle-status-menu="${event.id}">${escapeHtml(event.status)}</button><div class="status-menu-panel" data-status-menu="${event.id}" hidden><button class="button subtle" data-set-status="${event.id}" data-status-value="Live">Live</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button></div></div><div class="action-row compact"><button class="button" data-open-event="${event.id}">Live Ansicht</button><button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
+                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-menu"><button class="button subtle status-menu-trigger" data-toggle-status-menu="${event.id}">${escapeHtml(event.status)}</button><div class="status-menu-panel" data-status-menu="${event.id}" hidden><button class="button subtle" data-set-status="${event.id}" data-status-value="Aktiv">Aktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button></div></div><div class="action-row compact"><button class="button" data-open-event="${event.id}">Aktive Ansicht</button><button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
                 </div>
               </div>
               <div class="grid">
@@ -2135,7 +2146,7 @@ function bindGeneralUi() {
     button.addEventListener("click", async () => {
       const page = button.dataset.page;
       const targetEventId = ["setup", "branding", "live", "public", "display"].includes(page)
-        ? (getActiveEventId() || state.event.id)
+        ? (state.event.id || getActiveEventId())
         : state.event.id;
       syncUrl(page, targetEventId);
       await routeAndLoad();
@@ -2236,7 +2247,7 @@ function bindDashboardActions() {
       gripType: "Standard",
       attempts: 3,
       scoringMode: "Bester Versuch",
-      status: "Geplant",
+      status: "Inaktiv",
       ownerUid: state.user.uid,
       ...emptyBranding,
     };
@@ -2319,12 +2330,12 @@ function bindSetupActions() {
   });
 
   root.querySelector("#startEvent")?.addEventListener("click", async () => {
-    state.event.status = "Live";
+    state.event.status = "Aktiv";
     await saveEvent();
   });
 
   root.querySelector("#archiveEvent")?.addEventListener("click", async () => {
-    state.event.status = "Archiviert";
+    state.event.status = "Inaktiv";
     await saveEvent();
   });
 
@@ -2425,9 +2436,18 @@ async function routeAndLoad() {
 
   if (route.page === "setup" || route.page === "branding" || route.page === "live") {
     safeUnsub("publicEvents");
-    if (route.eventId) {
-      state.event.id = route.eventId;
-      subscribeToEvent(route.eventId);
+    const organizerEventId = route.eventId || getActiveEventId() || state.event.id;
+    if (organizerEventId) {
+      state.event.id = organizerEventId;
+      if (!route.eventId) {
+        syncUrl(route.page, organizerEventId);
+      }
+      subscribeToEvent(organizerEventId);
+    } else {
+      state.currentPage = "dashboard";
+      syncUrl("dashboard");
+      if (state.user) subscribeToDashboard();
+      else subscribeToPublicEvents();
     }
   }
 
@@ -2463,7 +2483,7 @@ window.addEventListener("popstate", routeAndLoad);
 await routeAndLoad();
 
 setInterval(() => {
-  if (!state.connected || state.event.status !== "Live") return;
+  if (!state.connected || !isActiveEventStatus(state.event.status)) return;
   state.elapsedSeconds = (state.elapsedSeconds + 1) % 60;
   updateLiveMeasurementDom();
 }, 1000);
