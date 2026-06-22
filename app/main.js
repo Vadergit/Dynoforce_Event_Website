@@ -90,6 +90,7 @@ const state = {
   dashboardLoaded: false,
   publicEventsLoaded: false,
   eventLoaded: false,
+  loadingEventId: "",
   currentPage: "dashboard",
   escapeListenerBound: false,
   unsubscribers: {
@@ -959,13 +960,35 @@ function subscribeToEvent(eventId) {
   safeUnsub("event");
   safeUnsub("results");
   state.eventLoaded = false;
+  state.loadingEventId = eventId;
   state.results = [];
   rememberActiveEventId(eventId);
+  state.event = {
+    ...state.event,
+    id: eventId,
+    name: "DynoForce Event",
+    description: "",
+    organiser: "Veranstalter",
+    organiserEmail: "",
+    location: "",
+    date: "",
+    challengeType: "Maximalkraft",
+    forceMode: "Beide",
+    gripType: "Standard",
+    attempts: 3,
+    scoringMode: "Bester Versuch",
+    status: "Inaktiv",
+    createdAt: null,
+    closedAt: null,
+  };
+  render();
 
   state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), (snapshot) => {
+    if (state.loadingEventId !== eventId) return;
     if (snapshot.exists()) {
       state.event = eventDocToState(snapshot.id, snapshot.data());
       state.eventLoaded = true;
+      state.loadingEventId = snapshot.id;
       clearError();
       render();
     } else {
@@ -974,6 +997,7 @@ function subscribeToEvent(eventId) {
       render();
     }
   }, (error) => {
+    if (state.loadingEventId !== eventId) return;
     setError(`Event konnte nicht geladen werden: ${error.message}`);
     state.eventLoaded = true;
     render();
@@ -982,6 +1006,7 @@ function subscribeToEvent(eventId) {
   state.unsubscribers.results = onSnapshot(
     query(collection(db, "results"), where("eventId", "==", eventId)),
     (snapshot) => {
+      if (state.loadingEventId !== eventId) return;
       state.results = snapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
@@ -989,6 +1014,7 @@ function subscribeToEvent(eventId) {
       render();
     },
     (error) => {
+      if (state.loadingEventId !== eventId) return;
       setError(`Resultate konnten nicht geladen werden: ${error.message}`);
       render();
     },
