@@ -54,7 +54,7 @@ const emptyBranding = {
   venueLogo: "",
   headerBanner: DEFAULT_EVENT_HEADER_BANNER,
   sponsorBanner: "",
-  showVenueLogo: true,
+  showVenueLogo: false,
   eventLogoScale: 100,
   venueLogoScale: 100,
   headerBannerScale: 100,
@@ -927,7 +927,7 @@ function applyBrandingPresetData(data = {}) {
       state.event[field] = data[field];
     }
   });
-  state.event.showVenueLogo = state.event.showVenueLogo !== false;
+  state.event.showVenueLogo = state.event.showVenueLogo === true;
   state.event.eventLogoScale = Number(state.event.eventLogoScale || 100);
   state.event.venueLogoScale = Number(state.event.venueLogoScale || 100);
   state.event.headerBannerScale = Number(state.event.headerBannerScale || 100);
@@ -1261,7 +1261,7 @@ function eventDocToState(id, data) {
     venueLogo: data.venueLogo || "",
     headerBanner: data.headerBanner || "",
     sponsorBanner: data.sponsorBanner || "",
-    showVenueLogo: data.showVenueLogo !== false,
+    showVenueLogo: data.showVenueLogo === true,
     eventLogoScale: Number(data.eventLogoScale || 100),
     venueLogoScale: Number(data.venueLogoScale || 100),
     headerBannerScale: Number(data.headerBannerScale || 100),
@@ -1562,7 +1562,7 @@ async function saveEvent(overrides = {}) {
       venueLogo: state.event.venueLogo,
       headerBanner: state.event.headerBanner,
       sponsorBanner: state.event.sponsorBanner,
-      showVenueLogo: state.event.showVenueLogo !== false,
+      showVenueLogo: state.event.showVenueLogo === true,
       eventLogoScale: Number(state.event.eventLogoScale || 100),
       venueLogoScale: Number(state.event.venueLogoScale || 100),
       headerBannerScale: Number(state.event.headerBannerScale || 100),
@@ -1696,7 +1696,7 @@ async function downloadPdf() {
     const qrCodeDataUrl = await QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 220 });
     const headerBanner = state.event.headerBannerPdfData || state.event.headerBanner || "";
     const eventLogo = state.event.eventLogoPdfData || state.event.eventLogo || "";
-    const venueLogo = state.event.showVenueLogo === false ? "" : state.event.venueLogoPdfData || state.event.venueLogo || "";
+    const venueLogo = state.event.showVenueLogo === true ? state.event.venueLogoPdfData || state.event.venueLogo || "" : "";
     const sponsorBanner = state.event.sponsorBannerPdfData || state.event.sponsorBanner || "";
     const primary = state.event.primaryColor || "#1f4f46";
     const summaryRows = [
@@ -2317,7 +2317,7 @@ function brandingAssetControls(fieldName, label, formatHint) {
       </label>
       ${fieldName === "venueLogo" ? `
         <label class="branding-toggle">
-          <input type="checkbox" id="showVenueLogoInput" ${state.event.showVenueLogo === false ? "" : "checked"} />
+          <input type="checkbox" id="showVenueLogoInput" ${state.event.showVenueLogo === true ? "checked" : ""} />
           <span>Hallenlogo anzeigen</span>
         </label>
       ` : ""}
@@ -2380,7 +2380,7 @@ function brandingLivePreview() {
 }
 
 function publicBrandingSection() {
-  const visibleLogoCount = [state.event.eventLogo, state.event.venueLogo && state.event.showVenueLogo !== false].filter(Boolean).length;
+  const visibleLogoCount = [state.event.eventLogo, state.event.venueLogo && state.event.showVenueLogo === true].filter(Boolean).length;
   return `
     <div class="card brand-hero" id="publicBrandHero">
       ${state.event.headerBanner ? `
@@ -2391,7 +2391,7 @@ function publicBrandingSection() {
       <div class="brand-hero-content ${visibleLogoCount <= 1 ? "single-logo" : ""}">
         <div class="brand-hero-logos">
           ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
-          ${state.event.venueLogo && state.event.showVenueLogo !== false ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
+          ${state.event.venueLogo && state.event.showVenueLogo === true ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
         </div>
         <div class="brand-hero-copy">
           <div class="eyebrow">DynoForce Event</div>
