@@ -2228,10 +2228,11 @@ function brandingLivePreview() {
 }
 
 function publicBrandingSection() {
+  const visibleLogoCount = [state.event.eventLogo, state.event.venueLogo && state.event.showVenueLogo !== false].filter(Boolean).length;
   return `
     <div class="card brand-hero" id="publicBrandHero">
       ${state.event.headerBanner ? `<img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")}" />` : ""}
-      <div class="brand-hero-content">
+      <div class="brand-hero-content ${visibleLogoCount <= 1 ? "single-logo" : ""}">
         <div class="brand-hero-logos">
           ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
           ${state.event.venueLogo && state.event.showVenueLogo !== false ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
