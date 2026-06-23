@@ -56,6 +56,10 @@ const emptyBranding = {
   venueLogoScale: 100,
   headerBannerScale: 100,
   sponsorBannerScale: 100,
+  eventLogoAspect: "1 / 1",
+  venueLogoAspect: "1 / 1",
+  headerBannerAspect: "4 / 1",
+  sponsorBannerAspect: "5 / 1",
   eventLogoPdfData: "",
   venueLogoPdfData: "",
   headerBannerPdfData: "",
@@ -1205,6 +1209,10 @@ function eventDocToState(id, data) {
     venueLogoScale: Number(data.venueLogoScale || 100),
     headerBannerScale: Number(data.headerBannerScale || 100),
     sponsorBannerScale: Number(data.sponsorBannerScale || 100),
+    eventLogoAspect: normalizeBrandingAspect(data.eventLogoAspect, "1 / 1"),
+    venueLogoAspect: normalizeBrandingAspect(data.venueLogoAspect, "1 / 1"),
+    headerBannerAspect: normalizeBrandingAspect(data.headerBannerAspect, "4 / 1"),
+    sponsorBannerAspect: normalizeBrandingAspect(data.sponsorBannerAspect, "5 / 1"),
     eventLogoPdfData: data.eventLogoPdfData || "",
     venueLogoPdfData: data.venueLogoPdfData || "",
     headerBannerPdfData: data.headerBannerPdfData || "",
@@ -1419,6 +1427,10 @@ async function saveEvent(overrides = {}) {
       venueLogoScale: Number(state.event.venueLogoScale || 100),
       headerBannerScale: Number(state.event.headerBannerScale || 100),
       sponsorBannerScale: Number(state.event.sponsorBannerScale || 100),
+      eventLogoAspect: normalizeBrandingAspect(state.event.eventLogoAspect, "1 / 1"),
+      venueLogoAspect: normalizeBrandingAspect(state.event.venueLogoAspect, "1 / 1"),
+      headerBannerAspect: normalizeBrandingAspect(state.event.headerBannerAspect, "4 / 1"),
+      sponsorBannerAspect: normalizeBrandingAspect(state.event.sponsorBannerAspect, "5 / 1"),
       eventLogoPdfData: state.event.eventLogoPdfData || "",
       venueLogoPdfData: state.event.venueLogoPdfData || "",
       headerBannerPdfData: state.event.headerBannerPdfData || "",
@@ -2100,17 +2112,43 @@ function getBrandingScale(fieldName) {
   return Math.max(50, Math.min(180, Number(state.event[`${fieldName}Scale`] || 100)));
 }
 
+function normalizeBrandingAspect(value, fallback = "1 / 1") {
+  const allowed = ["1 / 1", "4 / 3", "3 / 2", "16 / 9", "2 / 1", "3 / 1", "4 / 1", "5 / 1"];
+  return allowed.includes(value) ? value : fallback;
+}
+
 function brandingScaleStyle(fieldName) {
-  return `--asset-scale:${getBrandingScale(fieldName) / 100};`;
+  const fallbackAspect = fieldName === "headerBanner" ? "4 / 1" : fieldName === "sponsorBanner" ? "5 / 1" : "1 / 1";
+  const aspect = normalizeBrandingAspect(state.event[`${fieldName}Aspect`], fallbackAspect);
+  return `--asset-scale:${getBrandingScale(fieldName) / 100};--asset-ratio:${aspect};`;
 }
 
 function brandingAssetControls(fieldName, label, formatHint) {
   const scaleField = `${fieldName}Scale`;
+  const aspectField = `${fieldName}Aspect`;
   const scale = getBrandingScale(fieldName);
+  const fallbackAspect = fieldName === "headerBanner" ? "4 / 1" : fieldName === "sponsorBanner" ? "5 / 1" : "1 / 1";
+  const aspect = normalizeBrandingAspect(state.event[aspectField], fallbackAspect);
+  const aspectOptions = [
+    ["1 / 1", "Quadratisch"],
+    ["4 / 3", "Kompakt"],
+    ["3 / 2", "Foto"],
+    ["16 / 9", "Breit"],
+    ["2 / 1", "Logo breit"],
+    ["3 / 1", "Banner"],
+    ["4 / 1", "Header"],
+    ["5 / 1", "Sponsor"],
+  ];
   return `
     <div class="branding-tools">
       <label class="button subtle" for="${fieldName}Input">${state.event[fieldName] ? "Bild ersetzen" : "Bild hinzufügen"}</label>
       <input class="branding-file-input" type="file" id="${fieldName}Input" accept="image/*" />
+      <label class="branding-aspect-control">
+        <span>Format</span>
+        <select data-branding-aspect="${aspectField}" data-branding-target="${fieldName}">
+          ${aspectOptions.map(([value, name]) => `<option value="${value}" ${value === aspect ? "selected" : ""}>${name}</option>`).join("")}
+        </select>
+      </label>
       <label class="branding-scale-control">
         <span>${label} <strong data-scale-value="${scaleField}">${scale}%</strong></span>
         <input type="range" min="50" max="180" step="5" value="${scale}" data-branding-scale="${scaleField}" data-branding-target="${fieldName}" />
@@ -2125,17 +2163,17 @@ function brandingLivePreview() {
     <div class="branding-live-preview branding-editor">
       <div class="branding-live-hero" style="border-color:${state.event.primaryColor || "#1f4f46"};">
         <div class="branding-editor-slot branding-editor-banner">
-          ${state.event.headerBanner ? `<img class="branding-live-banner branding-scale-target" data-branding-preview="headerBanner" src="${state.event.headerBanner}" alt="Header Banner Vorschau" style="${brandingScaleStyle("headerBanner")}" />` : `<div class="branding-live-banner placeholder">Header Banner</div>`}
+          ${state.event.headerBanner ? `<img class="branding-live-banner branding-scale-target" data-branding-preview="headerBanner" src="${state.event.headerBanner}" alt="Header Banner Vorschau" style="${brandingScaleStyle("headerBanner")}" />` : `<div class="branding-live-banner placeholder" data-branding-preview="headerBanner" style="${brandingScaleStyle("headerBanner")}">Header Banner</div>`}
           ${brandingAssetControls("headerBanner", "Header Grösse", "Querformat, ideal 2400 x 900 px")}
         </div>
         <div class="branding-live-content">
           <div class="branding-live-logos">
             <div class="branding-editor-slot branding-editor-logo">
-              <div class="branding-live-logo-box">${state.event.eventLogo ? `<img class="branding-scale-target" data-branding-preview="eventLogo" src="${state.event.eventLogo}" alt="Eventlogo Vorschau" style="${brandingScaleStyle("eventLogo")}" />` : `<span>Eventlogo</span>`}</div>
+              <div class="branding-live-logo-box" data-branding-preview="eventLogo" style="${brandingScaleStyle("eventLogo")}">${state.event.eventLogo ? `<img class="branding-scale-target" src="${state.event.eventLogo}" alt="Eventlogo Vorschau" style="${brandingScaleStyle("eventLogo")}" />` : `<span>Eventlogo</span>`}</div>
               ${brandingAssetControls("eventLogo", "Eventlogo", "PNG/SVG, quadratisch")}
             </div>
             <div class="branding-editor-slot branding-editor-logo">
-              <div class="branding-live-logo-box">${state.event.venueLogo ? `<img class="branding-scale-target" data-branding-preview="venueLogo" src="${state.event.venueLogo}" alt="Hallenlogo Vorschau" style="${brandingScaleStyle("venueLogo")}" />` : `<span>Hallenlogo</span>`}</div>
+              <div class="branding-live-logo-box" data-branding-preview="venueLogo" style="${brandingScaleStyle("venueLogo")}">${state.event.venueLogo ? `<img class="branding-scale-target" src="${state.event.venueLogo}" alt="Hallenlogo Vorschau" style="${brandingScaleStyle("venueLogo")}" />` : `<span>Hallenlogo</span>`}</div>
               ${brandingAssetControls("venueLogo", "Hallenlogo", "PNG/SVG, gerne horizontal")}
             </div>
           </div>
@@ -2148,8 +2186,8 @@ function brandingLivePreview() {
       </div>
       <div class="branding-live-footer">
         <div class="branding-editor-slot">
-          <div class="branding-live-sponsor">
-            ${state.event.sponsorBanner ? `<img class="branding-scale-target" data-branding-preview="sponsorBanner" src="${state.event.sponsorBanner}" alt="Sponsor Banner Vorschau" style="${brandingScaleStyle("sponsorBanner")}" />` : `<span>Sponsor Banner erscheint hier</span>`}
+          <div class="branding-live-sponsor" data-branding-preview="sponsorBanner" style="${brandingScaleStyle("sponsorBanner")}">
+            ${state.event.sponsorBanner ? `<img class="branding-scale-target" src="${state.event.sponsorBanner}" alt="Sponsor Banner Vorschau" style="${brandingScaleStyle("sponsorBanner")}" />` : `<span>Sponsor Banner erscheint hier</span>`}
           </div>
           ${brandingAssetControls("sponsorBanner", "Sponsor Grösse", "Querformat, ideal 2400 x 500 px")}
         </div>
@@ -2689,6 +2727,19 @@ function bindBrandingActions() {
       brandingScaleSaveTimer = window.setTimeout(() => {
         void saveEvent();
       }, 250);
+    });
+  });
+
+  root.querySelectorAll("[data-branding-aspect]").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const aspectField = select.dataset.brandingAspect;
+      const target = select.dataset.brandingTarget;
+      const value = normalizeBrandingAspect(select.value, state.event[aspectField] || "1 / 1");
+      state.event[aspectField] = value;
+      root.querySelectorAll(`[data-branding-preview="${target}"]`).forEach((element) => {
+        element.style.setProperty("--asset-ratio", value);
+      });
+      await saveEvent();
     });
   });
 

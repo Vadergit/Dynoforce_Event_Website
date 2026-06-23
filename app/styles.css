@@ -752,6 +752,22 @@ a {
   color: var(--muted);
 }
 
+.branding-aspect-control {
+  display: grid;
+  gap: 8px;
+  min-width: 180px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.branding-aspect-control select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0 12px;
+}
+
 .branding-scale-control span {
   display: flex;
   justify-content: space-between;
@@ -772,8 +788,7 @@ a {
 
 .branding-scale-target,
 .brand-hero-banner,
-.brand-hero-sponsor,
-.brand-hero-logos img {
+.brand-hero-sponsor {
   transform: scale(var(--asset-scale, 1));
   transform-origin: center;
 }
@@ -784,7 +799,8 @@ a {
 
 .branding-live-banner {
   width: 100%;
-  height: clamp(280px, 32vw, 430px);
+  aspect-ratio: var(--asset-ratio, 4 / 1);
+  max-height: 430px;
   object-fit: contain;
   display: block;
   background: #faf9f5;
@@ -813,7 +829,8 @@ a {
 
 .branding-live-logo-box {
   width: 128px;
-  height: 128px;
+  aspect-ratio: var(--asset-ratio, 1 / 1);
+  min-height: 96px;
   border-radius: 22px;
   border: 1px solid var(--line);
   background: #faf9f5;
@@ -857,7 +874,8 @@ a {
 }
 
 .branding-live-sponsor {
-  min-height: 160px;
+  aspect-ratio: var(--asset-ratio, 5 / 1);
+  min-height: 150px;
   border: 1px dashed #c8c0b4;
   border-radius: 18px;
   background: #faf9f5;
@@ -1001,27 +1019,30 @@ th {
 }
 
 .brand-hero-banner {
-  aspect-ratio: 4 / 1;
+  aspect-ratio: var(--asset-ratio, 4 / 1);
+  max-height: 520px;
 }
 
 .brand-hero-content {
   display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(220px, auto) 1fr;
+  gap: 32px;
   padding: 28px;
   align-items: center;
 }
 
 .brand-hero-logos {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   flex-wrap: wrap;
   align-items: center;
 }
 
 .brand-hero-logos img {
-  width: 76px;
-  height: 76px;
+  width: clamp(76px, calc(96px * var(--asset-scale, 1)), 180px);
+  aspect-ratio: var(--asset-ratio, 1 / 1);
+  height: auto;
+  max-height: 140px;
   object-fit: contain;
   border-radius: 18px;
   border: 1px solid var(--line);
@@ -1043,7 +1064,8 @@ th {
 }
 
 .brand-hero-sponsor {
-  aspect-ratio: 5 / 1;
+  aspect-ratio: var(--asset-ratio, 5 / 1);
+  max-height: 260px;
 }
 
 .display-board td {
@@ -1094,7 +1116,7 @@ th {
   }
 
   .branding-live-banner {
-    height: 300px;
+    max-height: 360px;
   }
 }
 
@@ -1104,7 +1126,7 @@ th {
   }
 
   .branding-live-banner {
-    height: 240px;
+    max-height: 280px;
   }
 
   .branding-live-content,
@@ -1122,6 +1144,10 @@ th {
   }
 
   .branding-scale-control {
+    min-width: 100%;
+  }
+
+  .branding-aspect-control {
     min-width: 100%;
   }
 
