@@ -55,6 +55,7 @@ const emptyBranding = {
   eventLogoScale: 100,
   venueLogoScale: 100,
   headerBannerScale: 100,
+  headerBannerThumbScale: 100,
   sponsorBannerScale: 100,
   eventLogoAspect: "1 / 1",
   venueLogoAspect: "1 / 1",
@@ -1208,6 +1209,7 @@ function eventDocToState(id, data) {
     eventLogoScale: Number(data.eventLogoScale || 100),
     venueLogoScale: Number(data.venueLogoScale || 100),
     headerBannerScale: Number(data.headerBannerScale || 100),
+    headerBannerThumbScale: Number(data.headerBannerThumbScale || 100),
     sponsorBannerScale: Number(data.sponsorBannerScale || 100),
     eventLogoAspect: normalizeBrandingAspect(data.eventLogoAspect, "1 / 1"),
     venueLogoAspect: normalizeBrandingAspect(data.venueLogoAspect, "1 / 1"),
@@ -1426,6 +1428,7 @@ async function saveEvent(overrides = {}) {
       eventLogoScale: Number(state.event.eventLogoScale || 100),
       venueLogoScale: Number(state.event.venueLogoScale || 100),
       headerBannerScale: Number(state.event.headerBannerScale || 100),
+      headerBannerThumbScale: Number(state.event.headerBannerThumbScale || 100),
       sponsorBannerScale: Number(state.event.sponsorBannerScale || 100),
       eventLogoAspect: normalizeBrandingAspect(state.event.eventLogoAspect, "1 / 1"),
       venueLogoAspect: normalizeBrandingAspect(state.event.venueLogoAspect, "1 / 1"),
@@ -2112,6 +2115,10 @@ function getBrandingScale(fieldName) {
   return Math.max(50, Math.min(180, Number(state.event[`${fieldName}Scale`] || 100)));
 }
 
+function getHeaderBannerThumbScale() {
+  return Math.max(60, Math.min(220, Number(state.event.headerBannerThumbScale || 100)));
+}
+
 function normalizeBrandingAspect(value, fallback = "1 / 1") {
   const allowed = ["1 / 1", "4 / 3", "3 / 2", "16 / 9", "2 / 1", "3 / 1", "4 / 1", "5 / 1"];
   return allowed.includes(value) ? value : fallback;
@@ -2153,6 +2160,12 @@ function brandingAssetControls(fieldName, label, formatHint) {
         <span>${label} <strong data-scale-value="${scaleField}">${scale}%</strong></span>
         <input type="range" min="50" max="180" step="5" value="${scale}" data-branding-scale="${scaleField}" data-branding-target="${fieldName}" />
       </label>
+      ${fieldName === "headerBanner" ? `
+        <label class="branding-scale-control compact">
+          <span>Kleine Vorschau <strong data-scale-value="headerBannerThumbScale">${getHeaderBannerThumbScale()}%</strong></span>
+          <input type="range" min="60" max="220" step="5" value="${getHeaderBannerThumbScale()}" data-header-thumb-scale />
+        </label>
+      ` : ""}
       <small>${formatHint}</small>
     </div>
   `;
@@ -2230,7 +2243,7 @@ function eventCardMediaMarkup() {
   return `
     <div class="event-card-side">
       <div class="status-badge">${state.event.status}</div>
-      ${state.event.headerBanner ? `<img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")}" />` : ""}
+      ${state.event.headerBanner ? `<img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")};--thumb-scale:${getHeaderBannerThumbScale() / 100};" />` : ""}
     </div>
   `;
 }
@@ -2736,6 +2749,20 @@ function bindBrandingActions() {
       brandingScaleSaveTimer = window.setTimeout(() => {
         void saveEvent();
       }, 250);
+    });
+  });
+
+  root.querySelectorAll("[data-header-thumb-scale]").forEach((input) => {
+    const updateThumbScale = () => {
+      const value = Math.max(60, Math.min(220, Number(input.value || 100)));
+      state.event.headerBannerThumbScale = value;
+      root.querySelector(`[data-scale-value="headerBannerThumbScale"]`)?.replaceChildren(`${value}%`);
+    };
+
+    input.addEventListener("input", updateThumbScale);
+    input.addEventListener("change", async () => {
+      updateThumbScale();
+      await saveEvent();
     });
   });
 

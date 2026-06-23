@@ -349,9 +349,9 @@ a {
 }
 
 .event-card-banner {
-  width: 150px;
+  width: clamp(90px, calc(150px * var(--thumb-scale, 1)), 330px);
   aspect-ratio: var(--asset-ratio, 4 / 1);
-  max-height: 56px;
+  max-height: 86px;
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -813,6 +813,11 @@ a {
   width: 100%;
   height: 30px;
   accent-color: var(--primary);
+}
+
+.branding-scale-control.compact {
+  flex: 0 1 260px;
+  min-width: 240px;
 }
 
 .branding-tools small {
