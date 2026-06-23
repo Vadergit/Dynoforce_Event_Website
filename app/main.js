@@ -167,6 +167,7 @@ const pageMeta = {
 
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
+const QR_CACHE_VERSION = "2026-06-23-https-2";
 let attemptDetectionTimer = null;
 let brandingScaleSaveTimer = null;
 
@@ -2095,7 +2096,7 @@ function dailyWinnerCardsMarkup() {
 }
 
 function qrImage(url) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=264x264&margin=0&data=${encodeURIComponent(url)}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=264x264&margin=0&v=${QR_CACHE_VERSION}&data=${encodeURIComponent(url)}`;
 }
 
 function updateLiveMeasurementDom() {
