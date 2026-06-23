@@ -55,6 +55,7 @@ const emptyBranding = {
   headerBanner: DEFAULT_EVENT_HEADER_BANNER,
   sponsorBanner: "",
   showVenueLogo: false,
+  showHeaderBannerThumb: true,
   eventLogoScale: 100,
   venueLogoScale: 100,
   headerBannerScale: 100,
@@ -898,6 +899,7 @@ const BRANDING_PRESET_FIELDS = [
   "headerBanner",
   "sponsorBanner",
   "showVenueLogo",
+  "showHeaderBannerThumb",
   "eventLogoScale",
   "venueLogoScale",
   "headerBannerScale",
@@ -928,6 +930,7 @@ function applyBrandingPresetData(data = {}) {
     }
   });
   state.event.showVenueLogo = state.event.showVenueLogo === true;
+  state.event.showHeaderBannerThumb = state.event.showHeaderBannerThumb !== false;
   state.event.eventLogoScale = Number(state.event.eventLogoScale || 100);
   state.event.venueLogoScale = Number(state.event.venueLogoScale || 100);
   state.event.headerBannerScale = Number(state.event.headerBannerScale || 100);
@@ -1262,6 +1265,7 @@ function eventDocToState(id, data) {
     headerBanner: data.headerBanner || "",
     sponsorBanner: data.sponsorBanner || "",
     showVenueLogo: data.showVenueLogo === true,
+    showHeaderBannerThumb: data.showHeaderBannerThumb !== false,
     eventLogoScale: Number(data.eventLogoScale || 100),
     venueLogoScale: Number(data.venueLogoScale || 100),
     headerBannerScale: Number(data.headerBannerScale || 100),
@@ -1563,6 +1567,7 @@ async function saveEvent(overrides = {}) {
       headerBanner: state.event.headerBanner,
       sponsorBanner: state.event.sponsorBanner,
       showVenueLogo: state.event.showVenueLogo === true,
+      showHeaderBannerThumb: state.event.showHeaderBannerThumb !== false,
       eventLogoScale: Number(state.event.eventLogoScale || 100),
       venueLogoScale: Number(state.event.venueLogoScale || 100),
       headerBannerScale: Number(state.event.headerBannerScale || 100),
@@ -2322,6 +2327,10 @@ function brandingAssetControls(fieldName, label, formatHint) {
         </label>
       ` : ""}
       ${fieldName === "headerBanner" ? `
+        <label class="branding-toggle">
+          <input type="checkbox" id="showHeaderBannerThumbInput" ${state.event.showHeaderBannerThumb === false ? "" : "checked"} />
+          <span>Kleines Fenster anzeigen</span>
+        </label>
         <label class="branding-scale-control compact">
           <span>Kleines Fenster <strong data-scale-value="headerBannerThumbScale">${getHeaderBannerThumbScale()}%</strong></span>
           <input type="range" min="60" max="220" step="5" value="${getHeaderBannerThumbScale()}" data-header-thumb-scale />
@@ -2433,7 +2442,7 @@ function brandingPresetControls() {
 function eventCardMediaMarkup() {
   return `
     <div class="event-card-side">
-      ${state.event.headerBanner ? `
+      ${state.event.headerBanner && state.event.showHeaderBannerThumb !== false ? `
         <div class="event-card-banner-frame" style="${brandingScaleStyle("headerBanner")};--thumb-zoom:${(getHeaderBannerThumbScale() / 100) * 1.2};">
           <img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" />
         </div>
@@ -2995,6 +3004,11 @@ function bindBrandingActions() {
 
   root.querySelector("#showVenueLogoInput")?.addEventListener("change", async (event) => {
     state.event.showVenueLogo = event.target.checked;
+    await saveEvent();
+  });
+
+  root.querySelector("#showHeaderBannerThumbInput")?.addEventListener("change", async (event) => {
+    state.event.showHeaderBannerThumb = event.target.checked;
     await saveEvent();
   });
 
