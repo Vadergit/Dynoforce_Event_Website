@@ -46,9 +46,10 @@ const MODE_LOCK_THRESHOLD = 1.0;
 const PEAK_MINIMUM_THRESHOLD = 2.0;
 const ATTEMPT_START_THRESHOLD = 2.0;
 const ATTEMPT_END_THRESHOLD = 2.0;
+const DEFAULT_DYNOFORCE_LOGO = "/dynoforce-icon.png";
 
 const emptyBranding = {
-  eventLogo: "",
+  eventLogo: DEFAULT_DYNOFORCE_LOGO,
   venueLogo: "",
   headerBanner: "",
   sponsorBanner: "",
@@ -1255,7 +1256,7 @@ function eventDocToState(id, data) {
     participantCount: Number(data.participantCount || 0),
     createdAt: data.createdAt || null,
     closedAt: data.closedAt || null,
-    eventLogo: data.eventLogo || "",
+    eventLogo: data.eventLogo || DEFAULT_DYNOFORCE_LOGO,
     venueLogo: data.venueLogo || "",
     headerBanner: data.headerBanner || "",
     sponsorBanner: data.sponsorBanner || "",
