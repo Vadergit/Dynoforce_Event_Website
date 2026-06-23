@@ -2613,13 +2613,13 @@ function template(page) {
               : `<button class="button" id="openLoginModal">Anmelden</button>`}
           </div>
           ${state.lastError ? `<div class="notice error">${state.lastError}</div>` : ""}
+          ${!state.user ? loginCard() : ""}
           ${organizerEventPickerMarkup(page)}
           ${page === "dashboard" && !state.user ? `
             ${publicHomeCard()}
             <div style="margin-top:18px;">
               ${publicEventsSection()}
             </div>
-            ${loginCard()}
           ` : ""}
           ${!lockedPage && state.user && page === "dashboard" ? `
             <div class="grid two">
@@ -2678,7 +2678,21 @@ function template(page) {
             <div class="grid live">
               <div class="grid">
                 <div class="card"><div class="card-header event-card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div>${eventCardMediaMarkup()}</div></div>
-                <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid two"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div></div></div>
+                <div class="card participant-entry-card">
+                  <div class="participant-entry-head">
+                    <div>
+                      <div class="eyebrow">Nächster Teilnehmer</div>
+                      <h3>Vorname und Name eingeben</h3>
+                      <p>Danach startet die Messung automatisch, sobald die Kraftschwelle überschritten wird.</p>
+                    </div>
+                    <div class="participant-entry-badge">1</div>
+                  </div>
+                  <div class="field-grid two participant-fields">
+                    <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
+                    <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
+                  </div>
+                  <div class="participant-current-line"><span>Aktuell bereit für</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch keinen Teilnehmer"}</strong></div>
+                </div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
                   <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>

@@ -454,6 +454,86 @@ a {
   resize: vertical;
 }
 
+.participant-entry-card {
+  border-color: rgba(31, 79, 70, 0.28);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfaf6 100%);
+  box-shadow: 0 18px 44px rgba(31, 79, 70, 0.08);
+}
+
+.participant-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.participant-entry-head h3 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.participant-entry-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.participant-entry-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.participant-fields {
+  padding: 16px;
+  border: 1px solid rgba(31, 79, 70, 0.16);
+  border-radius: 20px;
+  background: rgba(31, 79, 70, 0.045);
+}
+
+.participant-fields .field input {
+  min-height: 58px;
+  border-color: rgba(31, 79, 70, 0.28);
+  background: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.participant-fields .field input:focus {
+  outline: 3px solid rgba(31, 79, 70, 0.16);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.participant-current-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.participant-current-line span {
+  color: var(--muted);
+}
+
+.participant-current-line strong {
+  font-size: 26px;
+  letter-spacing: -0.04em;
+  text-align: right;
+}
+
 .upload-hint {
   margin-top: 10px;
   padding: 12px 14px;
