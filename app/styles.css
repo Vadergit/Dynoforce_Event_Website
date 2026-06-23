@@ -337,6 +337,7 @@ a {
 
 .event-card-header {
   align-items: center;
+  gap: 24px;
 }
 
 .event-card-side {
@@ -344,18 +345,19 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
-  flex-shrink: 0;
+  flex: 0 1 min(42%, 520px);
+  min-width: 320px;
 }
 
 .event-card-banner {
-  width: clamp(90px, calc(150px * var(--thumb-scale, 1)), 330px);
+  width: min(100%, clamp(300px, calc(420px * var(--thumb-scale, 1)), 520px));
   aspect-ratio: var(--asset-ratio, 4 / 1);
-  max-height: 86px;
+  max-height: 110px;
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #faf9f5;
-  padding: 6px;
+  padding: 8px;
 }
 
 .hero {

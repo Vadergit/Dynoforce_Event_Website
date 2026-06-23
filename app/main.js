@@ -2433,7 +2433,6 @@ function brandingPresetControls() {
 function eventCardMediaMarkup() {
   return `
     <div class="event-card-side">
-      <div class="status-badge">${state.event.status}</div>
       ${state.event.headerBanner ? `<img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")};--thumb-scale:${getHeaderBannerThumbScale() / 100};" />` : ""}
     </div>
   `;
