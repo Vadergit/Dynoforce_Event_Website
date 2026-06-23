@@ -52,6 +52,10 @@ const emptyBranding = {
   venueLogo: "",
   headerBanner: "",
   sponsorBanner: "",
+  eventLogoScale: 100,
+  venueLogoScale: 100,
+  headerBannerScale: 100,
+  sponsorBannerScale: 100,
   eventLogoPdfData: "",
   venueLogoPdfData: "",
   headerBannerPdfData: "",
@@ -154,6 +158,7 @@ const pageMeta = {
 
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
 let attemptDetectionTimer = null;
+let brandingScaleSaveTimer = null;
 
 function slugify(value) {
   return String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "event";
@@ -1196,6 +1201,10 @@ function eventDocToState(id, data) {
     venueLogo: data.venueLogo || "",
     headerBanner: data.headerBanner || "",
     sponsorBanner: data.sponsorBanner || "",
+    eventLogoScale: Number(data.eventLogoScale || 100),
+    venueLogoScale: Number(data.venueLogoScale || 100),
+    headerBannerScale: Number(data.headerBannerScale || 100),
+    sponsorBannerScale: Number(data.sponsorBannerScale || 100),
     eventLogoPdfData: data.eventLogoPdfData || "",
     venueLogoPdfData: data.venueLogoPdfData || "",
     headerBannerPdfData: data.headerBannerPdfData || "",
@@ -1406,6 +1415,10 @@ async function saveEvent(overrides = {}) {
       venueLogo: state.event.venueLogo,
       headerBanner: state.event.headerBanner,
       sponsorBanner: state.event.sponsorBanner,
+      eventLogoScale: Number(state.event.eventLogoScale || 100),
+      venueLogoScale: Number(state.event.venueLogoScale || 100),
+      headerBannerScale: Number(state.event.headerBannerScale || 100),
+      sponsorBannerScale: Number(state.event.sponsorBannerScale || 100),
       eventLogoPdfData: state.event.eventLogoPdfData || "",
       venueLogoPdfData: state.event.venueLogoPdfData || "",
       headerBannerPdfData: state.event.headerBannerPdfData || "",
@@ -2082,31 +2095,48 @@ function publicEventsSection() {
   `;
 }
 
-function brandingPreviewImage(url, label) {
-  return url
-    ? `<img src="${url}" alt="${label}" style="max-width:100%;border-radius:12px;border:1px solid var(--line);" />`
-    : `${label}<br/>Noch kein Upload`;
+function getBrandingScale(fieldName) {
+  return Math.max(50, Math.min(180, Number(state.event[`${fieldName}Scale`] || 100)));
 }
 
-function brandingInputHint(title, description, recommendation) {
+function brandingScaleStyle(fieldName) {
+  return `--asset-scale:${getBrandingScale(fieldName) / 100};`;
+}
+
+function brandingAssetControls(fieldName, label, formatHint) {
+  const scaleField = `${fieldName}Scale`;
+  const scale = getBrandingScale(fieldName);
   return `
-    <div class="upload-hint">
-      <strong>${title}</strong>
-      <p>${description}</p>
-      <span>${recommendation}</span>
+    <div class="branding-tools">
+      <label class="button subtle" for="${fieldName}Input">${state.event[fieldName] ? "Bild ersetzen" : "Bild hinzufügen"}</label>
+      <input class="branding-file-input" type="file" id="${fieldName}Input" accept="image/*" />
+      <label class="branding-scale-control">
+        <span>${label} <strong data-scale-value="${scaleField}">${scale}%</strong></span>
+        <input type="range" min="50" max="180" step="5" value="${scale}" data-branding-scale="${scaleField}" data-branding-target="${fieldName}" />
+      </label>
+      <small>${formatHint}</small>
     </div>
   `;
 }
 
 function brandingLivePreview() {
   return `
-    <div class="branding-live-preview">
+    <div class="branding-live-preview branding-editor">
       <div class="branding-live-hero" style="border-color:${state.event.primaryColor || "#1f4f46"};">
-        ${state.event.headerBanner ? `<img class="branding-live-banner" src="${state.event.headerBanner}" alt="Header Banner Vorschau" />` : `<div class="branding-live-banner placeholder">Header Banner</div>`}
+        <div class="branding-editor-slot branding-editor-banner">
+          ${state.event.headerBanner ? `<img class="branding-live-banner branding-scale-target" data-branding-preview="headerBanner" src="${state.event.headerBanner}" alt="Header Banner Vorschau" style="${brandingScaleStyle("headerBanner")}" />` : `<div class="branding-live-banner placeholder">Header Banner</div>`}
+          ${brandingAssetControls("headerBanner", "Header Grösse", "Querformat, ideal 2400 x 900 px")}
+        </div>
         <div class="branding-live-content">
           <div class="branding-live-logos">
-            <div class="branding-live-logo-box">${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Eventlogo Vorschau" />` : `<span>Eventlogo</span>`}</div>
-            <div class="branding-live-logo-box">${state.event.venueLogo ? `<img src="${state.event.venueLogo}" alt="Hallenlogo Vorschau" />` : `<span>Hallenlogo</span>`}</div>
+            <div class="branding-editor-slot branding-editor-logo">
+              <div class="branding-live-logo-box">${state.event.eventLogo ? `<img class="branding-scale-target" data-branding-preview="eventLogo" src="${state.event.eventLogo}" alt="Eventlogo Vorschau" style="${brandingScaleStyle("eventLogo")}" />` : `<span>Eventlogo</span>`}</div>
+              ${brandingAssetControls("eventLogo", "Eventlogo", "PNG/SVG, quadratisch")}
+            </div>
+            <div class="branding-editor-slot branding-editor-logo">
+              <div class="branding-live-logo-box">${state.event.venueLogo ? `<img class="branding-scale-target" data-branding-preview="venueLogo" src="${state.event.venueLogo}" alt="Hallenlogo Vorschau" style="${brandingScaleStyle("venueLogo")}" />` : `<span>Hallenlogo</span>`}</div>
+              ${brandingAssetControls("venueLogo", "Hallenlogo", "PNG/SVG, gerne horizontal")}
+            </div>
           </div>
           <div class="branding-live-copy">
             <div class="eyebrow">Vorschau öffentliche Eventseite</div>
@@ -2116,12 +2146,20 @@ function brandingLivePreview() {
         </div>
       </div>
       <div class="branding-live-footer">
-        <div class="branding-live-sponsor">
-          ${state.event.sponsorBanner ? `<img src="${state.event.sponsorBanner}" alt="Sponsor Banner Vorschau" />` : `<span>Sponsor Banner erscheint hier</span>`}
+        <div class="branding-editor-slot">
+          <div class="branding-live-sponsor">
+            ${state.event.sponsorBanner ? `<img class="branding-scale-target" data-branding-preview="sponsorBanner" src="${state.event.sponsorBanner}" alt="Sponsor Banner Vorschau" style="${brandingScaleStyle("sponsorBanner")}" />` : `<span>Sponsor Banner erscheint hier</span>`}
+          </div>
+          ${brandingAssetControls("sponsorBanner", "Sponsor Grösse", "Querformat, ideal 2400 x 500 px")}
         </div>
         <div class="branding-live-meta">
-          <div class="metric-line"><span>Primärfarbe</span><strong>${state.event.primaryColor || "#1f4f46"}</strong></div>
-          <div class="metric-line"><span>Wirkung</span><strong>Klar und professionell</strong></div>
+          <div>
+            <div class="panel-label">Primärfarbe</div>
+            <div class="swatches compact">
+              ${["#1f4f46", "#345d7e", "#8c5a21", "#4f4f4f"].map((color) => `<button class="swatch" data-color="${color}" style="background:${color}" aria-label="Primärfarbe ${color}"></button>`).join("")}
+            </div>
+          </div>
+          <div class="metric-line"><span>Aktuelle Farbe</span><strong>${state.event.primaryColor || "#1f4f46"}</strong></div>
         </div>
       </div>
     </div>
@@ -2131,11 +2169,11 @@ function brandingLivePreview() {
 function publicBrandingSection() {
   return `
     <div class="card brand-hero" id="publicBrandHero">
-      ${state.event.headerBanner ? `<img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" />` : ""}
+      ${state.event.headerBanner ? `<img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")}" />` : ""}
       <div class="brand-hero-content">
         <div class="brand-hero-logos">
-          ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" />` : ""}
-          ${state.event.venueLogo ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" />` : ""}
+          ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
+          ${state.event.venueLogo ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
         </div>
         <div class="brand-hero-copy">
           <div class="eyebrow">DynoForce Event</div>
@@ -2144,7 +2182,7 @@ function publicBrandingSection() {
           <p>${state.event.description || `${state.event.organiser || "Veranstalter"} präsentiert dieses Event.`}</p>
         </div>
       </div>
-      ${state.event.sponsorBanner ? `<img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" />` : ""}
+      ${state.event.sponsorBanner ? `<img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" style="${brandingScaleStyle("sponsorBanner")}" />` : ""}
     </div>
   `;
 }
@@ -2361,33 +2399,14 @@ function template(page) {
             ${resultEditorMarkup()}
           ` : ""}
           ${!lockedPage && page === "branding" ? `
-            <div class="grid two">
-              <div class="card">
-                <div class="card-header"><div><h3>Branding</h3><p>Logos und Banner werden direkt eingesetzt und rechts sofort in der Vorschau dargestellt.</p></div></div>
-                <div class="field-grid">
-                  <div class="field"><label>Eventlogo</label><input type="file" id="eventLogoInput" accept="image/*" />${brandingInputHint("Einsatz", "Wird im Kopfbereich und im PDF als zentrales Eventlogo gezeigt.", "Empfohlen: PNG oder SVG mit transparentem Hintergrund, quadratisch, mindestens 800 × 800 px.")}</div>
-                  <div class="field"><label>Hallenlogo</label><input type="file" id="venueLogoInput" accept="image/*" />${brandingInputHint("Einsatz", "Zeigt die Boulderhalle oder den Veranstaltungsort direkt neben dem Eventlogo.", "Empfohlen: PNG oder SVG mit transparentem Hintergrund, gerne horizontal, mindestens 1000 px Breite.")}</div>
-                  <div class="field"><label>Header Banner</label><input type="file" id="headerBannerInput" accept="image/*" />${brandingInputHint("Einsatz", "Grosses Titelbild für öffentliche Eventseite und PDF.", "Empfohlen: JPG oder PNG im Querformat, ideal 2400 × 900 px oder breiter.")}</div>
-                  <div class="field"><label>Sponsor Banner</label><input type="file" id="sponsorBannerInput" accept="image/*" />${brandingInputHint("Einsatz", "Wird unterhalb des Hauptbereichs für Sponsoren oder Partner eingeblendet.", "Empfohlen: JPG oder PNG im Querformat, ideal 2400 × 500 px.")}</div>
-                  <div class="color-box">
-                    <div class="panel-label">Primärfarbe</div>
-                    <p class="muted" style="margin:10px 0 14px;">Die Primärfarbe steuert Akzente, Buttons und Hervorhebungen in der Eventdarstellung.</p>
-                    <div class="swatches">
-                      ${["#1f4f46", "#345d7e", "#8c5a21", "#4f4f4f"].map((color) => `<button class="swatch" data-color="${color}" style="background:${color}"></button>`).join("")}
-                    </div>
-                  </div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3>Branding Vorschau</h3>
+                  <p>${state.uploading ? `Upload läuft: ${state.uploading}` : "Bilder direkt an der gewünschten Stelle hinzufügen und passend skalieren."}</p>
                 </div>
               </div>
-              <div class="card">
-                <div class="card-header"><div><h3>Live Vorschau</h3><p>${state.uploading ? `Upload läuft: ${state.uploading}` : "So wirkt das Branding später auf Eventseite und PDF."}</p></div></div>
-                ${brandingLivePreview()}
-                <div class="grid" style="margin-top:18px;">
-                  <div class="brand-preview">${brandingPreviewImage(state.event.eventLogo, "Event Logo")}</div>
-                  <div class="brand-preview">${brandingPreviewImage(state.event.venueLogo, "Venue Logo")}</div>
-                  <div class="brand-preview">${brandingPreviewImage(state.event.headerBanner, "Header Banner")}</div>
-                  <div class="brand-preview">${brandingPreviewImage(state.event.sponsorBanner, "Sponsor Banner")}</div>
-                </div>
-              </div>
+              ${brandingLivePreview()}
             </div>
           ` : ""}
           ${!lockedPage && page === "live" ? `
@@ -2647,6 +2666,28 @@ function bindBrandingActions() {
       state.event.primaryColor = button.dataset.color;
       await saveEvent();
       document.documentElement.style.setProperty("--primary", state.event.primaryColor);
+    });
+  });
+
+  root.querySelectorAll("[data-branding-scale]").forEach((input) => {
+    const updateScale = () => {
+      const scaleField = input.dataset.brandingScale;
+      const target = input.dataset.brandingTarget;
+      const value = Math.max(50, Math.min(180, Number(input.value || 100)));
+      state.event[scaleField] = value;
+      root.querySelector(`[data-scale-value="${scaleField}"]`)?.replaceChildren(`${value}%`);
+      root.querySelectorAll(`[data-branding-preview="${target}"]`).forEach((element) => {
+        element.style.setProperty("--asset-scale", String(value / 100));
+      });
+    };
+
+    input.addEventListener("input", updateScale);
+    input.addEventListener("change", async () => {
+      updateScale();
+      if (brandingScaleSaveTimer) window.clearTimeout(brandingScaleSaveTimer);
+      brandingScaleSaveTimer = window.setTimeout(() => {
+        void saveEvent();
+      }, 250);
     });
   });
 

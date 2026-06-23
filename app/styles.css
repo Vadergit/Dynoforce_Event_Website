@@ -696,6 +696,82 @@ a {
   background: var(--surface);
 }
 
+.branding-editor {
+  position: relative;
+}
+
+.branding-editor-slot {
+  position: relative;
+}
+
+.branding-editor-banner {
+  overflow: hidden;
+}
+
+.branding-editor-logo {
+  display: grid;
+  gap: 10px;
+}
+
+.branding-file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.branding-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 12px 28px rgb(30 24 16 / 10%);
+}
+
+.branding-editor-banner .branding-tools {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+}
+
+.branding-scale-control {
+  min-width: 220px;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.branding-scale-control span {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.branding-scale-control input {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.branding-tools small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.branding-scale-target,
+.brand-hero-banner,
+.brand-hero-sponsor,
+.brand-hero-logos img {
+  transform: scale(var(--asset-scale, 1));
+  transform-origin: center;
+}
+
 .branding-live-hero {
   border-top: 6px solid var(--primary);
 }
@@ -780,6 +856,10 @@ a {
 .branding-live-meta {
   display: grid;
   gap: 12px;
+}
+
+.swatches.compact {
+  margin-top: 10px;
 }
 
 .public-event-item {
