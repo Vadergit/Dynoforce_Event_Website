@@ -166,6 +166,7 @@ const pageMeta = {
 };
 
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
+const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
 let attemptDetectionTimer = null;
 let brandingScaleSaveTimer = null;
 
@@ -954,11 +955,11 @@ function getRouteInfo() {
 }
 
 function getPublicUrl() {
-  return `${window.location.origin}${APP_BASE}/#/e/${state.event.id}`;
+  return `${PUBLIC_ORIGIN}${APP_BASE}/#/e/${state.event.id}`;
 }
 
 function getDisplayUrl() {
-  return `${window.location.origin}${APP_BASE}/#/display/${state.event.id}`;
+  return `${PUBLIC_ORIGIN}${APP_BASE}/#/display/${state.event.id}`;
 }
 
 function syncUrl(page, eventId = state.event.id) {
