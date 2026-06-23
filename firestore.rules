@@ -46,5 +46,11 @@ service cloud.firestore {
         )
       );
     }
+
+    match /brandingPresets/{presetId} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
   }
 }

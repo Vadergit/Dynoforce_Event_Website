@@ -752,6 +752,38 @@ a {
   align-items: center;
 }
 
+.branding-preset-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.6fr);
+  gap: 16px;
+  align-items: end;
+  padding: 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #faf9f5;
+}
+
+.branding-preset-panel p {
+  margin: 6px 0 0;
+}
+
+.branding-preset-actions {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) auto minmax(170px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.branding-preset-actions input,
+.branding-preset-actions select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0 12px;
+}
+
 .branding-live-preview {
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -1226,6 +1258,11 @@ th {
   }
 
   .branding-live-content {
+    grid-template-columns: 1fr;
+  }
+
+  .branding-preset-panel,
+  .branding-preset-actions {
     grid-template-columns: 1fr;
   }
 

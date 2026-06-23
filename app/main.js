@@ -111,6 +111,7 @@ const state = {
     auth: null,
     dashboard: null,
     publicEvents: null,
+    brandingPresets: null,
     event: null,
     results: null,
   },
@@ -147,6 +148,8 @@ const state = {
   },
   events: [],
   publicEvents: [],
+  brandingPresets: [],
+  brandingPresetsLoaded: false,
   resultCache: {},
   results: [],
 };
@@ -885,6 +888,53 @@ function safeUnsub(key) {
   }
 }
 
+const BRANDING_PRESET_FIELDS = [
+  "eventLogo",
+  "venueLogo",
+  "headerBanner",
+  "sponsorBanner",
+  "showVenueLogo",
+  "eventLogoScale",
+  "venueLogoScale",
+  "headerBannerScale",
+  "headerBannerThumbScale",
+  "sponsorBannerScale",
+  "eventLogoAspect",
+  "venueLogoAspect",
+  "headerBannerAspect",
+  "sponsorBannerAspect",
+  "eventLogoPdfData",
+  "venueLogoPdfData",
+  "headerBannerPdfData",
+  "sponsorBannerPdfData",
+  "primaryColor",
+];
+
+function getCurrentBrandingPresetData() {
+  return BRANDING_PRESET_FIELDS.reduce((payload, field) => {
+    payload[field] = state.event[field] ?? emptyBranding[field] ?? "";
+    return payload;
+  }, {});
+}
+
+function applyBrandingPresetData(data = {}) {
+  BRANDING_PRESET_FIELDS.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(data, field)) {
+      state.event[field] = data[field];
+    }
+  });
+  state.event.showVenueLogo = state.event.showVenueLogo !== false;
+  state.event.eventLogoScale = Number(state.event.eventLogoScale || 100);
+  state.event.venueLogoScale = Number(state.event.venueLogoScale || 100);
+  state.event.headerBannerScale = Number(state.event.headerBannerScale || 100);
+  state.event.headerBannerThumbScale = Number(state.event.headerBannerThumbScale || 100);
+  state.event.sponsorBannerScale = Number(state.event.sponsorBannerScale || 100);
+  state.event.eventLogoAspect = normalizeBrandingAspect(state.event.eventLogoAspect, "1 / 1");
+  state.event.venueLogoAspect = normalizeBrandingAspect(state.event.venueLogoAspect, "1 / 1");
+  state.event.headerBannerAspect = normalizeBrandingAspect(state.event.headerBannerAspect, "4 / 1");
+  state.event.sponsorBannerAspect = normalizeBrandingAspect(state.event.sponsorBannerAspect, "5 / 1");
+}
+
 function getRouteInfo() {
   const hash = window.location.hash.replace(/^#/, "");
   const segments = hash.split("/").filter(Boolean);
@@ -1366,6 +1416,87 @@ function subscribeToDashboard() {
       render();
     },
   );
+}
+
+function subscribeToBrandingPresets() {
+  if (!state.user) {
+    state.brandingPresets = [];
+    state.brandingPresetsLoaded = true;
+    render();
+    return;
+  }
+
+  safeUnsub("brandingPresets");
+  state.brandingPresetsLoaded = false;
+  state.unsubscribers.brandingPresets = onSnapshot(
+    query(collection(db, "brandingPresets"), where("ownerUid", "==", state.user.uid)),
+    (snapshot) => {
+      state.brandingPresets = snapshot.docs.map((presetDoc) => {
+        const data = presetDoc.data();
+        return {
+          id: presetDoc.id,
+          name: data.name || "Branding",
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
+          data: data.branding || {},
+        };
+      }).sort((a, b) => String(a.name).localeCompare(String(b.name), "de"));
+      state.brandingPresetsLoaded = true;
+      render();
+    },
+    (error) => {
+      setError(`Branding Vorlagen konnten nicht geladen werden: ${error.message}`);
+      state.brandingPresetsLoaded = true;
+      render();
+    },
+  );
+}
+
+async function saveBrandingPreset(name) {
+  if (!state.user) {
+    setError("Bitte zuerst anmelden.");
+    render();
+    return;
+  }
+  const presetName = String(name || "").trim();
+  if (!presetName) return;
+
+  try {
+    await addDoc(collection(db, "brandingPresets"), {
+      name: presetName,
+      ownerUid: state.user.uid,
+      branding: getCurrentBrandingPresetData(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    setFlash(`Branding Vorlage "${presetName}" gespeichert.`);
+    render();
+  } catch (error) {
+    setError(`Branding Vorlage konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
+}
+
+async function applyBrandingPreset(presetId) {
+  const preset = state.brandingPresets.find((item) => item.id === presetId);
+  if (!preset) return;
+  applyBrandingPresetData(preset.data);
+  await saveEvent();
+  setFlash(`Branding "${preset.name}" angewendet.`);
+  render();
+}
+
+async function deleteBrandingPreset(presetId) {
+  const preset = state.brandingPresets.find((item) => item.id === presetId);
+  if (!preset || !window.confirm(`Branding Vorlage "${preset.name}" wirklich löschen?`)) return;
+  try {
+    await deleteDoc(doc(db, "brandingPresets", presetId));
+    setFlash(`Branding Vorlage "${preset.name}" gelöscht.`);
+    render();
+  } catch (error) {
+    setError(`Branding Vorlage konnte nicht gelöscht werden: ${error instanceof Error ? error.message : String(error)}`);
+    render();
+  }
 }
 
 function subscribeToPublicEvents() {
@@ -2249,6 +2380,27 @@ function publicBrandingSection() {
   `;
 }
 
+function brandingPresetControls() {
+  return `
+    <div class="branding-preset-panel">
+      <div>
+        <div class="panel-label">Branding Vorlagen</div>
+        <p class="muted">Speichere ein fertiges Branding und wende es später bei anderen Events wieder an.</p>
+      </div>
+      <div class="branding-preset-actions">
+        <input id="brandingPresetName" placeholder="Vorlagenname, z.B. Bouba Standard" />
+        <button class="button primary" id="saveBrandingPreset">Branding speichern</button>
+        <select id="brandingPresetSelect">
+          <option value="">${state.brandingPresetsLoaded ? "Vorlage auswählen" : "Vorlagen werden geladen..."}</option>
+          ${state.brandingPresets.map((preset) => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`).join("")}
+        </select>
+        <button class="button" id="applyBrandingPreset">Anwenden</button>
+        <button class="button danger" id="deleteBrandingPreset">Löschen</button>
+      </div>
+    </div>
+  `;
+}
+
 function eventCardMediaMarkup() {
   return `
     <div class="event-card-side">
@@ -2477,6 +2629,7 @@ function template(page) {
                   <p>${state.uploading ? `Upload läuft: ${state.uploading}` : "Bilder direkt an der gewünschten Stelle hinzufügen und passend skalieren."}</p>
                 </div>
               </div>
+              ${brandingPresetControls()}
               ${brandingLivePreview()}
             </div>
           ` : ""}
@@ -2732,6 +2885,31 @@ function bindSetupActions() {
 }
 
 function bindBrandingActions() {
+  root.querySelector("#saveBrandingPreset")?.addEventListener("click", async () => {
+    const presetName = root.querySelector("#brandingPresetName")?.value || "";
+    await saveBrandingPreset(presetName);
+  });
+
+  root.querySelector("#applyBrandingPreset")?.addEventListener("click", async () => {
+    const presetId = root.querySelector("#brandingPresetSelect")?.value || "";
+    if (!presetId) {
+      setError("Bitte zuerst eine Branding Vorlage auswählen.");
+      render();
+      return;
+    }
+    await applyBrandingPreset(presetId);
+  });
+
+  root.querySelector("#deleteBrandingPreset")?.addEventListener("click", async () => {
+    const presetId = root.querySelector("#brandingPresetSelect")?.value || "";
+    if (!presetId) {
+      setError("Bitte zuerst eine Branding Vorlage auswählen.");
+      render();
+      return;
+    }
+    await deleteBrandingPreset(presetId);
+  });
+
   root.querySelectorAll("[data-color]").forEach((button) => {
     button.addEventListener("click", async () => {
       state.event.primaryColor = button.dataset.color;
@@ -2920,8 +3098,12 @@ state.unsubscribers.auth = onAuthStateChanged(auth, async (user) => {
   if (user) {
     safeUnsub("publicEvents");
     subscribeToDashboard();
+    subscribeToBrandingPresets();
   } else {
     safeUnsub("dashboard");
+    safeUnsub("brandingPresets");
+    state.brandingPresets = [];
+    state.brandingPresetsLoaded = true;
     subscribeToPublicEvents();
   }
   await routeAndLoad();
