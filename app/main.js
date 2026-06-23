@@ -2685,13 +2685,11 @@ function template(page) {
                       <h3>Vorname und Name eingeben</h3>
                       <p>Danach startet die Messung automatisch, sobald die Kraftschwelle überschritten wird.</p>
                     </div>
-                    <div class="participant-entry-badge">1</div>
                   </div>
                   <div class="field-grid two participant-fields">
                     <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
                     <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
                   </div>
-                  <div class="participant-current-line"><span>Aktuell bereit für</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch keinen Teilnehmer"}</strong></div>
                 </div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>

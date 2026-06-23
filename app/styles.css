@@ -481,23 +481,17 @@ a {
   line-height: 1.45;
 }
 
-.participant-entry-badge {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  background: var(--primary);
-  color: white;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  flex: 0 0 auto;
-}
-
 .participant-fields {
   padding: 16px;
   border: 1px solid rgba(31, 79, 70, 0.16);
   border-radius: 20px;
   background: rgba(31, 79, 70, 0.045);
+}
+
+.participant-fields .field label {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .participant-fields .field input {
@@ -512,26 +506,6 @@ a {
   outline: 3px solid rgba(31, 79, 70, 0.16);
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
-}
-
-.participant-current-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.participant-current-line span {
-  color: var(--muted);
-}
-
-.participant-current-line strong {
-  font-size: 26px;
-  letter-spacing: -0.04em;
-  text-align: right;
 }
 
 .upload-hint {
