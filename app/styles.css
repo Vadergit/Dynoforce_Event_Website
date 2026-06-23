@@ -543,6 +543,47 @@ a {
   justify-content: flex-end;
 }
 
+.public-summary-grid {
+  gap: 12px;
+}
+
+.compact-public-card {
+  padding: 18px 20px;
+}
+
+.compact-public-card .card-header {
+  margin-bottom: 10px;
+}
+
+.compact-public-card .card-header h3 {
+  font-size: 18px;
+}
+
+.compact-public-card .card-header p {
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.compact-public-card .button {
+  padding: 9px 13px;
+}
+
+.metric-list.compact {
+  gap: 8px;
+}
+
+.metric-list.compact .metric-line {
+  padding-bottom: 8px;
+}
+
+.metric-list.compact .metric-line strong {
+  font-size: 22px;
+}
+
+.metric-list.compact + .action-row {
+  margin-top: 12px;
+}
+
 .metric-list {
   display: grid;
   gap: 14px;
