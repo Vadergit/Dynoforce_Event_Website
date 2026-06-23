@@ -916,6 +916,10 @@ a {
   accent-color: var(--primary);
 }
 
+.branding-remove-button {
+  padding: 10px 12px;
+}
+
 .branding-tools small {
   flex: 1 1 180px;
   color: var(--muted);

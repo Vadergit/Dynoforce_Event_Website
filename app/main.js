@@ -1628,6 +1628,19 @@ async function uploadBrandingFile(fieldName, file) {
   }
 }
 
+async function removeBrandingFile(fieldName) {
+  if (!state.user) {
+    setError("Bitte zuerst anmelden, bevor Branding bearbeitet wird.");
+    render();
+    return;
+  }
+
+  state.event[fieldName] = fieldName === "eventLogo" ? DEFAULT_DYNOFORCE_LOGO : "";
+  state.event[getPdfBrandingFieldName(fieldName)] = "";
+  await saveEvent();
+  setFlash(fieldName === "eventLogo" ? "Eigenes Eventlogo entfernt. DF-Logo ist wieder aktiv." : "Bild entfernt.");
+}
+
 async function saveLiveResult() {
   await finalizeParticipantResult(true);
 }
@@ -2271,6 +2284,9 @@ function brandingAssetControls(fieldName, label, formatHint) {
   const scaleField = `${fieldName}Scale`;
   const aspectField = `${fieldName}Aspect`;
   const scale = getBrandingScale(fieldName);
+  const canRemoveImage = fieldName === "eventLogo"
+    ? Boolean(state.event.eventLogo && state.event.eventLogo !== DEFAULT_DYNOFORCE_LOGO)
+    : Boolean(state.event[fieldName]);
   const fallbackAspect = fieldName === "headerBanner" ? "4 / 1" : fieldName === "sponsorBanner" ? "5 / 1" : "1 / 1";
   const aspect = normalizeBrandingAspect(state.event[aspectField], fallbackAspect);
   const aspectOptions = [
@@ -2287,6 +2303,7 @@ function brandingAssetControls(fieldName, label, formatHint) {
     <div class="branding-tools">
       <label class="button subtle" for="${fieldName}Input">${state.event[fieldName] ? "Bild ersetzen" : "Bild hinzufügen"}</label>
       <input class="branding-file-input" type="file" id="${fieldName}Input" accept="image/*" />
+      ${canRemoveImage ? `<button class="button danger branding-remove-button" data-remove-branding="${fieldName}">Bild entfernen</button>` : ""}
       <label class="branding-aspect-control">
         <span>Format</span>
         <select data-branding-aspect="${aspectField}" data-branding-target="${fieldName}">
@@ -2911,6 +2928,13 @@ function bindBrandingActions() {
       return;
     }
     await deleteBrandingPreset(presetId);
+  });
+
+  root.querySelectorAll("[data-remove-branding]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      await removeBrandingFile(button.dataset.removeBranding);
+    });
   });
 
   root.querySelectorAll("[data-color]").forEach((button) => {
