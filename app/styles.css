@@ -694,6 +694,9 @@ a {
   border-radius: 22px;
   overflow: hidden;
   background: var(--surface);
+  max-width: 1180px;
+  margin: 0 auto;
+  box-shadow: 0 18px 44px rgba(23, 23, 23, 0.06);
 }
 
 .branding-editor {
@@ -710,7 +713,8 @@ a {
 
 .branding-editor-logo {
   display: grid;
-  gap: 10px;
+  gap: 14px;
+  min-width: 300px;
 }
 
 .branding-file-input {
@@ -723,28 +727,28 @@ a {
 
 .branding-tools {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 10px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 12px 28px rgb(30 24 16 / 10%);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(30, 24, 16, 0.08);
 }
 
 .branding-editor-banner .branding-tools {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .branding-scale-control {
-  min-width: 220px;
+  flex: 1 1 360px;
+  min-width: 320px;
   display: grid;
-  gap: 6px;
-  font-size: 12px;
+  gap: 10px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -756,10 +760,12 @@ a {
 
 .branding-scale-control input {
   width: 100%;
+  height: 30px;
   accent-color: var(--primary);
 }
 
 .branding-tools small {
+  flex: 1 1 180px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -778,9 +784,10 @@ a {
 
 .branding-live-banner {
   width: 100%;
-  height: 180px;
-  object-fit: cover;
+  height: clamp(280px, 32vw, 430px);
+  object-fit: contain;
   display: block;
+  background: #faf9f5;
 }
 
 .branding-live-banner.placeholder {
@@ -791,21 +798,23 @@ a {
 }
 
 .branding-live-content {
-  padding: 22px;
+  padding: 32px;
   display: grid;
-  gap: 18px;
+  grid-template-columns: minmax(320px, auto) 1fr;
+  gap: 34px;
+  align-items: center;
 }
 
 .branding-live-logos {
   display: flex;
-  gap: 14px;
+  gap: 24px;
   flex-wrap: wrap;
 }
 
 .branding-live-logo-box {
-  width: 88px;
-  height: 88px;
-  border-radius: 18px;
+  width: 128px;
+  height: 128px;
+  border-radius: 22px;
   border: 1px solid var(--line);
   background: #faf9f5;
   display: grid;
@@ -830,19 +839,25 @@ a {
   margin: 0;
 }
 
+.branding-live-copy h3 {
+  font-size: 38px;
+  letter-spacing: -0.04em;
+}
+
 .branding-live-copy p {
   margin-top: 8px;
   color: var(--muted);
+  font-size: 17px;
 }
 
 .branding-live-footer {
-  padding: 0 22px 22px;
+  padding: 0 32px 32px;
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .branding-live-sponsor {
-  min-height: 92px;
+  min-height: 160px;
   border: 1px dashed #c8c0b4;
   border-radius: 18px;
   background: #faf9f5;
@@ -856,6 +871,7 @@ a {
 .branding-live-meta {
   display: grid;
   gap: 12px;
+  max-width: 420px;
 }
 
 .swatches.compact {
@@ -980,7 +996,8 @@ th {
 .brand-hero-sponsor {
   width: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background: #faf9f5;
 }
 
 .brand-hero-banner {
@@ -1070,5 +1087,45 @@ th {
 
   .display-title {
     font-size: 38px;
+  }
+
+  .branding-live-content {
+    grid-template-columns: 1fr;
+  }
+
+  .branding-live-banner {
+    height: 300px;
+  }
+}
+
+@media (max-width: 760px) {
+  .branding-live-preview {
+    border-radius: 18px;
+  }
+
+  .branding-live-banner {
+    height: 240px;
+  }
+
+  .branding-live-content,
+  .branding-live-footer {
+    padding: 20px;
+  }
+
+  .branding-live-logo-box {
+    width: 112px;
+    height: 112px;
+  }
+
+  .branding-tools {
+    align-items: stretch;
+  }
+
+  .branding-scale-control {
+    min-width: 100%;
+  }
+
+  .branding-live-copy h3 {
+    font-size: 30px;
   }
 }

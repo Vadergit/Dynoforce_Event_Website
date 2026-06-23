@@ -1642,7 +1642,7 @@ async function downloadPdf() {
             .hero-banner {
               width: 100%;
               height: 56mm;
-              object-fit: cover;
+              object-fit: contain;
               display: block;
               background: var(--surface-muted);
             }
@@ -1691,10 +1691,11 @@ async function downloadPdf() {
             .sponsor-banner {
               width: 100%;
               max-height: 28mm;
-              object-fit: cover;
+              object-fit: contain;
               display: block;
               margin-top: 10px;
               border-radius: 12px;
+              background: var(--surface-muted);
             }
             .top-grid {
               display: grid;
