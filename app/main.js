@@ -2226,6 +2226,15 @@ function publicBrandingSection() {
   `;
 }
 
+function eventCardMediaMarkup() {
+  return `
+    <div class="event-card-side">
+      <div class="status-badge">${state.event.status}</div>
+      ${state.event.headerBanner ? `<img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")}" />` : ""}
+    </div>
+  `;
+}
+
 async function assetToDataUrl(url, embeddedDataUrl = "") {
   if (embeddedDataUrl) return embeddedDataUrl;
   if (!url) return null;
@@ -2451,7 +2460,7 @@ function template(page) {
           ${!lockedPage && page === "live" ? `
             <div class="grid live">
               <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div><div class="status-badge">${state.event.status}</div></div></div>
+                <div class="card"><div class="card-header event-card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div>${eventCardMediaMarkup()}</div></div>
                 <div class="card"><div class="card-header"><div><h3>Teilnehmer</h3><p>Zuerst Vorname und Name eingeben. Danach startet die Messung automatisch.</p></div></div><div class="field-grid two"><div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname" /></div><div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname" /></div></div><div class="metric-list" style="margin-top:14px;"><div class="metric-line"><span>Aktueller Teilnehmer</span><strong id="liveCurrentParticipant">${getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst"}</strong></div></div></div>
                 <div class="card">
                   <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>

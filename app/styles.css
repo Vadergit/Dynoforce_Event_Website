@@ -336,6 +336,29 @@ a {
   color: var(--muted);
 }
 
+.event-card-header {
+  align-items: center;
+}
+
+.event-card-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.event-card-banner {
+  width: 150px;
+  aspect-ratio: var(--asset-ratio, 4 / 1);
+  max-height: 56px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf9f5;
+  padding: 6px;
+}
+
 .hero {
   display: flex;
   justify-content: space-between;
@@ -1113,6 +1136,16 @@ th {
   .topbar-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .event-card-header,
+  .event-card-side {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .event-card-side {
+    flex-wrap: wrap;
   }
 
   .force-value {
