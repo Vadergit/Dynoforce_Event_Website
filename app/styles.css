@@ -490,8 +490,9 @@ a {
 
 .participant-fields .field label {
   color: var(--text);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 900;
+  line-height: 1.15;
 }
 
 .participant-fields .field input {
