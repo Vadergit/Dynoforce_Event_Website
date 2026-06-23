@@ -2382,7 +2382,11 @@ function publicBrandingSection() {
   const visibleLogoCount = [state.event.eventLogo, state.event.venueLogo && state.event.showVenueLogo !== false].filter(Boolean).length;
   return `
     <div class="card brand-hero" id="publicBrandHero">
-      ${state.event.headerBanner ? `<img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")}" />` : ""}
+      ${state.event.headerBanner ? `
+        <div class="brand-hero-media" style="${brandingScaleStyle("headerBanner")}">
+          <img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" />
+        </div>
+      ` : ""}
       <div class="brand-hero-content ${visibleLogoCount <= 1 ? "single-logo" : ""}">
         <div class="brand-hero-logos">
           ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
@@ -2395,7 +2399,11 @@ function publicBrandingSection() {
           <p>${state.event.description || `${state.event.organiser || "Veranstalter"} präsentiert dieses Event.`}</p>
         </div>
       </div>
-      ${state.event.sponsorBanner ? `<img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" style="${brandingScaleStyle("sponsorBanner")}" />` : ""}
+      ${state.event.sponsorBanner ? `
+        <div class="brand-hero-sponsor-frame" style="${brandingScaleStyle("sponsorBanner")}">
+          <img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" />
+        </div>
+      ` : ""}
     </div>
   `;
 }
