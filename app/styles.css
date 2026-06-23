@@ -345,14 +345,14 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
-  flex: 0 1 min(42%, 520px);
-  min-width: 320px;
+  flex: 0 1 min(46%, 620px);
+  min-width: 360px;
 }
 
 .event-card-banner-frame {
-  width: min(100%, clamp(300px, 36vw, 520px));
+  width: min(100%, clamp(360px, 40vw, 620px));
   aspect-ratio: var(--asset-ratio, 4 / 1);
-  max-height: 110px;
+  max-height: 130px;
   display: grid;
   place-items: center;
   overflow: hidden;

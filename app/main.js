@@ -2434,7 +2434,7 @@ function eventCardMediaMarkup() {
   return `
     <div class="event-card-side">
       ${state.event.headerBanner ? `
-        <div class="event-card-banner-frame" style="${brandingScaleStyle("headerBanner")};--thumb-zoom:${getHeaderBannerThumbScale() / 100};">
+        <div class="event-card-banner-frame" style="${brandingScaleStyle("headerBanner")};--thumb-zoom:${(getHeaderBannerThumbScale() / 100) * 1.2};">
           <img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" />
         </div>
       ` : ""}
