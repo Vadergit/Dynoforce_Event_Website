@@ -47,11 +47,12 @@ const PEAK_MINIMUM_THRESHOLD = 2.0;
 const ATTEMPT_START_THRESHOLD = 2.0;
 const ATTEMPT_END_THRESHOLD = 2.0;
 const DEFAULT_DYNOFORCE_LOGO = "/dynoforce-icon.png";
+const DEFAULT_EVENT_HEADER_BANNER = "/dynoforce-event-banner-template.png";
 
 const emptyBranding = {
   eventLogo: DEFAULT_DYNOFORCE_LOGO,
   venueLogo: "",
-  headerBanner: "",
+  headerBanner: DEFAULT_EVENT_HEADER_BANNER,
   sponsorBanner: "",
   showVenueLogo: true,
   eventLogoScale: 100,
