@@ -717,6 +717,14 @@ a {
   min-width: 300px;
 }
 
+.branding-editor-slot > .branding-live-banner,
+.branding-editor-slot > .branding-live-logo-box,
+.branding-editor-slot > .branding-live-sponsor {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
 .branding-file-input {
   position: absolute;
   inline-size: 1px;
@@ -726,6 +734,8 @@ a {
 }
 
 .branding-tools {
+  position: relative;
+  z-index: 5;
   display: flex;
   gap: 14px;
   align-items: center;
@@ -738,9 +748,11 @@ a {
 }
 
 .branding-editor-banner .branding-tools {
+  margin-top: 0;
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: none;
+  background: #fff;
 }
 
 .branding-scale-control {
