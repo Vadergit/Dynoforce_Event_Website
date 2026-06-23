@@ -820,6 +820,25 @@ a {
   min-width: 240px;
 }
 
+.branding-toggle {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 14px;
+}
+
+.branding-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
 .branding-tools small {
   flex: 1 1 180px;
   color: var(--muted);

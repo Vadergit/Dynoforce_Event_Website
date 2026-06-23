@@ -52,6 +52,7 @@ const emptyBranding = {
   venueLogo: "",
   headerBanner: "",
   sponsorBanner: "",
+  showVenueLogo: true,
   eventLogoScale: 100,
   venueLogoScale: 100,
   headerBannerScale: 100,
@@ -1206,6 +1207,7 @@ function eventDocToState(id, data) {
     venueLogo: data.venueLogo || "",
     headerBanner: data.headerBanner || "",
     sponsorBanner: data.sponsorBanner || "",
+    showVenueLogo: data.showVenueLogo !== false,
     eventLogoScale: Number(data.eventLogoScale || 100),
     venueLogoScale: Number(data.venueLogoScale || 100),
     headerBannerScale: Number(data.headerBannerScale || 100),
@@ -1425,6 +1427,7 @@ async function saveEvent(overrides = {}) {
       venueLogo: state.event.venueLogo,
       headerBanner: state.event.headerBanner,
       sponsorBanner: state.event.sponsorBanner,
+      showVenueLogo: state.event.showVenueLogo !== false,
       eventLogoScale: Number(state.event.eventLogoScale || 100),
       venueLogoScale: Number(state.event.venueLogoScale || 100),
       headerBannerScale: Number(state.event.headerBannerScale || 100),
@@ -1545,7 +1548,7 @@ async function downloadPdf() {
     const qrCodeDataUrl = await QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 220 });
     const headerBanner = state.event.headerBannerPdfData || state.event.headerBanner || "";
     const eventLogo = state.event.eventLogoPdfData || state.event.eventLogo || "";
-    const venueLogo = state.event.venueLogoPdfData || state.event.venueLogo || "";
+    const venueLogo = state.event.showVenueLogo === false ? "" : state.event.venueLogoPdfData || state.event.venueLogo || "";
     const sponsorBanner = state.event.sponsorBannerPdfData || state.event.sponsorBanner || "";
     const primary = state.event.primaryColor || "#1f4f46";
     const summaryRows = [
@@ -2160,6 +2163,12 @@ function brandingAssetControls(fieldName, label, formatHint) {
         <span>${label} <strong data-scale-value="${scaleField}">${scale}%</strong></span>
         <input type="range" min="50" max="180" step="5" value="${scale}" data-branding-scale="${scaleField}" data-branding-target="${fieldName}" />
       </label>
+      ${fieldName === "venueLogo" ? `
+        <label class="branding-toggle">
+          <input type="checkbox" id="showVenueLogoInput" ${state.event.showVenueLogo === false ? "" : "checked"} />
+          <span>Hallenlogo anzeigen</span>
+        </label>
+      ` : ""}
       ${fieldName === "headerBanner" ? `
         <label class="branding-scale-control compact">
           <span>Kleine Vorschau <strong data-scale-value="headerBannerThumbScale">${getHeaderBannerThumbScale()}%</strong></span>
@@ -2225,7 +2234,7 @@ function publicBrandingSection() {
       <div class="brand-hero-content">
         <div class="brand-hero-logos">
           ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
-          ${state.event.venueLogo ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
+          ${state.event.venueLogo && state.event.showVenueLogo !== false ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
         </div>
         <div class="brand-hero-copy">
           <div class="eyebrow">DynoForce Event</div>
@@ -2764,6 +2773,11 @@ function bindBrandingActions() {
       updateThumbScale();
       await saveEvent();
     });
+  });
+
+  root.querySelector("#showVenueLogoInput")?.addEventListener("change", async (event) => {
+    state.event.showVenueLogo = event.target.checked;
+    await saveEvent();
   });
 
   root.querySelectorAll("[data-branding-aspect]").forEach((select) => {
