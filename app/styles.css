@@ -543,6 +543,10 @@ a {
   justify-content: flex-end;
 }
 
+.compact-public-card .action-row.compact {
+  justify-content: flex-start;
+}
+
 .public-summary-grid {
   gap: 12px;
   align-items: start;
@@ -550,6 +554,7 @@ a {
 
 .compact-public-card {
   padding: 14px 18px;
+  align-self: stretch;
 }
 
 .compact-public-card .card-header {
@@ -574,6 +579,10 @@ a {
 }
 
 .metric-list.compact .metric-line {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 14px;
   padding-bottom: 6px;
 }
 
@@ -583,6 +592,15 @@ a {
 
 .metric-list.compact .metric-line strong {
   font-size: 19px;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+}
+
+.metric-list.compact .metric-line span {
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .metric-list.compact + .action-row {
