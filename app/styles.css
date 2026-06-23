@@ -68,13 +68,12 @@ a {
 .brand-mark {
   width: 48px;
   height: 48px;
-  border: 2px solid var(--text);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.08em;
+  display: block;
+  object-fit: contain;
+  background: #fff;
+  padding: 6px;
 }
 
 .brand h1,

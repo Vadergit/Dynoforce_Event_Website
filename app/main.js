@@ -2389,7 +2389,7 @@ function template(page) {
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark">DF</div>
+          <img class="brand-mark" src="/dynoforce-icon.png" alt="DynoForce Logo" />
           <div><h1>DynoForce Event</h1><p>Powered by DynoForce</p></div>
         </div>
         <nav class="nav">
