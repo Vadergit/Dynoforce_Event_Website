@@ -2323,7 +2323,7 @@ function brandingAssetControls(fieldName, label, formatHint) {
       ` : ""}
       ${fieldName === "headerBanner" ? `
         <label class="branding-scale-control compact">
-          <span>Kleine Vorschau <strong data-scale-value="headerBannerThumbScale">${getHeaderBannerThumbScale()}%</strong></span>
+          <span>Kleines Fenster <strong data-scale-value="headerBannerThumbScale">${getHeaderBannerThumbScale()}%</strong></span>
           <input type="range" min="60" max="220" step="5" value="${getHeaderBannerThumbScale()}" data-header-thumb-scale />
         </label>
       ` : ""}
@@ -2433,7 +2433,11 @@ function brandingPresetControls() {
 function eventCardMediaMarkup() {
   return `
     <div class="event-card-side">
-      ${state.event.headerBanner ? `<img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" style="${brandingScaleStyle("headerBanner")};--thumb-scale:${getHeaderBannerThumbScale() / 100};" />` : ""}
+      ${state.event.headerBanner ? `
+        <div class="event-card-banner-frame" style="${brandingScaleStyle("headerBanner")};--thumb-zoom:${getHeaderBannerThumbScale() / 100};">
+          <img class="event-card-banner" src="${state.event.headerBanner}" alt="Event Banner" />
+        </div>
+      ` : ""}
     </div>
   `;
 }
