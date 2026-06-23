@@ -1312,6 +1312,20 @@ th {
   line-height: 1.6;
 }
 
+.brand-hero-link {
+  display: inline-flex;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.brand-hero-link:hover {
+  color: var(--primary);
+}
+
 .brand-hero-meta {
   color: var(--muted);
   font-size: 15px;

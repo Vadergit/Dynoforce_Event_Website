@@ -2407,6 +2407,7 @@ function publicBrandingSection() {
           <h1 class="hero-title">${getEventDisplayName()}</h1>
           <div class="brand-hero-meta">${getEventSummaryLine() || "Live Event"}</div>
           <p>${state.event.description || `${state.event.organiser || "Veranstalter"} präsentiert dieses Event.`}</p>
+          <a class="brand-hero-link" href="https://dynoforce.ch" target="_blank" rel="noopener noreferrer">Mehr über DynoForce und die Geräte</a>
         </div>
       </div>
       ${state.event.sponsorBanner ? `
