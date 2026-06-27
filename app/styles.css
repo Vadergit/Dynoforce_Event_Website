@@ -47,6 +47,10 @@ a {
   grid-template-columns: 280px 1fr;
 }
 
+.app-shell.focus-shell {
+  grid-template-columns: 1fr;
+}
+
 .sidebar {
   background: var(--surface);
   border-right: 1px solid var(--line);
@@ -222,6 +226,10 @@ a {
   padding: 32px;
 }
 
+.focus-shell .content {
+  padding: 28px;
+}
+
 .content-inner {
   max-width: var(--max-width);
   margin: 0 auto;
@@ -264,6 +272,50 @@ a {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.focused-event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.brand.compact .brand-mark {
+  width: 44px;
+  height: 44px;
+}
+
+.brand.compact h1 {
+  font-size: 18px;
+}
+
+.focused-event-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.login-required-card {
+  max-width: 760px;
+  margin: 80px auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.login-required-card h3 {
+  margin: 4px 0 8px;
+  font-size: 30px;
 }
 
 .icon-button {
@@ -788,10 +840,29 @@ a {
   background: var(--surface);
 }
 
+.event-dashboard-item {
+  align-items: flex-start;
+}
+
 .event-item-actions {
   display: grid;
   gap: 12px;
   justify-items: end;
+}
+
+.event-link-grid {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.event-admin-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .status-menu {
@@ -1370,6 +1441,18 @@ th {
 
   .topbar-actions {
     width: 100%;
+    justify-content: flex-start;
+  }
+
+  .focused-event-header,
+  .login-required-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .focused-event-actions,
+  .event-link-grid,
+  .event-admin-row {
     justify-content: flex-start;
   }
 

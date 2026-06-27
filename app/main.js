@@ -168,6 +168,9 @@ const pageMeta = {
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
 
+const adminNavPages = ["dashboard", "setup", "branding"];
+const focusedEventPages = ["live", "public", "display"];
+
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
 const QR_CACHE_VERSION = "2026-06-23-https-2";
@@ -2419,6 +2422,68 @@ function publicBrandingSection() {
   `;
 }
 
+function focusedEventHeaderMarkup(page) {
+  if (page === "public" || page === "display") return "";
+  const connectionLabel = state.connecting ? "DynoGrip verbindet..." : state.connected ? "DynoGrip verbunden" : "DynoGrip nicht verbunden";
+  const actionsMarkup = state.user
+    ? `
+      <div class="focused-event-actions">
+        <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${connectionLabel}</span></div>
+        <button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button>
+      </div>
+    `
+    : `<button class="button" id="openLoginModalInline">Anmelden</button>`;
+  return `
+    <div class="focused-event-header">
+      <div class="brand compact">
+        <img class="brand-mark" src="/dynoforce-icon.png" alt="DynoForce Logo" />
+        <div>
+          <h1>${escapeHtml(state.event.name || "DynoForce Event")}</h1>
+          <p>${escapeHtml([state.event.organiser, state.event.challengeType, state.event.scoringMode].filter(Boolean).join(" · "))}</p>
+        </div>
+      </div>
+      ${actionsMarkup}
+    </div>
+  `;
+}
+
+function lockedEventLoginMarkup(page) {
+  if (!(page === "live" && !state.user)) return "";
+  return `
+    <div class="card login-required-card">
+      <div>
+        <div class="eyebrow">Organisator Login</div>
+        <h3>Für die Live-Messung anmelden</h3>
+        <p>Das Gerät kann nur von einem angemeldeten Organisator verbunden werden. So bleibt sichergestellt, dass niemand von einem anderen Ort aus ein Event übernimmt.</p>
+      </div>
+      <button class="button primary" id="openLoginModalInline">Anmelden</button>
+    </div>
+  `;
+}
+
+function dashboardEventActionsMarkup(event) {
+  return `
+    <div class="event-link-grid">
+      <button class="button subtle" data-edit-event="${event.id}">Setup</button>
+      <button class="button subtle" data-branding-event="${event.id}">Branding</button>
+      <button class="button ${isActiveEventStatus(event.status) ? "primary" : ""}" data-open-event="${event.id}">Live-Seite</button>
+      <a class="button" href="${APP_BASE}/#/e/${event.id}" target="_blank" rel="noopener noreferrer">Öffentlich</a>
+      <a class="button" href="${APP_BASE}/#/display/${event.id}" target="_blank" rel="noopener noreferrer">Display</a>
+    </div>
+    <div class="event-admin-row">
+      <div class="status-menu">
+        <button class="button subtle status-menu-trigger" data-toggle-status-menu="${event.id}">${escapeHtml(event.status)}</button>
+        <div class="status-menu-panel" data-status-menu="${event.id}" hidden>
+          <button class="button subtle" data-set-status="${event.id}" data-status-value="Aktiv">Aktiv</button>
+          <button class="button subtle" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button>
+          <button class="button subtle" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button>
+        </div>
+      </div>
+      <button class="button danger" data-delete-event="${event.id}">Löschen</button>
+    </div>
+  `;
+}
+
 function brandingPresetControls() {
   return `
     <div class="branding-preset-panel">
@@ -2573,15 +2638,16 @@ function template(page) {
   const record = state.results[0]?.value || 0;
   const average = averageValue();
   const last = state.results[state.results.length - 1];
+  const isFocusedPage = focusedEventPages.includes(page);
   const lockedPage = !state.user && ["dashboard", "setup", "branding", "live"].includes(page);
   const navItems = state.user
-    ? Object.keys(pageMeta).map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")
+    ? adminNavPages.map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")
     : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button>`;
   const [dashboardTitle, dashboardText] = getDashboardMeta();
 
   return `
-    <div class="app-shell">
-      <aside class="sidebar">
+    <div class="app-shell ${isFocusedPage ? "focus-shell" : ""}">
+      ${!isFocusedPage ? `<aside class="sidebar">
         <div class="brand">
           <img class="brand-mark" src="/dynoforce-icon.png" alt="DynoForce Logo" />
           <div><h1>DynoForce Event</h1><p>Powered by DynoForce</p></div>
@@ -2604,18 +2670,19 @@ function template(page) {
           <strong>DynoForce Event</strong>
           Professioneller Live-Betrieb für Wettkampf, Boulderhalle und Eventfläche.
         </div>
-      </aside>
+      </aside>` : ""}
       <main class="content">
         <div class="content-inner">
-          <div class="topbar">
+          ${isFocusedPage ? focusedEventHeaderMarkup(page) : `<div class="topbar">
             <div><div class="eyebrow">DynoForce Event System</div><h2>${page === "dashboard" ? dashboardTitle : pageMeta[page][0]}</h2><p>${page === "dashboard" ? dashboardText : pageMeta[page][1]}</p></div>
             ${state.user
               ? `<div class="topbar-actions"><div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div><button class="button" id="logoutButton">Abmelden</button></div>`
               : `<button class="button" id="openLoginModal">Anmelden</button>`}
-          </div>
+          </div>`}
           ${state.lastError ? `<div class="notice error">${state.lastError}</div>` : ""}
           ${!state.user ? loginCard() : ""}
-          ${organizerEventPickerMarkup(page)}
+          ${lockedEventLoginMarkup(page)}
+          ${!isFocusedPage ? organizerEventPickerMarkup(page) : ""}
           ${page === "dashboard" && !state.user ? `
             ${publicHomeCard()}
             <div style="margin-top:18px;">
@@ -2627,7 +2694,17 @@ function template(page) {
               <div class="card">
                 <div class="card-header"><div><h3>Meine Events</h3><p>${state.dashboardLoaded ? "Übersicht aller eigenen Veranstaltungen mit Status und Teilnehmerzahl." : "Lade Events aus Firestore..."}</p></div><button class="button primary" id="createEvent">Neues Event</button></div>
                 <div class="event-list">
-                  ${state.events.map((event) => `<div class="event-item"><div><h4>${escapeHtml(event.name || "Event")}</h4><p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p></div><div class="event-item-actions"><div class="status-menu"><button class="button subtle status-menu-trigger" data-toggle-status-menu="${event.id}">${escapeHtml(event.status)}</button><div class="status-menu-panel" data-status-menu="${event.id}" hidden><button class="button subtle" data-set-status="${event.id}" data-status-value="Aktiv">Aktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Inaktiv">Inaktiv</button><button class="button subtle" data-set-status="${event.id}" data-status-value="Abgeschlossen">Abgeschlossen</button></div></div><div class="action-row compact">${isActiveEventStatus(event.status) ? `<button class="button" data-open-event="${event.id}">Aktive Ansicht</button>` : ""}<button class="button" data-edit-event="${event.id}">Bearbeiten</button><button class="button danger" data-delete-event="${event.id}">Löschen</button></div></div></div>`).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
+                  ${state.events.map((event) => `
+                    <div class="event-item event-dashboard-item">
+                      <div>
+                        <h4>${escapeHtml(event.name || "Event")}</h4>
+                        <p>${escapeHtml(event.date)} · ${event.participants} Teilnehmer · ${escapeHtml(event.status)}</p>
+                      </div>
+                      <div class="event-item-actions">
+                        ${dashboardEventActionsMarkup(event)}
+                      </div>
+                    </div>
+                  `).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
                 </div>
               </div>
               <div class="grid">
@@ -2697,7 +2774,7 @@ function template(page) {
                   <div class="measurement-section">
                     <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
                     <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
-                    <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button><button class="button" id="closeEvent">Event abschliessen</button></div>
+                    <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button></div>
                     <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                     ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
                     <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird."}</p>
@@ -2791,7 +2868,9 @@ function bindGeneralUi() {
     root.querySelector("#loginModalBackdrop")?.classList.remove("open");
   };
 
-  root.querySelector("#openLoginModal")?.addEventListener("click", openLoginModal);
+  root.querySelectorAll("#openLoginModal, #openLoginModalInline").forEach((button) => {
+    button.addEventListener("click", openLoginModal);
+  });
   root.querySelector("#closeLoginModal")?.addEventListener("click", closeLoginModal);
   root.querySelector("#loginModalBackdrop")?.addEventListener("click", (event) => {
     if (event.target.id === "loginModalBackdrop") closeLoginModal();
@@ -2876,6 +2955,14 @@ function bindDashboardActions() {
       const eventId = item.dataset.editEvent;
       rememberActiveEventId(eventId);
       window.location.assign(getOrganizerPageUrl("setup", eventId));
+    });
+  });
+
+  root.querySelectorAll("[data-branding-event]").forEach((item) => {
+    item.addEventListener("click", async () => {
+      const eventId = item.dataset.brandingEvent;
+      rememberActiveEventId(eventId);
+      window.location.assign(getOrganizerPageUrl("branding", eventId));
     });
   });
 
