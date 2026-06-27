@@ -168,7 +168,7 @@ const pageMeta = {
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
 
-const adminNavPages = ["dashboard", "setup", "branding"];
+const adminNavPages = ["dashboard"];
 const focusedEventPages = ["live", "public", "display"];
 
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
@@ -2462,11 +2462,12 @@ function lockedEventLoginMarkup(page) {
 }
 
 function dashboardEventActionsMarkup(event) {
+  const active = isActiveEventStatus(event.status);
   return `
     <div class="event-link-grid">
       <button class="button subtle" data-edit-event="${event.id}">Setup</button>
       <button class="button subtle" data-branding-event="${event.id}">Branding</button>
-      <button class="button ${isActiveEventStatus(event.status) ? "primary" : ""}" data-open-event="${event.id}">Live-Seite</button>
+      <button class="button ${active ? "primary" : "subtle"}" ${active ? `data-open-event="${event.id}"` : "disabled"} title="${active ? "Live-Seite öffnen" : "Live-Seite ist erst verfügbar, wenn das Event aktiv ist."}">Live-Seite</button>
       <a class="button" href="${APP_BASE}/#/e/${event.id}" target="_blank" rel="noopener noreferrer">Öffentlich</a>
       <a class="button" href="${APP_BASE}/#/display/${event.id}" target="_blank" rel="noopener noreferrer">Display</a>
     </div>
@@ -2707,10 +2708,7 @@ function template(page) {
                   `).join("") || `<div class="event-item"><div><h4>Noch keine Events</h4><p>Lege dein erstes Event an und speichere es in Firestore.</p></div></div>`}
                 </div>
               </div>
-              <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>Schnellübersicht</h3><p>Live mit Firestore synchronisiert.</p></div></div><div class="metric-list"><div class="metric-line"><span>Aktives Event</span><strong>${state.event.name}</strong></div><div class="metric-line"><span>Challenge</span><strong>${state.event.challengeType}</strong></div><div class="metric-line"><span>Teilnehmer</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Status</span><strong>${state.event.status}</strong></div></div></div>
-                <div class="card"><div class="card-header"><div><h3>Direktlinks</h3><p>Öffentliche Ansichten für Tests.</p></div></div><div class="metric-list"><div class="metric-line"><span>Public URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div><div class="metric-line"><span>Display URL</span><strong><a href="${displayUrl}" target="_blank" rel="noopener noreferrer">${displayUrl}</a></strong></div></div></div>
-              </div>
+              <div class="card"><div class="card-header"><div><h3>Schnellübersicht</h3><p>Live mit Firestore synchronisiert.</p></div></div><div class="metric-list"><div class="metric-line"><span>Ausgewähltes Event</span><strong>${state.event.name}</strong></div><div class="metric-line"><span>Challenge</span><strong>${state.event.challengeType}</strong></div><div class="metric-line"><span>Teilnehmer</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Status</span><strong>${state.event.status}</strong></div></div></div>
             </div>
           ` : ""}
           ${!lockedPage && page === "setup" ? `
@@ -2945,8 +2943,14 @@ function bindDashboardActions() {
   root.querySelectorAll("[data-open-event]").forEach((item) => {
     item.addEventListener("click", async () => {
       const eventId = item.dataset.openEvent;
+      const eventRecord = state.events.find((event) => event.id === eventId);
+      if (eventRecord && !isActiveEventStatus(eventRecord.status)) {
+        setError("Die Live-Seite kann erst geöffnet werden, wenn das Event aktiv ist.");
+        render();
+        return;
+      }
       rememberActiveEventId(eventId);
-      window.location.assign(getOrganizerPageUrl("live", eventId));
+      window.open(getOrganizerPageUrl("live", eventId), "_blank", "noopener,noreferrer");
     });
   });
 
