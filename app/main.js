@@ -446,6 +446,19 @@ function getSelectedForceModeKey() {
   return "both";
 }
 
+function getDeviceBatteryLabel() {
+  if (!state.connected) return "—";
+  return Number.isFinite(Number(state.battery)) ? `${Math.round(Number(state.battery))}%` : "—";
+}
+
+function getDeviceConnectionLabel() {
+  if (state.connecting) return "DynoGrip verbindet...";
+  if (!state.connected) return "DynoGrip nicht verbunden";
+  const deviceName = state.ble.device?.name || "DynoGrip";
+  const chargingSuffix = state.signal.includes("lädt") ? " · lädt" : "";
+  return `${deviceName} verbunden · Akku ${getDeviceBatteryLabel()}${chargingSuffix}`;
+}
+
 function medalForRank(index) {
   if (index === 0) return "🏆";
   if (index === 1) return "🥈";
@@ -2255,13 +2268,13 @@ function updateLiveMeasurementDom() {
   setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
   setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
   setText("liveConnectionValue", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
-  setText("liveBatteryValue", state.connected ? `${state.battery}%` : "—");
+  setText("liveBatteryValue", getDeviceBatteryLabel());
   setText("liveSignalValue", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
   setText("sidebarConnectionLabel", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
-  setText("sidebarBatteryLabel", state.connected ? `${state.battery}%` : "—");
+  setText("sidebarBatteryLabel", getDeviceBatteryLabel());
   setText("sidebarSignalLabel", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
   setText("sidebarDeviceLabel", state.ble.device?.name || "Kein Gerät");
-  setText("topChipLabel", state.connecting ? "DynoGrip verbindet..." : state.connected ? `DynoGrip verbunden${state.ble.device?.name ? ` · ${state.ble.device.name}` : ""}` : "DynoGrip nicht verbunden");
+  setText("topChipLabel", getDeviceConnectionLabel());
   const completedAttempts = getCompletedAttemptsCount();
   setText("liveAttemptDisplay", `Versuche ${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
@@ -2548,11 +2561,10 @@ function publicBrandingSection() {
 
 function focusedEventHeaderMarkup(page) {
   if (page === "public" || page === "display") return "";
-  const connectionLabel = state.connecting ? "DynoGrip verbindet..." : state.connected ? "DynoGrip verbunden" : "DynoGrip nicht verbunden";
   const actionsMarkup = state.user
     ? `
       <div class="focused-event-actions">
-        <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${connectionLabel}</span></div>
+        <div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${getDeviceConnectionLabel()}</span></div>
         <button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button>
       </div>
     `
@@ -2785,7 +2797,7 @@ function template(page) {
             <div class="panel-label">Geräte Status</div>
             <div class="device-panel-top">
               <div class="status-indicator"><span class="dot ${state.connected ? "" : "off"}"></span><span id="sidebarConnectionLabel">${state.connecting ? "Verbinde..." : state.connected ? "Bereit" : "Nicht verbunden"}</span></div>
-              <strong class="device-battery" id="sidebarBatteryLabel">${state.connected ? `${state.battery}%` : "—"}</strong>
+              <strong class="device-battery" id="sidebarBatteryLabel">${getDeviceBatteryLabel()}</strong>
             </div>
             <div class="device-subline"><span>Gerät</span><strong id="sidebarDeviceLabel">${state.ble.device?.name || "DynoGrip"}</strong></div>
             <div class="action-row"><button class="button ${state.connected ? "" : "primary"}" id="connectToggle">${state.connected ? "Verbindung trennen" : state.connecting ? "Verbinde..." : "DynoGrip verbinden"}</button></div>
@@ -2801,7 +2813,7 @@ function template(page) {
           ${isFocusedPage ? focusedEventHeaderMarkup(page) : `<div class="topbar">
             <div><div class="eyebrow">DynoForce Event System</div><h2>${page === "dashboard" ? dashboardTitle : pageMeta[page][0]}</h2><p>${page === "dashboard" ? dashboardText : pageMeta[page][1]}</p></div>
             ${state.user
-              ? `<div class="topbar-actions"><div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${state.connecting ? "DynoGrip verbindet..." : state.connected ? "Messung bereit" : "DynoGrip nicht verbunden"}</span></div><button class="button" id="logoutButton">Abmelden</button></div>`
+              ? `<div class="topbar-actions"><div class="top-chip"><span class="dot ${state.connected ? "" : "off"}"></span><span id="topChipLabel">${getDeviceConnectionLabel()}</span></div><button class="button" id="logoutButton">Abmelden</button></div>`
               : `<button class="button" id="openLoginModal">Anmelden</button>`}
           </div>`}
           ${state.lastError ? `<div class="notice error">${state.lastError}</div>` : ""}
