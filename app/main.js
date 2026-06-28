@@ -2889,7 +2889,6 @@ function template(page) {
           ${!lockedPage && page === "live" ? `
             <div class="grid live">
               <div class="grid">
-                <div class="card"><div class="card-header event-card-header"><div><h3>${state.event.name}</h3><p>${state.event.organiser} · ${state.event.challengeType} · ${state.event.scoringMode}</p></div>${eventCardMediaMarkup()}</div></div>
                 <div class="card measurement-work-card">
                   <div class="participant-entry-card">
                     <div class="participant-entry-head">
