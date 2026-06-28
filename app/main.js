@@ -517,6 +517,24 @@ function formatEntryDirection(entry) {
   return formatDirectionLabel(entry.forceMode || entry.direction || "neutral");
 }
 
+function normalizeParticipantNameForMatch(firstName, lastName, participantName = "") {
+  const combined = [firstName, lastName].filter(Boolean).join(" ").trim() || String(participantName || "").trim();
+  return combined
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findExistingParticipantResult(firstName, lastName, participantName, forceMode) {
+  const targetName = normalizeParticipantNameForMatch(firstName, lastName, participantName);
+  if (!targetName) return null;
+  return state.results.find((entry) => {
+    const entryName = normalizeParticipantNameForMatch(entry.firstName, entry.lastName, entry.participantName || entry.name);
+    return entryName === targetName && resultDirectionKey(entry) === forceMode;
+  }) || null;
+}
+
 function getLivePlacement() {
   const measuredValue = getMeasuredValue();
   if (measuredValue < PEAK_MINIMUM_THRESHOLD) return "—";
@@ -821,6 +839,18 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     await ensureEventWritable();
 
     const finalValue = Number(getFinalAttemptValue(attempts).toFixed(1));
+    const existingResult = findExistingParticipantResult(firstName, lastName, participantName, finalDirection);
+    if (existingResult && finalValue <= Number(existingResult.value || 0)) {
+      const savedName = participantName;
+      resetLiveEntryState();
+      if (playCompletionSound) {
+        void playCompletionMelody();
+      }
+      setFlash(`${savedName} bleibt mit ${Number(existingResult.value || 0).toFixed(1)} kg in der Rangliste. Neuer Versuch: ${finalValue.toFixed(1)} kg.`);
+      render();
+      return true;
+    }
+
     const resultPayload = {
       eventId: state.event.id,
       ownerUid: state.user.uid,
@@ -834,26 +864,50 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
       attemptsCompleted: attempts.length,
       attemptsValues: attempts.map((attempt) => Number(attempt.value.toFixed(1))),
       scoringMode: state.event.scoringMode,
-      createdAt: serverTimestamp(),
     };
-    const resultRef = await addDoc(collection(db, "results"), resultPayload);
-    setResults([
-      ...state.results,
-      {
-        id: resultRef.id,
+    const savedName = participantName;
+
+    if (existingResult) {
+      const updatedPayload = {
         ...resultPayload,
-        createdAt: new Date(),
-      },
-    ]);
+        createdAt: existingResult.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        previousBestValue: Number(existingResult.value || 0),
+      };
+      await updateDoc(doc(db, "results", existingResult.id), updatedPayload);
+      setResults(state.results.map((entry) => (entry.id === existingResult.id
+        ? {
+          ...entry,
+          ...resultPayload,
+          updatedAt: new Date(),
+          previousBestValue: Number(existingResult.value || 0),
+        }
+        : entry)));
+    } else {
+      const createdPayload = {
+        ...resultPayload,
+        createdAt: serverTimestamp(),
+      };
+      const resultRef = await addDoc(collection(db, "results"), createdPayload);
+      setResults([
+        ...state.results,
+        {
+          id: resultRef.id,
+          ...createdPayload,
+          createdAt: new Date(),
+        },
+      ]);
+    }
     state.event.participantCount = state.results.length;
     await syncEventParticipantCount(state.results.length);
 
-    const savedName = participantName;
     resetLiveEntryState();
     if (playCompletionSound) {
       void playCompletionMelody();
     }
-    setFlash(`Resultat gespeichert: ${savedName} · ${finalValue.toFixed(1)} kg`);
+    setFlash(existingResult
+      ? `Resultat verbessert: ${savedName} · ${finalValue.toFixed(1)} kg`
+      : `Resultat gespeichert: ${savedName} · ${finalValue.toFixed(1)} kg`);
     render();
     return true;
   } catch (error) {
