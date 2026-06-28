@@ -30,6 +30,7 @@ const BLE = {
   commandCharacteristicUuid: "6e400002-b5a3-f393-e0a9-e50e24dcca9e",
   infoCharacteristicUuid: "6e400004-b5a3-f393-e0a9-e50e24dcca9e",
   cmdTare: 0x01,
+  cmdBuzzer: 0x04,
   cmdResetPeak: 0x09,
 };
 
@@ -48,6 +49,15 @@ const ATTEMPT_START_THRESHOLD = 2.0;
 const ATTEMPT_END_THRESHOLD = 2.0;
 const DEFAULT_DYNOFORCE_LOGO = "/dynoforce-icon.png";
 const DEFAULT_EVENT_HEADER_BANNER = "/dynoforce-event-banner-template.png";
+const DEVICE_TONES = {
+  connect: [{ frequency: 1047, duration: 80 }],
+  attempt: [{ frequency: 1175, duration: 90 }],
+  complete: [
+    { frequency: 784, duration: 110 },
+    { frequency: 988, duration: 110 },
+    { frequency: 1175, duration: 180 },
+  ],
+};
 
 const emptyBranding = {
   eventLogo: DEFAULT_DYNOFORCE_LOGO,
@@ -771,7 +781,7 @@ async function loadEventState(eventId) {
   return true;
 }
 
-async function finalizeParticipantResult(forceManualSave = false) {
+async function finalizeParticipantResult(forceManualSave = false, { playCompletionSound = forceManualSave } = {}) {
   if (!state.user) {
     setError("Bitte als Organisator anmelden, bevor Resultate gespeichert werden.");
     render();
@@ -840,6 +850,9 @@ async function finalizeParticipantResult(forceManualSave = false) {
 
     const savedName = participantName;
     resetLiveEntryState();
+    if (playCompletionSound) {
+      void playCompletionMelody();
+    }
     setFlash(`Resultat gespeichert: ${savedName} · ${finalValue.toFixed(1)} kg`);
     render();
     return true;
@@ -1158,6 +1171,9 @@ async function openBleConnection(device, { silent = false } = {}) {
   state.ble.reconnectAttempted = true;
   clearReconnectTimer();
   rememberPreferredBleDevice(device);
+  window.setTimeout(() => {
+    void ensureDeviceEventSoundsEnabled();
+  }, 250);
   if (!silent) {
     setFlash(`DynoGrip verbunden${device.name ? `: ${device.name}` : ""}.`);
   }
@@ -1228,19 +1244,67 @@ function disconnectDevice() {
   render();
 }
 
-async function sendCommand(bytes) {
+async function writeDeviceCommand(bytes, { silent = false } = {}) {
   if (!state.ble.commandCharacteristic) {
-    setError("Kein DynoGrip verbunden.");
-    render();
+    if (!silent) {
+      setError("Kein DynoGrip verbunden.");
+      render();
+    }
     return;
   }
   try {
     await state.ble.commandCharacteristic.writeValueWithoutResponse(bytes);
-    clearError();
+    if (!silent) clearError();
   } catch (error) {
-    setError(`Befehl fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    if (!silent) {
+      setError(`Befehl fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    } else {
+      console.warn("Geräteton konnte nicht gesendet werden", error);
+    }
   }
-  render();
+  if (!silent) render();
+}
+
+async function sendCommand(bytes) {
+  await writeDeviceCommand(bytes);
+}
+
+function buildDeviceMelodyCommand(notes) {
+  const normalizedNotes = notes
+    .filter((note) => Number(note.frequency) >= 100 && Number(note.duration) > 0)
+    .slice(0, 5);
+  const buffer = new Uint8Array(3 + normalizedNotes.length * 3);
+  buffer[0] = BLE.cmdBuzzer;
+  buffer[1] = 0xff;
+  buffer[2] = normalizedNotes.length;
+
+  normalizedNotes.forEach((note, index) => {
+    const offset = 3 + index * 3;
+    const frequency = Math.max(100, Math.min(8000, Math.round(note.frequency)));
+    const duration50Ms = Math.max(1, Math.min(255, Math.round(note.duration / 50)));
+    buffer[offset] = frequency & 0xff;
+    buffer[offset + 1] = (frequency >> 8) & 0xff;
+    buffer[offset + 2] = duration50Ms;
+  });
+
+  return buffer;
+}
+
+async function playDeviceTone(notes) {
+  if (!state.connected || !state.ble.commandCharacteristic || !notes?.length) return;
+  await writeDeviceCommand(buildDeviceMelodyCommand(notes), { silent: true });
+}
+
+async function ensureDeviceEventSoundsEnabled() {
+  await playDeviceTone(DEVICE_TONES.connect);
+}
+
+async function playAttemptBeep() {
+  await playDeviceTone(DEVICE_TONES.attempt);
+}
+
+async function playCompletionMelody() {
+  await playDeviceTone(DEVICE_TONES.complete);
 }
 
 function eventDocToState(id, data) {
@@ -2188,6 +2252,12 @@ function processAttemptDetectionTick() {
         },
       ];
       state.currentAttempt = Math.min((state.liveEntry.attempts?.length || 0) + 1, state.event.attempts);
+      const completedAttempts = state.liveEntry.attempts?.length || 0;
+      if (completedAttempts >= state.event.attempts) {
+        void playCompletionMelody();
+      } else {
+        void playAttemptBeep();
+      }
     }
 
     state.isInAttempt = false;
@@ -2198,7 +2268,7 @@ function processAttemptDetectionTick() {
     updateLiveMeasurementDom();
 
     if ((state.liveEntry.attempts?.length || 0) >= state.event.attempts) {
-      void finalizeParticipantResult(false);
+      void finalizeParticipantResult(false, { playCompletionSound: false });
     }
   }
 }
