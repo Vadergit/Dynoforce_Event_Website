@@ -2279,7 +2279,7 @@ function updateLiveMeasurementDom() {
   setText("liveAttemptDisplay", `Versuche ${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
-  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch über 2 kg und zählt beim Rückfall unter 2 kg.");
+  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Bereit für den nächsten Versuch.");
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -2895,7 +2895,7 @@ function template(page) {
                       <div>
                         <div class="eyebrow">Nächster Teilnehmer</div>
                         <h3>Vorname und Name eingeben</h3>
-                        <p>Danach startet die Messung automatisch, sobald die Kraftschwelle überschritten wird.</p>
+                        <p>Danach kann direkt gestartet werden.</p>
                       </div>
                     </div>
                     <div class="field-grid two participant-fields">
@@ -2905,12 +2905,12 @@ function template(page) {
                   </div>
                   <div class="measurement-divider"></div>
                   <div class="measurement-section">
-                    <div class="card-header"><div><h3>Live-Messung</h3><p>Die Erkennung folgt derselben Logik wie in der App und zählt gültige Versuche automatisch.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
+                    <div class="card-header"><div><h3>Live-Messung</h3><p>Die Versuche werden automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
                     <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                     <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button></div>
                     <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                     ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
-                    <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Messung startet automatisch, sobald ein gültiger Versuch erkannt wird."}</p>
+                    <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Bereit für den nächsten Versuch."}</p>
                   </div>
                 </div>
               </div>
