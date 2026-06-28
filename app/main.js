@@ -57,6 +57,10 @@ const DEVICE_TONES = {
     { frequency: 988, duration: 110 },
     { frequency: 1175, duration: 180 },
   ],
+  disconnect: [
+    { frequency: 988, duration: 80 },
+    { frequency: 659, duration: 120 },
+  ],
 };
 
 const emptyBranding = {
@@ -1178,6 +1182,10 @@ function scheduleAutoReconnect(delay = 1500) {
   }, delay);
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function onBluetoothDisconnected() {
   disconnectCleanup();
   setFlash("DynoGrip Verbindung getrennt.");
@@ -1293,10 +1301,12 @@ async function attemptAutoReconnect() {
   }
 }
 
-function disconnectDevice() {
+async function disconnectDevice() {
   try {
     state.ble.autoReconnectEnabled = false;
     clearReconnectTimer();
+    await playDeviceTone(DEVICE_TONES.disconnect);
+    await wait(220);
     if (state.ble.stateCharacteristic) {
       state.ble.stateCharacteristic.removeEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
     }
@@ -2956,7 +2966,7 @@ function bindGeneralUi() {
   });
 
   root.querySelector("#connectToggle")?.addEventListener("click", async () => {
-    if (state.connected) disconnectDevice();
+    if (state.connected) await disconnectDevice();
     else if (!state.connecting) await connectToDevice();
   });
 
