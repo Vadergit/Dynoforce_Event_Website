@@ -274,6 +274,30 @@ a {
   justify-content: flex-end;
 }
 
+.event-page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: -6px 0 22px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.event-page-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.back-button {
+  font-weight: 700;
+}
+
 .focused-event-header {
   display: flex;
   justify-content: space-between;
@@ -960,6 +984,102 @@ a {
   padding: 0 12px;
 }
 
+.branding-image-guide {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 6px 0 10px;
+}
+
+.branding-image-guide > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-muted);
+}
+
+.branding-image-guide strong {
+  font-size: 14px;
+}
+
+.branding-image-guide span,
+.branding-guide-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.branding-guide-note {
+  margin: 0 0 26px;
+}
+
+.branding-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin: 0 0 14px;
+}
+
+.branding-preview-heading h3,
+.branding-control-card h4 {
+  margin: 0;
+}
+
+.branding-public-preview {
+  max-width: 1180px;
+  margin: 0 auto 24px;
+  padding: 14px;
+  border: 1px dashed #c8c0b4;
+  border-radius: 26px;
+  background: #f7f6f1;
+}
+
+.branding-public-preview .brand-hero {
+  margin: 0;
+}
+
+.branding-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.branding-control-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #faf9f5;
+}
+
+.branding-control-card h4 {
+  margin-bottom: 14px;
+}
+
+.branding-control-card .branding-tools {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.branding-control-card .branding-scale-control {
+  flex-basis: 100%;
+  min-width: 100%;
+}
+
+.branding-color-card {
+  align-content: start;
+  gap: 14px;
+}
+
+.branding-color-card .metric-line {
+  margin-top: 16px;
+}
+
 .branding-live-preview {
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -1483,12 +1603,41 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .branding-image-guide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .branding-live-banner {
     max-height: 360px;
   }
 }
 
 @media (max-width: 760px) {
+  .event-page-toolbar,
+  .branding-preview-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .event-page-toolbar-actions {
+    justify-content: stretch;
+  }
+
+  .event-page-toolbar .button,
+  .branding-preview-heading .button {
+    text-align: center;
+  }
+
+  .branding-image-guide,
+  .branding-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .branding-public-preview {
+    padding: 8px;
+    border-radius: 20px;
+  }
+
   .branding-live-preview {
     border-radius: 18px;
   }

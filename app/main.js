@@ -1760,6 +1760,7 @@ async function uploadBrandingFile(fieldName, file) {
     state.uploading = fieldName;
     clearError();
     render();
+    const dimensions = await getImageFileDimensions(file);
     const extension = file.name.split(".").pop() || "bin";
     const path = `event-branding/${state.user.uid}/${state.event.id}/${fieldName}.${extension}`;
     const storageRef = ref(storage, path);
@@ -1768,8 +1769,10 @@ async function uploadBrandingFile(fieldName, file) {
     const url = await getDownloadURL(storageRef);
     state.event[fieldName] = url;
     state.event[getPdfBrandingFieldName(fieldName)] = embeddedDataUrl;
+    const aspectFallback = fieldName === "headerBanner" ? "4 / 1" : fieldName === "sponsorBanner" ? "5 / 1" : "1 / 1";
+    state.event[`${fieldName}Aspect`] = normalizeBrandingAspect(`${dimensions.width} / ${dimensions.height}`, state.event[`${fieldName}Aspect`] || aspectFallback);
     await saveEvent();
-    setFlash(`${fieldName} hochgeladen.`);
+    setFlash(`Bild hochgeladen: ${dimensions.width} × ${dimensions.height} px. Das Originalformat wurde übernommen.`);
   } catch (error) {
     setError(`Upload fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
@@ -2427,7 +2430,11 @@ function getHeaderBannerThumbScale() {
 
 function normalizeBrandingAspect(value, fallback = "1 / 1") {
   const allowed = ["1 / 1", "4 / 3", "3 / 2", "16 / 9", "2 / 1", "3 / 1", "4 / 1", "5 / 1"];
-  return allowed.includes(value) ? value : fallback;
+  if (allowed.includes(value)) return value;
+  const match = String(value || "").match(/^([1-9]\d{0,4})\s*\/\s*([1-9]\d{0,4})$/);
+  if (!match) return fallback;
+  const ratio = Number(match[1]) / Number(match[2]);
+  return ratio >= 0.2 && ratio <= 8 ? `${Number(match[1])} / ${Number(match[2])}` : fallback;
 }
 
 function brandingScaleStyle(fieldName) {
@@ -2455,6 +2462,10 @@ function brandingAssetControls(fieldName, label, formatHint) {
     ["4 / 1", "Header"],
     ["5 / 1", "Sponsor"],
   ];
+  if (!aspectOptions.some(([value]) => value === aspect)) {
+    const [width, height] = aspect.split("/").map((part) => Number(part.trim()));
+    aspectOptions.unshift([aspect, `Originalbild (${width} × ${height})`]);
+  }
   return `
     <div class="branding-tools">
       <label class="button subtle" for="${fieldName}Input">${state.event[fieldName] ? "Bild ersetzen" : "Bild hinzufügen"}</label>
@@ -2493,64 +2504,50 @@ function brandingAssetControls(fieldName, label, formatHint) {
 
 function brandingLivePreview() {
   return `
-    <div class="branding-live-preview branding-editor">
-      <div class="branding-live-hero" style="border-color:${state.event.primaryColor || "#1f4f46"};">
-        <div class="branding-editor-slot branding-editor-banner">
-          ${state.event.headerBanner ? `<img class="branding-live-banner branding-scale-target" data-branding-preview="headerBanner" src="${state.event.headerBanner}" alt="Header Banner Vorschau" style="${brandingScaleStyle("headerBanner")}" />` : `<div class="branding-live-banner placeholder" data-branding-preview="headerBanner" style="${brandingScaleStyle("headerBanner")}">Header Banner</div>`}
-          ${brandingAssetControls("headerBanner", "Header Grösse", "Querformat, ideal 2400 x 900 px")}
-        </div>
-        <div class="branding-live-content">
-          <div class="branding-live-logos">
-            <div class="branding-editor-slot branding-editor-logo">
-              <div class="branding-live-logo-box" data-branding-preview="eventLogo" style="${brandingScaleStyle("eventLogo")}">${state.event.eventLogo ? `<img class="branding-scale-target" src="${state.event.eventLogo}" alt="Eventlogo Vorschau" style="${brandingScaleStyle("eventLogo")}" />` : `<span>Eventlogo</span>`}</div>
-              ${brandingAssetControls("eventLogo", "Eventlogo", "PNG/SVG, quadratisch")}
-            </div>
-            <div class="branding-editor-slot branding-editor-logo">
-              <div class="branding-live-logo-box" data-branding-preview="venueLogo" style="${brandingScaleStyle("venueLogo")}">${state.event.venueLogo ? `<img class="branding-scale-target" src="${state.event.venueLogo}" alt="Hallenlogo Vorschau" style="${brandingScaleStyle("venueLogo")}" />` : `<span>Hallenlogo</span>`}</div>
-              ${brandingAssetControls("venueLogo", "Hallenlogo", "PNG/SVG, gerne horizontal")}
-            </div>
-          </div>
-          <div class="branding-live-copy">
-            <div class="eyebrow">Vorschau öffentliche Eventseite</div>
-            <h3>${getEventDisplayName()}</h3>
-            <p>${getEventSummaryLine() || "Datum · Ort · Challenge"}</p>
-          </div>
-        </div>
-      </div>
-      <div class="branding-live-footer">
-        <div class="branding-editor-slot">
-          <div class="branding-live-sponsor" data-branding-preview="sponsorBanner" style="${brandingScaleStyle("sponsorBanner")}">
-            ${state.event.sponsorBanner ? `<img class="branding-scale-target" src="${state.event.sponsorBanner}" alt="Sponsor Banner Vorschau" style="${brandingScaleStyle("sponsorBanner")}" />` : `<span>Sponsor Banner erscheint hier</span>`}
-          </div>
-          ${brandingAssetControls("sponsorBanner", "Sponsor Grösse", "Querformat, ideal 2400 x 500 px")}
-        </div>
-        <div class="branding-live-meta">
-          <div>
-            <div class="panel-label">Primärfarbe</div>
-            <div class="swatches compact">
-              ${["#1f4f46", "#345d7e", "#8c5a21", "#4f4f4f"].map((color) => `<button class="swatch" data-color="${color}" style="background:${color}" aria-label="Primärfarbe ${color}"></button>`).join("")}
-            </div>
-          </div>
-          <div class="metric-line"><span>Aktuelle Farbe</span><strong>${state.event.primaryColor || "#1f4f46"}</strong></div>
-        </div>
-      </div>
+    <div class="branding-image-guide">
+      <div><strong>Header Banner</strong><span>2400 × 600 px · 4:1</span></div>
+      <div><strong>Eventlogo</strong><span>1000 × 1000 px · PNG</span></div>
+      <div><strong>Hallenlogo</strong><span>1000 × 1000 px · PNG</span></div>
+      <div><strong>Sponsor Banner</strong><span>2500 × 500 px · 5:1</span></div>
+    </div>
+    <p class="branding-guide-note">Das Seitenverhältnis wird beim Hochladen automatisch aus dem Bild übernommen. Mit „Format“ und „Grösse“ kannst du es danach bewusst anpassen.</p>
+
+    <div class="branding-preview-heading">
+      <div><div class="eyebrow">Exakte Vorschau</div><h3>So erscheint der Kopf der öffentlichen Eventseite</h3></div>
+      <a class="button" href="${getPublicUrl()}" target="_blank" rel="noopener noreferrer">Öffentliche Seite öffnen ↗</a>
+    </div>
+    <div class="branding-public-preview">
+      ${publicBrandingSection(true)}
+    </div>
+
+    <div class="branding-control-grid">
+      <section class="branding-control-card"><h4>Header Banner</h4>${brandingAssetControls("headerBanner", "Header Grösse", "Empfohlen: 2400 × 600 px (4:1), JPG oder PNG")}</section>
+      <section class="branding-control-card"><h4>Eventlogo</h4>${brandingAssetControls("eventLogo", "Eventlogo", "Empfohlen: 1000 × 1000 px, PNG mit transparentem Hintergrund")}</section>
+      <section class="branding-control-card"><h4>Hallenlogo</h4>${brandingAssetControls("venueLogo", "Hallenlogo", "Empfohlen: 1000 × 1000 px; für breite Logos Format „Logo breit“ wählen")}</section>
+      <section class="branding-control-card"><h4>Sponsor Banner</h4>${brandingAssetControls("sponsorBanner", "Sponsor Grösse", "Empfohlen: 2500 × 500 px (5:1), JPG oder PNG")}</section>
+      <section class="branding-control-card branding-color-card">
+        <h4>Primärfarbe</h4>
+        <div class="swatches compact">${["#1f4f46", "#345d7e", "#8c5a21", "#4f4f4f"].map((color) => `<button class="swatch" data-color="${color}" style="background:${color}" aria-label="Primärfarbe ${color}"></button>`).join("")}</div>
+        <div class="metric-line"><span>Aktuelle Farbe</span><strong>${state.event.primaryColor || "#1f4f46"}</strong></div>
+      </section>
     </div>
   `;
 }
 
-function publicBrandingSection() {
+function publicBrandingSection(previewMode = false) {
   const visibleLogoCount = [state.event.eventLogo, state.event.venueLogo && state.event.showVenueLogo === true].filter(Boolean).length;
+  const previewAttribute = (fieldName) => previewMode ? `data-branding-preview="${fieldName}"` : "";
   return `
     <div class="card brand-hero" id="publicBrandHero">
       ${state.event.headerBanner ? `
-        <div class="brand-hero-media" style="${brandingScaleStyle("headerBanner")}">
-          <img class="brand-hero-banner" src="${state.event.headerBanner}" alt="Event Banner" />
+        <div class="brand-hero-media" ${previewAttribute("headerBanner")} style="${brandingScaleStyle("headerBanner")}">
+          <img class="brand-hero-banner" ${previewAttribute("headerBanner")} src="${state.event.headerBanner}" alt="Event Banner" />
         </div>
       ` : ""}
       <div class="brand-hero-content ${visibleLogoCount <= 1 ? "single-logo" : ""}">
         <div class="brand-hero-logos">
-          ${state.event.eventLogo ? `<img src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
-          ${state.event.venueLogo && state.event.showVenueLogo === true ? `<img src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
+          ${state.event.eventLogo ? `<img ${previewAttribute("eventLogo")} src="${state.event.eventLogo}" alt="Event Logo" style="${brandingScaleStyle("eventLogo")}" />` : ""}
+          ${state.event.venueLogo && state.event.showVenueLogo === true ? `<img ${previewAttribute("venueLogo")} src="${state.event.venueLogo}" alt="Hallenlogo" style="${brandingScaleStyle("venueLogo")}" />` : ""}
         </div>
         <div class="brand-hero-copy">
           <div class="eyebrow">DynoForce Event</div>
@@ -2561,8 +2558,8 @@ function publicBrandingSection() {
         </div>
       </div>
       ${state.event.sponsorBanner ? `
-        <div class="brand-hero-sponsor-frame" style="${brandingScaleStyle("sponsorBanner")}">
-          <img class="brand-hero-sponsor" src="${state.event.sponsorBanner}" alt="Sponsor Banner" />
+        <div class="brand-hero-sponsor-frame" ${previewAttribute("sponsorBanner")} style="${brandingScaleStyle("sponsorBanner")}">
+          <img class="brand-hero-sponsor" ${previewAttribute("sponsorBanner")} src="${state.event.sponsorBanner}" alt="Sponsor Banner" />
         </div>
       ` : ""}
     </div>
@@ -2589,6 +2586,19 @@ function focusedEventHeaderMarkup(page) {
         </div>
       </div>
       ${actionsMarkup}
+    </div>
+  `;
+}
+
+function organizerPageToolbarMarkup(page) {
+  if (!state.user || !["setup", "branding"].includes(page)) return "";
+  return `
+    <div class="event-page-toolbar">
+      <button class="button back-button" data-page="dashboard" aria-label="Zurück zum Dashboard">← Zurück zum Dashboard</button>
+      <div class="event-page-toolbar-actions">
+        ${page === "setup" ? `<button class="button subtle" data-page="branding">Weiter zum Branding →</button>` : `<button class="button subtle" data-page="setup">← Zum Event Setup</button>`}
+        <a class="button" href="${getPublicUrl()}" target="_blank" rel="noopener noreferrer">Öffentliche Seite ↗</a>
+      </div>
     </div>
   `;
 }
@@ -2733,6 +2743,16 @@ async function loadImage(src) {
   });
 }
 
+async function getImageFileDimensions(file) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(objectUrl);
+    return { width: image.naturalWidth || image.width, height: image.naturalHeight || image.height };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function withTimeout(promise, timeoutMs = 8000) {
   return await Promise.race([
     promise,
@@ -2830,6 +2850,7 @@ function template(page) {
           ${!state.user ? loginCard() : ""}
           ${lockedEventLoginMarkup(page)}
           ${!isFocusedPage ? organizerEventPickerMarkup(page) : ""}
+          ${organizerPageToolbarMarkup(page)}
           ${page === "dashboard" && !state.user ? `
             ${publicHomeCard()}
             <div style="margin-top:18px;">
@@ -2889,7 +2910,7 @@ function template(page) {
               <div class="card-header">
                 <div>
                   <h3>Branding Vorschau</h3>
-                  <p>${state.uploading ? `Upload läuft: ${state.uploading}` : "Bilder direkt an der gewünschten Stelle hinzufügen und passend skalieren."}</p>
+                  <p>${state.uploading ? `Upload läuft: ${state.uploading}` : "Klare Bildvorgaben, echte Seitenverhältnisse und eine Vorschau wie auf der öffentlichen Eventseite."}</p>
                 </div>
               </div>
               ${brandingPresetControls()}
