@@ -22,6 +22,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import QRCode from "qrcode";
 import { auth, db, storage } from "./firebase.js";
 
 const BLE = {
@@ -189,7 +190,6 @@ const focusedEventPages = ["live", "public", "display"];
 
 const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
-const QR_CACHE_VERSION = "2026-06-23-https-2";
 let attemptDetectionTimer = null;
 
 function slugify(value) {
@@ -1072,11 +1072,11 @@ function getRouteInfo() {
 }
 
 function getPublicUrl() {
-  return `${PUBLIC_ORIGIN}${APP_BASE}/#/e/${state.event.id}`;
+  return `${PUBLIC_ORIGIN.replace(/\.+$/, "")}${APP_BASE}/#/e/${encodeURIComponent(state.event.id)}`;
 }
 
 function getDisplayUrl() {
-  return `${PUBLIC_ORIGIN}${APP_BASE}/#/display/${state.event.id}`;
+  return `${PUBLIC_ORIGIN.replace(/\.+$/, "")}${APP_BASE}/#/display/${encodeURIComponent(state.event.id)}`;
 }
 
 function syncUrl(page, eventId = state.event.id) {
@@ -1877,7 +1877,6 @@ async function downloadPdf() {
   previewWindow.document.close();
 
   try {
-    const { default: QRCode } = await import("qrcode");
     const qrCodeDataUrl = await QRCode.toDataURL(getPublicUrl(), { margin: 0, width: 220 });
     const headerBanner = state.event.headerBannerPdfData || state.event.headerBanner || "";
     const eventLogo = state.event.eventLogoPdfData || state.event.eventLogo || "";
@@ -2296,7 +2295,30 @@ function dailyWinnerCardsMarkup() {
 }
 
 function qrImage(url) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=264x264&margin=0&v=${QR_CACHE_VERSION}&data=${encodeURIComponent(url)}`;
+  const qr = QRCode.create(url, { errorCorrectionLevel: "M" });
+  const moduleCount = qr.modules.size;
+  const margin = 4;
+  const imageSize = moduleCount + (margin * 2);
+  let path = "";
+
+  for (let row = 0; row < moduleCount; row += 1) {
+    let runStart = -1;
+
+    for (let column = 0; column <= moduleCount; column += 1) {
+      const isDark = column < moduleCount && qr.modules.get(row, column);
+
+      if (isDark && runStart < 0) {
+        runStart = column;
+      } else if (!isDark && runStart >= 0) {
+        const runLength = column - runStart;
+        path += `M${runStart + margin} ${row + margin}h${runLength}v1h-${runLength}z`;
+        runStart = -1;
+      }
+    }
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${imageSize} ${imageSize}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function updateLiveMeasurementDom() {
