@@ -110,6 +110,8 @@ const state = {
   deviceInfo: null,
   saving: false,
   uploading: "",
+  brandingDirty: false,
+  brandingBaseline: null,
   liveEntry: {
     firstName: "",
     lastName: "",
@@ -189,7 +191,6 @@ const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
 const QR_CACHE_VERSION = "2026-06-23-https-2";
 let attemptDetectionTimer = null;
-let brandingScaleSaveTimer = null;
 
 function slugify(value) {
   return String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "event";
@@ -1010,6 +1011,29 @@ function getCurrentBrandingPresetData() {
   }, {});
 }
 
+function cloneCurrentBrandingData() {
+  return structuredClone(getCurrentBrandingPresetData());
+}
+
+function markBrandingDirty() {
+  if (!state.brandingBaseline) state.brandingBaseline = cloneCurrentBrandingData();
+  state.brandingDirty = true;
+  const saveBar = root.querySelector(".branding-save-bar");
+  saveBar?.classList.add("is-dirty");
+  root.querySelector("[data-branding-save-title]")?.replaceChildren("Änderungen noch nicht veröffentlicht");
+  root.querySelector("[data-branding-save-description]")?.replaceChildren("Die Vorschau zeigt deinen Entwurf. Öffentlich bleibt das bisherige Branding aktiv.");
+  const publishButton = root.querySelector("#publishBrandingChanges");
+  const discardButton = root.querySelector("#discardBrandingChanges");
+  if (publishButton) publishButton.disabled = false;
+  if (discardButton) discardButton.disabled = false;
+}
+
+function resetBrandingDraft() {
+  if (state.brandingBaseline) applyBrandingPresetData(state.brandingBaseline);
+  state.brandingDirty = false;
+  document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
+}
+
 function applyBrandingPresetData(data = {}) {
   BRANDING_PRESET_FIELDS.forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(data, field)) {
@@ -1470,7 +1494,13 @@ async function subscribeToEvent(eventId) {
   state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), (snapshot) => {
     if (state.loadingEventId !== eventId) return;
     if (snapshot.exists()) {
+      const brandingDraft = state.currentPage === "branding" && state.brandingDirty ? cloneCurrentBrandingData() : null;
       state.event = eventDocToState(snapshot.id, snapshot.data());
+      if (brandingDraft) {
+        applyBrandingPresetData(brandingDraft);
+      } else if (state.currentPage === "branding") {
+        state.brandingBaseline = cloneCurrentBrandingData();
+      }
       state.eventLoaded = true;
       state.loadingEventId = snapshot.id;
       if (state.currentPage === "live" && !isActiveEventStatus(state.event.status)) {
@@ -1632,9 +1662,9 @@ async function saveBrandingPreset(name) {
 async function applyBrandingPreset(presetId) {
   const preset = state.brandingPresets.find((item) => item.id === presetId);
   if (!preset) return;
+  markBrandingDirty();
   applyBrandingPresetData(preset.data);
-  await saveEvent();
-  setFlash(`Branding "${preset.name}" angewendet.`);
+  setFlash(`Vorlage "${preset.name}" geladen. Mit „Änderungen übernehmen“ wird sie veröffentlicht.`);
   render();
 }
 
@@ -1740,8 +1770,10 @@ async function saveEvent(overrides = {}) {
     );
 
     setFlash("Event in Firestore gespeichert.");
+    return true;
   } catch (error) {
     setError(`Event speichern fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
   } finally {
     state.saving = false;
     render();
@@ -1762,17 +1794,17 @@ async function uploadBrandingFile(fieldName, file) {
     render();
     const dimensions = await getImageFileDimensions(file);
     const extension = file.name.split(".").pop() || "bin";
-    const path = `event-branding/${state.user.uid}/${state.event.id}/${fieldName}.${extension}`;
+    const path = `event-branding/${state.user.uid}/${state.event.id}/${fieldName}-${Date.now()}.${extension}`;
     const storageRef = ref(storage, path);
     const embeddedDataUrl = await createEmbeddedBrandingDataUrl(file, fieldName);
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
+    markBrandingDirty();
     state.event[fieldName] = url;
     state.event[getPdfBrandingFieldName(fieldName)] = embeddedDataUrl;
     const aspectFallback = fieldName === "headerBanner" ? "4 / 1" : fieldName === "sponsorBanner" ? "5 / 1" : "1 / 1";
     state.event[`${fieldName}Aspect`] = normalizeBrandingAspect(`${dimensions.width} / ${dimensions.height}`, state.event[`${fieldName}Aspect`] || aspectFallback);
-    await saveEvent();
-    setFlash(`Bild hochgeladen: ${dimensions.width} × ${dimensions.height} px. Das Originalformat wurde übernommen.`);
+    setFlash(`Bild bereit: ${dimensions.width} × ${dimensions.height} px. Mit „Änderungen übernehmen“ wird es veröffentlicht.`);
   } catch (error) {
     setError(`Upload fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
@@ -1788,10 +1820,11 @@ async function removeBrandingFile(fieldName) {
     return;
   }
 
+  markBrandingDirty();
   state.event[fieldName] = fieldName === "eventLogo" ? DEFAULT_DYNOFORCE_LOGO : "";
   state.event[getPdfBrandingFieldName(fieldName)] = "";
-  await saveEvent();
-  setFlash(fieldName === "eventLogo" ? "Eigenes Eventlogo entfernt. DF-Logo ist wieder aktiv." : "Bild entfernt.");
+  setFlash(fieldName === "eventLogo" ? "Eigenes Eventlogo im Entwurf entfernt. DF-Logo ist wieder aktiv." : "Bild im Entwurf entfernt.");
+  render();
 }
 
 async function saveLiveResult() {
@@ -2650,12 +2683,12 @@ function brandingPresetControls() {
       </div>
       <div class="branding-preset-actions">
         <input id="brandingPresetName" placeholder="Vorlagenname, z.B. Bouba Standard" />
-        <button class="button primary" id="saveBrandingPreset">Branding speichern</button>
+        <button class="button primary" id="saveBrandingPreset">Als Branding-Vorlage speichern</button>
         <select id="brandingPresetSelect">
           <option value="">${state.brandingPresetsLoaded ? "Vorlage auswählen" : "Vorlagen werden geladen..."}</option>
           ${state.brandingPresets.map((preset) => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`).join("")}
         </select>
-        <button class="button" id="applyBrandingPreset">Anwenden</button>
+        <button class="button" id="applyBrandingPreset">Vorlage laden</button>
         <button class="button danger" id="deleteBrandingPreset">Löschen</button>
       </div>
     </div>
@@ -2914,6 +2947,16 @@ function template(page) {
                 </div>
               </div>
               ${brandingPresetControls()}
+              <div class="branding-save-bar ${state.brandingDirty ? "is-dirty" : ""}">
+                <div>
+                  <strong data-branding-save-title>${state.brandingDirty ? "Änderungen noch nicht veröffentlicht" : "Branding ist gespeichert"}</strong>
+                  <span data-branding-save-description>${state.brandingDirty ? "Die Vorschau zeigt deinen Entwurf. Öffentlich bleibt das bisherige Branding aktiv." : "Neue Anpassungen werden erst nach deiner Bestätigung öffentlich sichtbar."}</span>
+                </div>
+                <div class="action-row compact">
+                  <button class="button" id="discardBrandingChanges" ${state.brandingDirty ? "" : "disabled"}>Änderungen verwerfen</button>
+                  <button class="button primary" id="publishBrandingChanges" ${state.brandingDirty && !state.saving ? "" : "disabled"}>${state.saving ? "Speichert..." : "Änderungen übernehmen"}</button>
+                </div>
+              </div>
               ${brandingLivePreview()}
             </div>
           ` : ""}
@@ -2978,6 +3021,11 @@ function bindGeneralUi() {
   root.querySelectorAll("[data-page]").forEach((button) => {
     button.addEventListener("click", async () => {
       const page = button.dataset.page;
+      if (state.currentPage === "branding" && page !== "branding" && state.brandingDirty) {
+        const discardChanges = window.confirm("Die Branding-Änderungen wurden noch nicht übernommen. Änderungen verwerfen und Seite verlassen?");
+        if (!discardChanges) return;
+        resetBrandingDraft();
+      }
       const targetEventId = ["setup", "branding", "live", "public", "display"].includes(page)
         ? (state.event.id || getActiveEventId())
         : state.event.id;
@@ -3199,6 +3247,23 @@ function bindSetupActions() {
 }
 
 function bindBrandingActions() {
+  root.querySelector("#publishBrandingChanges")?.addEventListener("click", async () => {
+    if (!state.brandingDirty || state.saving) return;
+    const saved = await saveEvent();
+    if (!saved) return;
+    state.brandingBaseline = cloneCurrentBrandingData();
+    state.brandingDirty = false;
+    setFlash("Branding-Änderungen wurden übernommen und sind jetzt öffentlich aktiv.");
+    render();
+  });
+
+  root.querySelector("#discardBrandingChanges")?.addEventListener("click", () => {
+    if (!state.brandingDirty) return;
+    resetBrandingDraft();
+    setFlash("Nicht veröffentlichte Branding-Änderungen wurden verworfen.");
+    render();
+  });
+
   root.querySelector("#saveBrandingPreset")?.addEventListener("click", async () => {
     const presetName = root.querySelector("#brandingPresetName")?.value || "";
     await saveBrandingPreset(presetName);
@@ -3232,15 +3297,17 @@ function bindBrandingActions() {
   });
 
   root.querySelectorAll("[data-color]").forEach((button) => {
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", () => {
+      markBrandingDirty();
       state.event.primaryColor = button.dataset.color;
-      await saveEvent();
       document.documentElement.style.setProperty("--primary", state.event.primaryColor);
+      render();
     });
   });
 
   root.querySelectorAll("[data-branding-scale]").forEach((input) => {
     const updateScale = () => {
+      markBrandingDirty();
       const scaleField = input.dataset.brandingScale;
       const target = input.dataset.brandingTarget;
       const value = Math.max(50, Math.min(180, Number(input.value || 100)));
@@ -3252,49 +3319,47 @@ function bindBrandingActions() {
     };
 
     input.addEventListener("input", updateScale);
-    input.addEventListener("change", async () => {
+    input.addEventListener("change", () => {
       updateScale();
-      if (brandingScaleSaveTimer) window.clearTimeout(brandingScaleSaveTimer);
-      brandingScaleSaveTimer = window.setTimeout(() => {
-        void saveEvent();
-      }, 250);
     });
   });
 
   root.querySelectorAll("[data-header-thumb-scale]").forEach((input) => {
     const updateThumbScale = () => {
+      markBrandingDirty();
       const value = Math.max(60, Math.min(220, Number(input.value || 100)));
       state.event.headerBannerThumbScale = value;
       root.querySelector(`[data-scale-value="headerBannerThumbScale"]`)?.replaceChildren(`${value}%`);
     };
 
     input.addEventListener("input", updateThumbScale);
-    input.addEventListener("change", async () => {
+    input.addEventListener("change", () => {
       updateThumbScale();
-      await saveEvent();
     });
   });
 
-  root.querySelector("#showVenueLogoInput")?.addEventListener("change", async (event) => {
+  root.querySelector("#showVenueLogoInput")?.addEventListener("change", (event) => {
+    markBrandingDirty();
     state.event.showVenueLogo = event.target.checked;
-    await saveEvent();
+    render();
   });
 
-  root.querySelector("#showHeaderBannerThumbInput")?.addEventListener("change", async (event) => {
+  root.querySelector("#showHeaderBannerThumbInput")?.addEventListener("change", (event) => {
+    markBrandingDirty();
     state.event.showHeaderBannerThumb = event.target.checked;
-    await saveEvent();
+    render();
   });
 
   root.querySelectorAll("[data-branding-aspect]").forEach((select) => {
-    select.addEventListener("change", async () => {
+    select.addEventListener("change", () => {
       const aspectField = select.dataset.brandingAspect;
       const target = select.dataset.brandingTarget;
       const value = normalizeBrandingAspect(select.value, state.event[aspectField] || "1 / 1");
+      markBrandingDirty();
       state.event[aspectField] = value;
       root.querySelectorAll(`[data-branding-preview="${target}"]`).forEach((element) => {
         element.style.setProperty("--asset-ratio", value);
       });
-      await saveEvent();
     });
   });
 
@@ -3368,6 +3433,13 @@ if (!attemptDetectionTimer) {
   attemptDetectionTimer = window.setInterval(processAttemptDetectionTick, 50);
 }
 
+window.addEventListener("beforeunload", (event) => {
+  if (state.currentPage === "branding" && state.brandingDirty) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
 async function routeAndLoad() {
   const route = getRouteInfo();
   state.currentPage = route.page;
@@ -3398,6 +3470,10 @@ async function routeAndLoad() {
         syncUrl(route.page, organizerEventId);
       }
       await subscribeToEvent(organizerEventId);
+      if (route.page === "branding") {
+        state.brandingBaseline = cloneCurrentBrandingData();
+        state.brandingDirty = false;
+      }
       if (route.page === "setup" || route.page === "live") {
         void refreshResultsForEvent(organizerEventId, { force: true });
       }
