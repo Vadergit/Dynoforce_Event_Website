@@ -1473,8 +1473,7 @@ th {
   padding: 0;
 }
 
-.brand-hero-media,
-.brand-hero-sponsor-frame {
+.brand-hero-media {
   width: 100%;
   display: grid;
   place-items: center;
@@ -1556,9 +1555,30 @@ th {
   margin-top: 6px;
 }
 
-.brand-hero-sponsor-frame {
+.brand-sponsor-footer {
+  display: grid;
+  place-items: center;
+  margin-top: 18px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.brand-sponsor-footer.is-preview {
+  margin-top: 12px;
+}
+
+.brand-sponsor-footer-frame {
+  width: min(900px, 100%);
   aspect-ratio: var(--asset-ratio, 5 / 1);
-  max-height: 260px;
+  max-height: 180px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #faf9f5;
 }
 
 .display-board td {

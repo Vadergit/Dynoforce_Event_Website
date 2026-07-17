@@ -2551,6 +2551,7 @@ function brandingLivePreview() {
     </div>
     <div class="branding-public-preview">
       ${publicBrandingSection(true)}
+      ${publicSponsorFooter(true)}
     </div>
 
     <div class="branding-control-grid">
@@ -2590,12 +2591,19 @@ function publicBrandingSection(previewMode = false) {
           <a class="brand-hero-link" href="https://dynoforce.ch" target="_blank" rel="noopener noreferrer">Mehr über DynoForce und die Geräte</a>
         </div>
       </div>
-      ${state.event.sponsorBanner ? `
-        <div class="brand-hero-sponsor-frame" ${previewAttribute("sponsorBanner")} style="${brandingScaleStyle("sponsorBanner")}">
-          <img class="brand-hero-sponsor" ${previewAttribute("sponsorBanner")} src="${state.event.sponsorBanner}" alt="Sponsor Banner" />
-        </div>
-      ` : ""}
     </div>
+  `;
+}
+
+function publicSponsorFooter(previewMode = false) {
+  if (!state.event.sponsorBanner) return "";
+  const previewAttribute = previewMode ? `data-branding-preview="sponsorBanner"` : "";
+  return `
+    <footer class="brand-sponsor-footer ${previewMode ? "is-preview" : ""}" aria-label="Event Partner">
+      <div class="brand-sponsor-footer-frame" ${previewAttribute} style="${brandingScaleStyle("sponsorBanner")}">
+        <img class="brand-hero-sponsor" ${previewAttribute} src="${state.event.sponsorBanner}" alt="Sponsor Banner" />
+      </div>
+    </footer>
   `;
 }
 
@@ -3004,6 +3012,7 @@ function template(page) {
             <div class="grid" style="margin-top:18px;">
               <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
             </div>
+            ${publicSponsorFooter()}
           ` : ""}
           ${page === "display" ? `
             <div class="grid two">
