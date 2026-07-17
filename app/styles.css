@@ -1689,6 +1689,159 @@ th {
   }
 }
 
+html.mobile-layout body {
+  overflow-x: hidden;
+}
+
+html.mobile-layout .public-event-shell {
+  width: var(--mobile-layout-width, 100%);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+html.mobile-layout .public-event-shell .content {
+  width: 100%;
+  min-width: 0;
+  padding-top: 10px;
+  padding-right: max(10px, env(safe-area-inset-right));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding-left: max(10px, env(safe-area-inset-left));
+}
+
+html.mobile-layout .public-event-shell .content-inner,
+html.mobile-layout .public-event-shell .public-summary-grid,
+html.mobile-layout .public-event-shell .brand-hero,
+html.mobile-layout .public-event-shell .brand-sponsor-footer {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+html.mobile-layout .public-event-shell .brand-hero,
+html.mobile-layout .public-event-shell .brand-sponsor-footer,
+html.mobile-layout .public-event-shell .compact-public-card,
+html.mobile-layout .public-event-shell .public-summary-grid + .grid .card {
+  border-radius: 18px;
+}
+
+html.mobile-layout .public-event-shell .brand-hero-media {
+  min-height: 0;
+  max-height: none;
+}
+
+html.mobile-layout .public-event-shell .brand-hero-content,
+html.mobile-layout .public-event-shell .brand-hero-content.single-logo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
+}
+
+html.mobile-layout .public-event-shell .brand-hero-logos {
+  gap: 10px;
+}
+
+html.mobile-layout .public-event-shell .brand-hero-logos img {
+  width: clamp(68px, 22vw, 92px);
+  max-height: 92px;
+  padding: 6px;
+  border-radius: 14px;
+}
+
+html.mobile-layout .public-event-shell .hero-title {
+  max-width: 100%;
+  font-size: clamp(26px, 7.2vw, 32px);
+  line-height: 1.02;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+}
+
+html.mobile-layout .public-event-shell .brand-hero-meta,
+html.mobile-layout .public-event-shell .brand-hero-copy p {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+html.mobile-layout .public-event-shell .public-summary-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html.mobile-layout .public-event-shell .compact-public-card,
+html.mobile-layout .public-event-shell .public-summary-grid + .grid .card {
+  min-width: 0;
+  padding: 16px;
+}
+
+html.mobile-layout .public-event-shell .compact-public-card .card-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+html.mobile-layout .public-event-shell .compact-public-card .status-badge {
+  align-self: flex-start;
+}
+
+html.mobile-layout .public-event-shell .metric-list.compact .metric-line {
+  grid-template-columns: minmax(82px, 0.7fr) minmax(0, 1.3fr);
+  gap: 10px;
+}
+
+html.mobile-layout .public-event-shell .metric-list.compact .metric-line strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+html.mobile-layout .public-event-shell .event-info-card .metric-list.compact .metric-line {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+}
+
+html.mobile-layout .public-event-shell .event-info-card .metric-list.compact .metric-line strong {
+  text-align: left;
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+html.mobile-layout .public-event-shell .public-summary-grid + .grid h4 {
+  margin-top: 4px !important;
+}
+
+html.mobile-layout .public-event-shell .public-summary-grid + .grid th,
+html.mobile-layout .public-event-shell .public-summary-grid + .grid td {
+  padding: 10px 4px;
+  font-size: 13px;
+}
+
+html.mobile-layout .public-event-shell .public-summary-grid + .grid th:nth-child(3),
+html.mobile-layout .public-event-shell .public-summary-grid + .grid td:nth-child(3) {
+  display: none;
+}
+
+html.mobile-layout .public-event-shell .public-summary-grid + .grid th:last-child,
+html.mobile-layout .public-event-shell .public-summary-grid + .grid td:last-child {
+  white-space: nowrap;
+}
+
+html.mobile-layout .public-event-shell .rank-pill {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+}
+
+html.mobile-layout .public-event-shell .brand-sponsor-footer {
+  padding: 6px;
+  margin-top: 12px;
+}
+
+html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
+  border-radius: 12px;
+}
+
 @media (max-width: 760px) {
   body {
     overflow-x: hidden;

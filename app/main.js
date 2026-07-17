@@ -196,6 +196,22 @@ const APP_BASE = (import.meta.env.BASE_URL || "/")
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
 let attemptDetectionTimer = null;
 
+function updateDeviceLayoutClass() {
+  const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const touchAppleDevice = navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
+  const narrowViewport = window.matchMedia("(max-width: 760px)").matches;
+  const compactTouchScreen = navigator.maxTouchPoints > 0
+    && Math.min(window.screen.width || window.innerWidth, window.screen.height || window.innerHeight) <= 900;
+  const useMobileLayout = narrowViewport || mobileUserAgent || touchAppleDevice || compactTouchScreen;
+  const detectedWidth = Math.min(window.innerWidth, window.screen.width || window.innerWidth);
+
+  document.documentElement.classList.toggle("mobile-layout", useMobileLayout);
+  document.documentElement.style.setProperty("--mobile-layout-width", `${detectedWidth}px`);
+}
+
+updateDeviceLayoutClass();
+window.addEventListener("resize", updateDeviceLayoutClass, { passive: true });
+
 function slugify(value) {
   return String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "event";
 }
@@ -2953,7 +2969,7 @@ function template(page) {
   }
 
   return `
-    <div class="app-shell ${isFocusedPage ? "focus-shell" : ""}">
+    <div class="app-shell ${isFocusedPage ? "focus-shell" : ""} ${["public", "display"].includes(page) ? "public-event-shell" : ""}">
       ${!isFocusedPage ? `<aside class="sidebar">
         <div class="brand">
           <img class="brand-mark" src="/dynoforce-icon.png" alt="DynoForce Logo" />
