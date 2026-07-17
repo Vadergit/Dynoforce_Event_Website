@@ -121,6 +121,8 @@ const state = {
   dashboardLoaded: false,
   publicEventsLoaded: false,
   eventLoaded: false,
+  eventBrandingReady: false,
+  eventBrandingAssetKey: "",
   resultsLoaded: false,
   loadingEventId: "",
   currentPage: "dashboard",
@@ -767,6 +769,8 @@ async function primeEventState(eventId) {
 
     if (eventSnapshot.exists()) {
       state.event = eventDocToState(eventSnapshot.id, eventSnapshot.data());
+      await preparePublicEventBranding(state.event, eventId);
+      if (state.loadingEventId !== eventId) return;
       setResults(resultsSnapshot.docs.map((resultDoc) => ({
         id: resultDoc.id,
         ...resultDoc.data(),
@@ -803,6 +807,10 @@ async function loadEventState(eventId) {
   }
 
   state.event = eventDocToState(eventSnapshot.id, eventSnapshot.data());
+  await preparePublicEventBranding(state.event, eventId);
+
+  if (state.loadingEventId !== eventId) return false;
+
   setResults(resultsSnapshot.docs.map((resultDoc) => ({
     id: resultDoc.id,
     ...resultDoc.data(),
@@ -1456,6 +1464,8 @@ async function subscribeToEvent(eventId) {
   safeUnsub("event");
   safeUnsub("results");
   state.eventLoaded = false;
+  state.eventBrandingReady = false;
+  state.eventBrandingAssetKey = "";
   state.loadingEventId = eventId;
   if (!hydrateResultsFromCache(eventId)) {
     setResults([], { loaded: false, eventId, cache: false });
@@ -1493,7 +1503,7 @@ async function subscribeToEvent(eventId) {
     }
   }
 
-  state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), (snapshot) => {
+  state.unsubscribers.event = onSnapshot(doc(db, "events", eventId), async (snapshot) => {
     if (state.loadingEventId !== eventId) return;
     if (snapshot.exists()) {
       const brandingDraft = state.currentPage === "branding" && state.brandingDirty ? cloneCurrentBrandingData() : null;
@@ -1503,6 +1513,8 @@ async function subscribeToEvent(eventId) {
       } else if (state.currentPage === "branding") {
         state.brandingBaseline = cloneCurrentBrandingData();
       }
+      await preparePublicEventBranding(state.event, eventId);
+      if (state.loadingEventId !== eventId) return;
       state.eventLoaded = true;
       state.loadingEventId = snapshot.id;
       if (state.currentPage === "live" && !isActiveEventStatus(state.event.status)) {
@@ -2481,6 +2493,60 @@ function getBrandingScale(fieldName) {
   return Math.max(50, Math.min(180, Number(state.event[`${fieldName}Scale`] || 100)));
 }
 
+function getEventBrandingAssetKey(event = state.event) {
+  return [
+    event.headerBanner || "",
+    event.eventLogo || "",
+    event.showVenueLogo === true ? event.venueLogo || "" : "",
+    event.sponsorBanner || "",
+  ].join("|");
+}
+
+function preloadBrandingImage(url) {
+  if (!url) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    const timeout = window.setTimeout(resolve, 5000);
+    const finish = () => {
+      window.clearTimeout(timeout);
+      resolve();
+    };
+
+    image.onload = finish;
+    image.onerror = finish;
+    image.src = url;
+
+    if (image.complete) finish();
+  });
+}
+
+async function preparePublicEventBranding(event, eventId) {
+  if (!event || !["public", "display"].includes(state.currentPage)) {
+    state.eventBrandingReady = true;
+    return;
+  }
+
+  const assetKey = getEventBrandingAssetKey(event);
+  if (state.eventBrandingReady && state.event.id === eventId && state.eventBrandingAssetKey === assetKey) {
+    return;
+  }
+
+  state.eventBrandingReady = false;
+  render();
+  await Promise.all([
+    preloadBrandingImage(event.headerBanner),
+    preloadBrandingImage(event.eventLogo),
+    preloadBrandingImage(event.showVenueLogo === true ? event.venueLogo : ""),
+    preloadBrandingImage(event.sponsorBanner),
+  ]);
+
+  if (state.loadingEventId === eventId && getEventBrandingAssetKey(state.event) === assetKey) {
+    state.eventBrandingReady = true;
+    state.eventBrandingAssetKey = assetKey;
+  }
+}
+
 function getHeaderBannerThumbScale() {
   return Math.max(60, Math.min(220, Number(state.event.headerBannerThumbScale || 100)));
 }
@@ -2877,6 +2943,15 @@ function template(page) {
     : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button>`;
   const [dashboardTitle, dashboardText] = getDashboardMeta();
 
+  if (["public", "display"].includes(page) && (!state.eventLoaded || !state.eventBrandingReady)) {
+    return `
+      <main class="event-loading-screen" aria-live="polite" aria-busy="true">
+        <div class="event-loading-indicator" aria-hidden="true"></div>
+        <strong>Event wird geladen</strong>
+      </main>
+    `;
+  }
+
   return `
     <div class="app-shell ${isFocusedPage ? "focus-shell" : ""}">
       ${!isFocusedPage ? `<aside class="sidebar">
@@ -3029,8 +3104,8 @@ function template(page) {
           ${page === "public" ? `
             ${publicBrandingSection()}
             <div class="grid two public-summary-grid">
-              <div class="card compact-public-card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list compact"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div>${state.event.organiserEmail ? `<div class="metric-line"><span>Kontakt</span><strong>${state.event.organiserEmail}</strong></div>` : ""}<div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
-              <div class="card compact-public-card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list compact"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${getBestResultLabel()}</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${getAverageLabel()}</strong></div></div><div class="action-row compact"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
+              <div class="card compact-public-card event-info-card"><div class="card-header"><div><h3>${getEventDisplayName()}</h3><p>${getEventSummaryLine()}</p></div><div class="status-badge">${state.event.status}</div></div><div class="metric-list compact"><div class="metric-line"><span>Veranstalter</span><strong>${state.event.organiser || "DynoForce"}</strong></div>${state.event.organiserEmail ? `<div class="metric-line"><span>Kontakt</span><strong>${state.event.organiserEmail}</strong></div>` : ""}<div class="metric-line"><span>Beschreibung</span><strong>${state.event.description || "Live Event mit öffentlicher Rangliste."}</strong></div></div></div>
+              <div class="card compact-public-card event-stats-card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list compact"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${getBestResultLabel()}</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${getAverageLabel()}</strong></div></div><div class="action-row compact"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
             </div>
             ${isDailyChallengeType() ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
             <div class="grid" style="margin-top:18px;">
