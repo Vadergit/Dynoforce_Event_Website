@@ -188,7 +188,9 @@ const pageMeta = {
 const adminNavPages = ["dashboard"];
 const focusedEventPages = ["live", "public", "display"];
 
-const APP_BASE = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
+const APP_BASE = (import.meta.env.BASE_URL || "/")
+  .replace(/^\.\//, "/")
+  .replace(/\/+$/, "");
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
 let attemptDetectionTimer = null;
 
