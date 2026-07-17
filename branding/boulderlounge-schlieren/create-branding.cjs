@@ -4,7 +4,8 @@ const sharp = require('sharp');
 const root = __dirname;
 const logoPath = path.join(root, 'boulderlounge-logo-original.png');
 const dynoforcePath = path.join(root, '..', '..', 'public', 'dynoforce-icon.png');
-const cleanHeaderPath = path.join(root, 'boulderlounge-header-clean-ai.png');
+const userHeaderPath = path.join(root, 'boulderlounge-header-user-v3.png');
+const userHeaderLogoPath = path.join(root, 'boulderlounge-logo-user-v3.png');
 
 const BLUE = '#071f78';
 const ROYAL = '#1236b5';
@@ -22,10 +23,23 @@ async function contain(input, width, height) {
 }
 
 async function createHeader() {
-  await sharp(cleanHeaderPath)
+  const background = await sharp(userHeaderPath)
     .resize(2400, 600, { fit: 'cover', position: 'centre' })
-    .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
-    .toFile(path.join(root, 'header-banner-clean-2400x600.jpg'));
+    .png()
+    .toBuffer();
+  const venueLogo = await contain(userHeaderLogoPath, 340, 386);
+  const logoCard = svg(2400, 600, `
+    <defs><filter id="shadow"><feDropShadow dx="0" dy="10" stdDeviation="16" flood-opacity=".24"/></filter></defs>
+    <rect x="120" y="60" width="480" height="480" rx="36" fill="#fff" filter="url(#shadow)"/>
+  `);
+
+  await sharp(background)
+    .composite([
+      { input: logoCard, top: 0, left: 0 },
+      { input: venueLogo, top: 107, left: 190 },
+    ])
+    .jpeg({ quality: 94, chromaSubsampling: '4:4:4' })
+    .toFile(path.join(root, 'header-banner-logo-left-2400x600.jpg'));
 }
 
 async function createEventLogo() {
