@@ -1660,6 +1660,13 @@ td:last-child {
   text-align: right;
 }
 
+th.direction-column,
+td.direction-column {
+  width: 22%;
+  text-align: right;
+  white-space: nowrap;
+}
+
 th {
   font-size: 12px;
   text-transform: uppercase;
