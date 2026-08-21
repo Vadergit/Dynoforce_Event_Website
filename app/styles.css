@@ -649,18 +649,69 @@ a {
   padding: 20px;
 }
 
-.live-compact .measure-wrap {
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: 16px;
-  padding-top: 14px;
+.live-force-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 20px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px 18px 12px;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  border-left: 6px solid var(--primary);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(31, 79, 70, 0.09), rgba(255, 255, 255, 0.88));
+  box-shadow: 0 12px 28px rgba(31, 79, 70, 0.08);
 }
 
-.live-compact .force-value {
-  font-size: 88px;
+.live-force-main {
+  min-width: 0;
 }
 
-.live-compact .progress {
-  margin-top: 12px;
+.live-force-eyebrow,
+.live-placement-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-force-hero .force-value {
+  margin-top: 4px;
+  font-size: clamp(108px, 9vw, 116px);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-force-hero .force-unit {
+  margin-bottom: 9px;
+  font-size: 30px;
+}
+
+.live-force-hero .progress {
+  height: 14px;
+  margin-top: 7px;
+  border: 1px solid rgba(31, 79, 70, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.live-placement-card {
+  display: grid;
+  gap: 10px;
+  align-content: center;
+  min-height: 96px;
+  padding: 15px;
+  border: 1px solid rgba(31, 79, 70, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  text-align: center;
+}
+
+.live-placement-card strong {
+  color: var(--primary);
+  font-size: 38px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .live-compact .metric-line {
@@ -1909,6 +1960,14 @@ th {
     font-size: 72px;
   }
 
+  .live-force-hero {
+    grid-template-columns: minmax(0, 1fr) 160px;
+  }
+
+  .live-compact .live-force-hero .force-value {
+    font-size: clamp(96px, 12vw, 118px);
+  }
+
   .display-title {
     font-size: 38px;
   }
@@ -2085,6 +2144,24 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
 }
 
 @media (max-width: 760px) {
+  .live-force-hero {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 16px;
+  }
+
+  .live-compact .live-force-hero .force-value {
+    font-size: clamp(76px, 24vw, 96px);
+  }
+
+  .live-placement-card {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    min-height: 0;
+    text-align: left;
+  }
+
   body {
     overflow-x: hidden;
   }
