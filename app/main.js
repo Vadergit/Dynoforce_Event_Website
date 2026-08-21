@@ -2377,7 +2377,7 @@ function updateLiveMeasurementDom() {
   setText("liveAttemptDisplay", `Versuche ${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
-  setText("liveSaveHint", state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Bereit für den nächsten Versuch.");
+  setText("liveSaveHint", state.liveEntry.attempts.length ? "Die Resultate werden nach dem letzten Versuch automatisch gespeichert." : "Bereit für den nächsten Versuch.");
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -3084,36 +3084,35 @@ function template(page) {
             </div>
           ` : ""}
           ${!lockedPage && page === "live" ? `
-            <div class="grid live">
-              <div class="grid">
+            <div class="grid live live-compact">
+              <div class="grid live-primary-column">
                 <div class="card measurement-work-card">
+                  <div class="measurement-section">
+                    <div class="card-header"><div><h3>Live-Messung</h3><p>Die Versuche werden automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
+                    <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                    <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
+                    ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
+                    <p class="muted live-save-hint" id="liveSaveHint">${state.liveEntry.attempts.length ? "Die Resultate werden nach dem letzten Versuch automatisch gespeichert." : "Bereit für den nächsten Versuch."}</p>
+                  </div>
+                  <div class="measurement-divider"></div>
                   <div class="participant-entry-card">
                     <div class="participant-entry-head">
                       <div>
                         <div class="eyebrow">Nächster Teilnehmer</div>
                         <h3>Vorname und Name eingeben</h3>
-                        <p>Danach kann direkt gestartet werden.</p>
                       </div>
+                      <p>Danach kann direkt gestartet werden.</p>
                     </div>
                     <div class="field-grid two participant-fields">
                       <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
                       <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
                     </div>
                   </div>
-                  <div class="measurement-divider"></div>
-                  <div class="measurement-section">
-                    <div class="card-header"><div><h3>Live-Messung</h3><p>Die Versuche werden automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
-                    <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Richtung</span><strong id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
-                    <div class="action-row"><button class="button success" id="saveResult">Resultat speichern</button></div>
-                    <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
-                    ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
-                    <p class="muted" id="liveSaveHint" style="margin:18px 0 0;">${state.liveEntry.attempts.length ? "Jetzt speichern oder weitere Versuche durchführen." : "Bereit für den nächsten Versuch."}</p>
-                  </div>
                 </div>
               </div>
-              <div class="grid">
-                <div class="card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Getrennte Ranglisten für Ziehen und Drücken." : "Top 10 permanent sichtbar und automatisch aktualisiert."}</p></div></div><div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
-                <div class="card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Verfolge das Event live auf deinem eigenen Gerät.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard, Resultate und PDF-Export jederzeit direkt auf dem Smartphone oder Tablet öffnen.</p></div></div></div>
+              <div class="grid live-side-column">
+                <div class="card live-qr-card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Event live auf dem eigenen Gerät verfolgen.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard und Resultate direkt öffnen.</p></div></div></div>
+                <div class="card live-leaderboard-card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Top 3 für Ziehen und Drücken." : "Top 3 – automatisch aktualisiert."}</p></div></div><div class="grid live-leaderboard-sections">${leaderboardSections(3).map((section) => `<div><h4>${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
               </div>
             </div>
           ` : ""}
