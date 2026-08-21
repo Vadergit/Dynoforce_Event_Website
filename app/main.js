@@ -478,10 +478,9 @@ function getCompletedAttemptsCount() {
 
 function getLiveStatusHint() {
   const hasParticipant = Boolean(state.liveEntry.firstName && state.liveEntry.lastName);
-  if (!hasParticipant) return "Vorname und Name eingeben. Die Kraft wird angezeigt, aber noch nicht gewertet.";
+  if (!hasParticipant) return "";
   if (!state.liveEntry.readyForAttempt) return "Kraft vollständig lösen – danach startet die Wertung frisch bei 0 Versuchen.";
-  if (state.liveEntry.attempts.length) return "Die Resultate werden nach dem letzten Versuch automatisch gespeichert.";
-  return "Bereit für den ersten gewerteten Versuch.";
+  return "";
 }
 
 function getDisplayForceValue() {
@@ -2492,7 +2491,12 @@ function updateLiveMeasurementDom() {
   setText("liveAttemptDisplay", `Versuche ${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
-  setText("liveSaveHint", getLiveStatusHint());
+  const liveSaveHint = document.getElementById("liveSaveHint");
+  if (liveSaveHint) {
+    const hint = getLiveStatusHint();
+    liveSaveHint.textContent = hint;
+    liveSaveHint.hidden = !hint;
+  }
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -3218,7 +3222,7 @@ function template(page) {
                     </div>
                     <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                     ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
-                    <p class="muted live-save-hint" id="liveSaveHint">${getLiveStatusHint()}</p>
+                    <p class="muted live-save-hint" id="liveSaveHint" ${getLiveStatusHint() ? "" : "hidden"}>${getLiveStatusHint()}</p>
                   </div>
                   <div class="measurement-divider"></div>
                   <div class="participant-entry-card">
