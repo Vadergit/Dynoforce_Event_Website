@@ -118,6 +118,7 @@ const state = {
     lastName: "",
     attempts: [],
   },
+  lastCompletedResult: null,
   dashboardLoaded: false,
   publicEventsLoaded: false,
   eventLoaded: false,
@@ -580,6 +581,39 @@ function getLivePlacement() {
   return `#${betterResults + 1}`;
 }
 
+function getResultPlacement(value, direction) {
+  const normalizedDirection = direction || "neutral";
+  const comparableResults = normalizeForceMode(state.event.forceMode) === "Beide"
+    ? state.results.filter((entry) => resultDirectionKey(entry) === normalizedDirection)
+    : state.results;
+  const betterResults = comparableResults.filter((entry) => Number(entry.value || 0) > Number(value || 0)).length;
+  return `#${betterResults + 1}`;
+}
+
+function lastCompletedResultMarkup() {
+  const result = state.lastCompletedResult;
+  if (!result || result.eventId !== state.event.id) return "";
+  const leaderboardValueDiffers = Number(result.leaderboardValue || 0) > Number(result.value || 0);
+  return `
+    <div class="last-result-strip ${leaderboardValueDiffers ? "has-ranking-value" : ""}" aria-live="polite">
+      <div class="last-result-person">
+        <small>Letztes Resultat</small>
+        <strong>${result.participantName}</strong>
+        <span>${formatDirectionLabel(result.direction)}</span>
+      </div>
+      <div>
+        <small>Letzter Versuch</small>
+        <strong>${Number(result.value || 0).toFixed(1)} kg</strong>
+      </div>
+      ${leaderboardValueDiffers ? `<div><small>Ranglistenwert</small><strong>${Number(result.leaderboardValue || 0).toFixed(1)} kg</strong></div>` : ""}
+      <div>
+        <small>Platzierung</small>
+        <strong>${result.placement}</strong>
+      </div>
+    </div>
+  `;
+}
+
 function getFinalAttemptValue(attempts) {
   if (!attempts.length) return 0;
   if (state.event.scoringMode === "Durchschnitt") {
@@ -886,6 +920,15 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     const existingResult = findExistingParticipantResult(firstName, lastName, participantName, finalDirection);
     if (existingResult && finalValue <= Number(existingResult.value || 0)) {
       const savedName = participantName;
+      const leaderboardValue = Number(existingResult.value || 0);
+      state.lastCompletedResult = {
+        eventId: state.event.id,
+        participantName: savedName,
+        value: finalValue,
+        leaderboardValue,
+        direction: finalDirection,
+        placement: getResultPlacement(leaderboardValue, finalDirection),
+      };
       resetLiveEntryState();
       if (playCompletionSound) {
         void playCompletionMelody();
@@ -944,6 +987,15 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     }
     state.event.participantCount = state.results.length;
     await syncEventParticipantCount(state.results.length);
+
+    state.lastCompletedResult = {
+      eventId: state.event.id,
+      participantName: savedName,
+      value: finalValue,
+      leaderboardValue: finalValue,
+      direction: finalDirection,
+      placement: getResultPlacement(finalValue, finalDirection),
+    };
 
     resetLiveEntryState();
     if (playCompletionSound) {
@@ -1483,6 +1535,9 @@ async function subscribeToEvent(eventId) {
   state.eventBrandingReady = false;
   state.eventBrandingAssetKey = "";
   state.loadingEventId = eventId;
+  if (state.lastCompletedResult?.eventId !== eventId) {
+    state.lastCompletedResult = null;
+  }
   if (!hydrateResultsFromCache(eventId)) {
     setResults([], { loaded: false, eventId, cache: false });
   }
@@ -3107,11 +3162,12 @@ function template(page) {
                       <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
                       <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
                     </div>
+                    ${lastCompletedResultMarkup()}
                   </div>
                 </div>
               </div>
               <div class="grid live-side-column">
-                <div class="card live-qr-card"><div class="card-header"><div><h3>Zuschauer QR-Code</h3><p>Event live auf dem eigenen Gerät verfolgen.</p></div></div><div class="qr-block"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><p class="muted">Leaderboard und Resultate direkt öffnen.</p></div></div></div>
+                <div class="card live-qr-card"><div class="live-qr-row"><div class="live-qr-copy"><h3>Zuschauer QR-Code</h3><p>Event live auf dem eigenen Gerät verfolgen.</p><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><span>Leaderboard und Resultate direkt öffnen.</span></div><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a></div></div>
                 <div class="card live-leaderboard-card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Top 3 für Ziehen und Drücken." : "Top 3 – automatisch aktualisiert."}</p></div></div><div class="grid live-leaderboard-sections">${leaderboardSections(3).map((section) => `<div><h4>${section.title}</h4><table>${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
               </div>
             </div>
