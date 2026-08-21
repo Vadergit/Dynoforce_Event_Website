@@ -117,6 +117,8 @@ const state = {
     firstName: "",
     lastName: "",
     attempts: [],
+    participantKey: "",
+    readyForAttempt: false,
   },
   lastCompletedResult: null,
   dashboardLoaded: false,
@@ -426,8 +428,31 @@ function readLiveParticipantInputs() {
   return { firstName, lastName, participantName: [firstName, lastName].filter(Boolean).join(" ").trim() };
 }
 
+function resetAttemptsForParticipantChange() {
+  state.liveEntry.attempts = [];
+  state.currentAttempt = 1;
+  state.peak = 0;
+  state.rawPeak = 0;
+  state.peakDirection = "neutral";
+  state.lockedMode = null;
+  state.isInAttempt = false;
+  state.previousForce = state.currentForce;
+  state.wentBelowThreshold = false;
+}
+
 function syncLiveEntryFromInputs() {
   const { firstName, lastName } = readLiveParticipantInputs();
+  const participantKey = firstName && lastName
+    ? normalizeParticipantNameForMatch(firstName, lastName)
+    : "";
+  const identityChanged = participantKey !== state.liveEntry.participantKey;
+
+  if (identityChanged) {
+    resetAttemptsForParticipantChange();
+    state.liveEntry.participantKey = participantKey;
+    state.liveEntry.readyForAttempt = Boolean(participantKey) && state.currentForce < ATTEMPT_END_THRESHOLD;
+  }
+
   state.liveEntry.firstName = firstName;
   state.liveEntry.lastName = lastName;
 }
@@ -448,6 +473,14 @@ function getParticipantNameParts() {
 
 function getCompletedAttemptsCount() {
   return Math.min(state.liveEntry.attempts?.length || 0, state.event.attempts || 0);
+}
+
+function getLiveStatusHint() {
+  const hasParticipant = Boolean(state.liveEntry.firstName && state.liveEntry.lastName);
+  if (!hasParticipant) return "Vorname und Name eingeben. Die Kraft wird angezeigt, aber noch nicht gewertet.";
+  if (!state.liveEntry.readyForAttempt) return "Kraft vollständig lösen – danach startet die Wertung frisch bei 0 Versuchen.";
+  if (state.liveEntry.attempts.length) return "Die Resultate werden nach dem letzten Versuch automatisch gespeichert.";
+  return "Bereit für den ersten gewerteten Versuch.";
 }
 
 function getDisplayForceValue() {
@@ -577,8 +610,9 @@ function findExistingParticipantResult(firstName, lastName, participantName, for
 function getLivePlacement() {
   const measuredValue = getMeasuredValue();
   if (measuredValue < PEAK_MINIMUM_THRESHOLD) return "—";
-  const betterResults = state.results.filter((entry) => Number(entry.value || 0) > measuredValue).length;
-  return `#${betterResults + 1}`;
+  const direction = state.lockedMode || state.forceDirection;
+  if (direction !== "pull" && direction !== "push") return "—";
+  return getResultPlacement(measuredValue, direction);
 }
 
 function getResultPlacement(value, direction) {
@@ -599,10 +633,10 @@ function lastCompletedResultMarkup() {
       <div class="last-result-person">
         <small>Letztes Resultat</small>
         <strong>${result.participantName}</strong>
-        <span>${formatDirectionLabel(result.direction)}</span>
+        <span>${result.direction === "pull" ? "Zug" : result.direction === "push" ? "Druck" : "Neutral"}</span>
       </div>
       <div>
-        <small>Letzter Versuch</small>
+        <small>Bester Versuch</small>
         <strong>${Number(result.value || 0).toFixed(1)} kg</strong>
       </div>
       ${leaderboardValueDiffers ? `<div><small>Ranglistenwert</small><strong>${Number(result.leaderboardValue || 0).toFixed(1)} kg</strong></div>` : ""}
@@ -629,6 +663,8 @@ function resetLiveEntryState() {
   state.liveEntry.firstName = "";
   state.liveEntry.lastName = "";
   state.liveEntry.attempts = [];
+  state.liveEntry.participantKey = "";
+  state.liveEntry.readyForAttempt = false;
   state.currentAttempt = 1;
   state.currentForce = 0;
   state.signedForce = 0;
@@ -2432,7 +2468,7 @@ function updateLiveMeasurementDom() {
   setText("liveAttemptDisplay", `Versuche ${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
-  setText("liveSaveHint", state.liveEntry.attempts.length ? "Die Resultate werden nach dem letzten Versuch automatisch gespeichert." : "Bereit für den nächsten Versuch.");
+  setText("liveSaveHint", getLiveStatusHint());
 
   const progressBar = document.getElementById("liveProgressBar");
   if (progressBar) {
@@ -2449,7 +2485,12 @@ function processAttemptDetectionTick() {
   const direction = state.lockedMode || state.forceDirection;
   const { firstName, lastName } = getParticipantNameParts();
   const hasParticipant = Boolean(firstName && lastName);
-  const canTrackAttempt = hasParticipant && (direction === "neutral" ? normalizeForceMode(state.event.forceMode) === "Beide" : isDirectionAllowed(direction));
+  if (hasParticipant && !state.liveEntry.readyForAttempt && absForce < ATTEMPT_END_THRESHOLD) {
+    state.liveEntry.readyForAttempt = true;
+  }
+  const canTrackAttempt = hasParticipant
+    && state.liveEntry.readyForAttempt
+    && (direction === "neutral" ? normalizeForceMode(state.event.forceMode) === "Beide" : isDirectionAllowed(direction));
 
   if (!state.isInAttempt && absForce >= ATTEMPT_START_THRESHOLD && canTrackAttempt) {
     state.isInAttempt = true;
@@ -3147,7 +3188,7 @@ function template(page) {
                     <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Bester Versuch</span><strong id="liveRecordValue">${Number(record).toFixed(1)} kg</strong></div><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
                     <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                     ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
-                    <p class="muted live-save-hint" id="liveSaveHint">${state.liveEntry.attempts.length ? "Die Resultate werden nach dem letzten Versuch automatisch gespeichert." : "Bereit für den nächsten Versuch."}</p>
+                    <p class="muted live-save-hint" id="liveSaveHint">${getLiveStatusHint()}</p>
                   </div>
                   <div class="measurement-divider"></div>
                   <div class="participant-entry-card">
