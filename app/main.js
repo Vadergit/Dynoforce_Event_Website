@@ -148,6 +148,7 @@ const state = {
     infoCharacteristic: null,
     reconnectTimer: null,
     autoReconnectEnabled: true,
+    autoReconnectInFlight: false,
     reconnectAttempted: false,
   },
   event: {
@@ -1361,6 +1362,7 @@ function onStateCharacteristicChanged(event) {
 }
 
 async function openBleConnection(device, { silent = false } = {}) {
+  device.removeEventListener("gattserverdisconnected", onBluetoothDisconnected);
   device.addEventListener("gattserverdisconnected", onBluetoothDisconnected);
   const server = await device.gatt.connect();
   const service = await server.getPrimaryService(BLE.serviceUuid);
@@ -1396,7 +1398,7 @@ async function connectToDevice(deviceOverride = null, options = {}) {
   if (!navigator.bluetooth) {
     setError("Web Bluetooth ist in diesem Browser nicht verfügbar. Bitte Chrome oder Edge verwenden.");
     render();
-    return;
+    return false;
   }
   try {
     clearReconnectTimer();
@@ -1408,17 +1410,26 @@ async function connectToDevice(deviceOverride = null, options = {}) {
     render();
     await openBleConnection(device, options);
     render();
+    return true;
   } catch (error) {
     disconnectCleanup();
     if (!options.silent) {
       setError(error instanceof Error ? error.message : String(error));
     }
     render();
+    return false;
   }
 }
 
 async function attemptAutoReconnect() {
-  if (!state.ble.autoReconnectEnabled || !navigator.bluetooth?.getDevices || state.connected || state.connecting) return;
+  if (
+    !state.ble.autoReconnectEnabled
+    || !navigator.bluetooth?.getDevices
+    || state.connected
+    || state.connecting
+    || state.ble.autoReconnectInFlight
+  ) return;
+  state.ble.autoReconnectInFlight = true;
   try {
     const devices = await navigator.bluetooth.getDevices();
     const preferredDeviceId = getPreferredBleDeviceId();
@@ -1429,14 +1440,23 @@ async function attemptAutoReconnect() {
       scheduleAutoReconnect(5000);
       return;
     }
-    await connectToDevice(candidate, { silent: true });
-    if (state.connected) {
+    const connected = await connectToDevice(candidate, { silent: true });
+    if (connected && state.connected) {
       setFlash(`DynoGrip automatisch verbunden${candidate.name ? `: ${candidate.name}` : ""}.`);
       render();
+    } else {
+      scheduleAutoReconnect(5000);
     }
   } catch {
     scheduleAutoReconnect(5000);
+  } finally {
+    state.ble.autoReconnectInFlight = false;
   }
+}
+
+function resumeAutoReconnect() {
+  if (document.visibilityState === "hidden" || !state.user) return;
+  void attemptAutoReconnect();
 }
 
 async function disconnectDevice() {
@@ -2459,7 +2479,6 @@ function updateLiveMeasurementDom() {
   setText("liveForceValue", getDisplayForceValue().toFixed(1));
   setText("livePlacementValue", getLivePlacement());
   setText("liveDirectionValue", formatDirectionLabel(state.forceDirection));
-  setText("liveMeasuredValue", `${getMeasuredValue().toFixed(1)} kg`);
   setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
   setText("liveConnectionValue", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
   setText("liveBatteryValue", getDeviceBatteryLabel());
@@ -3189,7 +3208,7 @@ function template(page) {
                 <div class="card measurement-work-card">
                   <div class="measurement-section">
                     <div class="card-header"><div><h3>Live-Messung</h3><p>Die Versuche werden automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
-                    <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div><div class="metric-line"><span>Aktueller Messwert</span><strong id="liveMeasuredValue">${getMeasuredValue().toFixed(1)} kg</strong></div></div></div>
+                    <div class="measure-wrap"><div><div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit"> kg</span></div><div class="progress"><div class="progress-bar" id="liveProgressBar" style="width:${Math.max(8, Math.min(100, getDisplayForceValue()))}%"></div></div></div><div class="metric-list"><div class="metric-line"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div></div></div>
                     <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
                     ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
                     <p class="muted live-save-hint" id="liveSaveHint">${getLiveStatusHint()}</p>
@@ -3742,6 +3761,9 @@ try {
 }
 
 window.addEventListener("popstate", routeAndLoad);
+window.addEventListener("focus", resumeAutoReconnect);
+window.addEventListener("online", resumeAutoReconnect);
+document.addEventListener("visibilitychange", resumeAutoReconnect);
 await routeAndLoad();
 
 setInterval(() => {
