@@ -1648,6 +1648,23 @@ table {
   border-collapse: collapse;
 }
 
+table col.rank-column {
+  width: 10%;
+}
+
+table col.name-column {
+  width: 42%;
+}
+
+table col.direction-column,
+table col.result-column {
+  width: 24%;
+}
+
+.leaderboard-table {
+  table-layout: fixed;
+}
+
 th,
 td {
   text-align: left;
@@ -1662,8 +1679,8 @@ td:last-child {
 
 th.direction-column,
 td.direction-column {
-  width: 22%;
   text-align: right;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
