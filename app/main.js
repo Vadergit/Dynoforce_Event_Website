@@ -98,6 +98,9 @@ const state = {
   signedForce: 0,
   peak: 0,
   rawPeak: 0,
+  placementPreviewPeak: 0,
+  placementPreviewDirection: "neutral",
+  placementPreviewInAttempt: false,
   forceDirection: "neutral",
   peakDirection: "neutral",
   lockedMode: null,
@@ -439,6 +442,7 @@ function resetAttemptsForParticipantChange() {
   state.isInAttempt = false;
   state.previousForce = state.currentForce;
   state.wentBelowThreshold = false;
+  resetLivePlacementPreview();
 }
 
 function syncLiveEntryFromInputs() {
@@ -608,11 +612,17 @@ function findExistingParticipantResult(firstName, lastName, participantName, for
 }
 
 function getLivePlacement() {
-  const measuredValue = getMeasuredValue();
+  const measuredValue = state.placementPreviewPeak;
   if (measuredValue < PEAK_MINIMUM_THRESHOLD) return "—";
-  const direction = state.lockedMode || state.forceDirection;
+  const direction = state.placementPreviewDirection;
   if (direction !== "pull" && direction !== "push") return "—";
   return getResultPlacement(measuredValue, direction);
+}
+
+function resetLivePlacementPreview() {
+  state.placementPreviewPeak = 0;
+  state.placementPreviewDirection = "neutral";
+  state.placementPreviewInAttempt = false;
 }
 
 function getResultPlacement(value, direction) {
@@ -670,6 +680,7 @@ function resetLiveEntryState() {
   state.signedForce = 0;
   state.peak = 0;
   state.rawPeak = 0;
+  resetLivePlacementPreview();
   state.peakDirection = "neutral";
   state.forceDirection = "neutral";
   state.lockedMode = null;
@@ -1272,6 +1283,7 @@ function disconnectCleanup() {
   state.ble.stateCharacteristic = null;
   state.ble.commandCharacteristic = null;
   state.ble.infoCharacteristic = null;
+  resetLivePlacementPreview();
 }
 
 function getPreferredBleDeviceId() {
@@ -1344,6 +1356,19 @@ function onStateCharacteristicChanged(event) {
   state.currentForce = absForce;
   state.forceDirection = direction;
   state.rawPeak = Math.abs(signedForce) > Math.abs(state.rawPeak) && absForce >= PEAK_MINIMUM_THRESHOLD ? signedForce : state.rawPeak;
+
+  if (!state.placementPreviewInAttempt && absForce >= ATTEMPT_START_THRESHOLD) {
+    state.placementPreviewPeak = absForce;
+    state.placementPreviewDirection = direction;
+    state.placementPreviewInAttempt = true;
+  } else if (state.placementPreviewInAttempt && absForce > state.placementPreviewPeak) {
+    state.placementPreviewPeak = absForce;
+    state.placementPreviewDirection = direction;
+  }
+
+  if (state.placementPreviewInAttempt && absForce < ATTEMPT_END_THRESHOLD) {
+    state.placementPreviewInAttempt = false;
+  }
 
   if (state.lockedMode === null && absForce >= MODE_LOCK_THRESHOLD && direction !== "neutral") {
     state.lockedMode = direction;
@@ -3211,7 +3236,7 @@ function template(page) {
               <div class="grid live-primary-column">
                 <div class="card measurement-work-card">
                   <div class="measurement-section">
-                    <div class="card-header"><div><h3>Live-Messung</h3><p>Die Versuche werden automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
+                    <div class="card-header"><div><h3>Live-Messung</h3><p>Nach Eingabe von Vor- und Nachname werden die Versuche automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
                     <div class="live-force-hero">
                       <div class="live-force-main">
                         <span class="live-force-eyebrow">Aktuelle Kraft</span>
