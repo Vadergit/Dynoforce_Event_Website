@@ -20,6 +20,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import QRCode from "qrcode";
@@ -602,10 +603,10 @@ function normalizeParticipantNameForMatch(firstName, lastName, participantName =
     .trim();
 }
 
-function findExistingParticipantResult(firstName, lastName, participantName, forceMode) {
+function findExistingParticipantResult(firstName, lastName, participantName, forceMode, results = state.results) {
   const targetName = normalizeParticipantNameForMatch(firstName, lastName, participantName);
   if (!targetName) return null;
-  return state.results.find((entry) => {
+  return results.find((entry) => {
     const entryName = normalizeParticipantNameForMatch(entry.firstName, entry.lastName, entry.participantName || entry.name);
     return entryName === targetName && resultDirectionKey(entry) === forceMode;
   }) || null;
@@ -637,23 +638,22 @@ function getResultPlacement(value, direction) {
 function lastCompletedResultMarkup() {
   const result = state.lastCompletedResult;
   if (!result || result.eventId !== state.event.id) return "";
-  const leaderboardValueDiffers = Number(result.leaderboardValue || 0) > Number(result.value || 0);
+  const directionResults = result.directionResults?.length ? result.directionResults : [result];
+  const directionLabel = directionResults
+    .map((entry) => (entry.direction === "pull" ? "Zug" : entry.direction === "push" ? "Druck" : "Neutral"))
+    .join(" & ");
   return `
-    <div class="last-result-strip ${leaderboardValueDiffers ? "has-ranking-value" : ""}" aria-live="polite">
+    <div class="last-result-strip" aria-live="polite">
       <div class="last-result-person">
         <small>Letztes Resultat</small>
         <strong>${result.participantName}</strong>
-        <span>${result.direction === "pull" ? "Zug" : result.direction === "push" ? "Druck" : "Neutral"}</span>
+        <span>${directionLabel}</span>
       </div>
-      <div>
-        <small>Bester Versuch</small>
-        <strong>${Number(result.value || 0).toFixed(1)} kg</strong>
-      </div>
-      ${leaderboardValueDiffers ? `<div><small>Ranglistenwert</small><strong>${Number(result.leaderboardValue || 0).toFixed(1)} kg</strong></div>` : ""}
-      <div>
-        <small>Platzierung</small>
-        <strong>${result.placement}</strong>
-      </div>
+      ${directionResults.map((entry) => {
+        const label = entry.direction === "pull" ? "Zug" : entry.direction === "push" ? "Druck" : "Versuch";
+        const leaderboardValueDiffers = Number(entry.leaderboardValue || 0) > Number(entry.value || 0);
+        return `<div><small>Bester ${label}</small><strong>${Number(entry.value || 0).toFixed(1)} kg</strong><span>${leaderboardValueDiffers ? `Rangliste ${Number(entry.leaderboardValue || 0).toFixed(1)} kg · ` : ""}${entry.placement}</span></div>`;
+      }).join("")}
     </div>
   `;
 }
@@ -667,6 +667,31 @@ function getFinalAttemptValue(attempts) {
     return attempts[attempts.length - 1].value;
   }
   return Math.max(...attempts.map((attempt) => attempt.value));
+}
+
+function getDirectionalResultGroups(attempts) {
+  if (normalizeForceMode(state.event.forceMode) !== "Beide") {
+    const direction = attempts.map((attempt) => attempt.direction).filter(Boolean).at(-1)
+      || state.lockedMode
+      || getSelectedForceModeKey();
+    return [{
+      direction,
+      attempts,
+      finalValue: Number(getFinalAttemptValue(attempts).toFixed(1)),
+    }];
+  }
+
+  return ["pull", "push"]
+    .map((direction) => {
+      const directionalAttempts = attempts.filter((attempt) => attempt.direction === direction);
+      if (!directionalAttempts.length) return null;
+      return {
+        direction,
+        attempts: directionalAttempts,
+        finalValue: Number(Math.max(...directionalAttempts.map((attempt) => attempt.value)).toFixed(1)),
+      };
+    })
+    .filter(Boolean);
 }
 
 function resetLiveEntryState() {
@@ -952,9 +977,8 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     return false;
   }
 
-  const directions = attempts.map((attempt) => attempt.direction).filter(Boolean);
-  const finalDirection = directions[directions.length - 1] || state.lockedMode || getSelectedForceModeKey();
-  if (!isDirectionAllowed(finalDirection)) {
+  const resultGroups = getDirectionalResultGroups(attempts);
+  if (!resultGroups.length || resultGroups.some((group) => !isDirectionAllowed(group.direction))) {
     setError("Die erfassten Versuche passen nicht zur gewählten Richtung.");
     render();
     return false;
@@ -962,75 +986,76 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
 
   try {
     await ensureEventWritable();
-
-    const finalValue = Number(getFinalAttemptValue(attempts).toFixed(1));
-    const existingResult = findExistingParticipantResult(firstName, lastName, participantName, finalDirection);
-    if (existingResult && finalValue <= Number(existingResult.value || 0)) {
-      const savedName = participantName;
-      const leaderboardValue = Number(existingResult.value || 0);
-      state.lastCompletedResult = {
-        eventId: state.event.id,
-        participantName: savedName,
-        value: finalValue,
-        leaderboardValue,
-        direction: finalDirection,
-        placement: getResultPlacement(leaderboardValue, finalDirection),
-      };
-      resetLiveEntryState();
-      if (playCompletionSound) {
-        void playCompletionMelody();
-      }
-      setFlash(`${savedName} bleibt mit ${Number(existingResult.value || 0).toFixed(1)} kg in der Rangliste. Neuer Versuch: ${finalValue.toFixed(1)} kg.`);
-      render();
-      return true;
-    }
-
-    const resultPayload = {
-      eventId: state.event.id,
-      ownerUid: state.user.uid,
-      firstName,
-      lastName,
-      participantName,
-      value: finalValue,
-      unit: "kg",
-      forceMode: finalDirection,
-      attemptNumber: attempts.length,
-      attemptsCompleted: attempts.length,
-      attemptsValues: attempts.map((attempt) => Number(attempt.value.toFixed(1))),
-      scoringMode: state.event.scoringMode,
-    };
     const savedName = participantName;
+    const batch = writeBatch(db);
+    let pendingWrites = 0;
+    let nextResults = [...state.results];
+    const directionResults = [];
 
-    if (existingResult) {
-      const updatedPayload = {
-        ...resultPayload,
-        createdAt: existingResult.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        previousBestValue: Number(existingResult.value || 0),
+    for (const group of resultGroups) {
+      const existingResult = findExistingParticipantResult(
+        firstName,
+        lastName,
+        participantName,
+        group.direction,
+        nextResults,
+      );
+      const leaderboardValue = Math.max(group.finalValue, Number(existingResult?.value || 0));
+      const resultPayload = {
+        eventId: state.event.id,
+        ownerUid: state.user.uid,
+        firstName,
+        lastName,
+        participantName,
+        value: group.finalValue,
+        unit: "kg",
+        forceMode: group.direction,
+        attemptNumber: group.attempts.length,
+        attemptsCompleted: group.attempts.length,
+        attemptsValues: group.attempts.map((attempt) => Number(attempt.value.toFixed(1))),
+        scoringMode: "Bester Versuch",
       };
-      await updateDoc(doc(db, "results", existingResult.id), updatedPayload);
-      setResults(state.results.map((entry) => (entry.id === existingResult.id
-        ? {
-          ...entry,
-          ...resultPayload,
-          updatedAt: new Date(),
-          previousBestValue: Number(existingResult.value || 0),
-        }
-        : entry)));
-    } else {
-      const createdPayload = {
-        ...resultPayload,
-        createdAt: serverTimestamp(),
-      };
-      const resultRef = await addDoc(collection(db, "results"), createdPayload);
-      setResults([
-        ...state.results,
-        {
+
+      if (!existingResult) {
+        const resultRef = doc(collection(db, "results"));
+        const createdPayload = { ...resultPayload, createdAt: serverTimestamp() };
+        batch.set(resultRef, createdPayload);
+        pendingWrites += 1;
+        nextResults.push({
           id: resultRef.id,
           ...createdPayload,
           createdAt: new Date(),
-        },
-      ]);
+        });
+      } else if (group.finalValue > Number(existingResult.value || 0)) {
+        const updatedPayload = {
+          ...resultPayload,
+          createdAt: existingResult.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          previousBestValue: Number(existingResult.value || 0),
+        };
+        batch.update(doc(db, "results", existingResult.id), updatedPayload);
+        pendingWrites += 1;
+        nextResults = nextResults.map((entry) => (entry.id === existingResult.id
+          ? {
+            ...entry,
+            ...resultPayload,
+            updatedAt: new Date(),
+            previousBestValue: Number(existingResult.value || 0),
+          }
+          : entry));
+      }
+
+      directionResults.push({
+        value: group.finalValue,
+        leaderboardValue,
+        direction: group.direction,
+        placement: getResultPlacement(leaderboardValue, group.direction),
+      });
+    }
+
+    if (pendingWrites) {
+      await batch.commit();
+      setResults(nextResults);
     }
     state.event.participantCount = state.results.length;
     await syncEventParticipantCount(state.results.length);
@@ -1038,19 +1063,17 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     state.lastCompletedResult = {
       eventId: state.event.id,
       participantName: savedName,
-      value: finalValue,
-      leaderboardValue: finalValue,
-      direction: finalDirection,
-      placement: getResultPlacement(finalValue, finalDirection),
+      directionResults,
     };
 
     resetLiveEntryState();
     if (playCompletionSound) {
       void playCompletionMelody();
     }
-    setFlash(existingResult
-      ? `Resultat verbessert: ${savedName} · ${finalValue.toFixed(1)} kg`
-      : `Resultat gespeichert: ${savedName} · ${finalValue.toFixed(1)} kg`);
+    const resultSummary = directionResults
+      .map((result) => `${result.direction === "pull" ? "Zug" : "Druck"} ${result.value.toFixed(1)} kg`)
+      .join(" · ");
+    setFlash(`${pendingWrites ? "Resultat gespeichert" : "Resultat ausgewertet"}: ${savedName} · ${resultSummary}`);
     render();
     return true;
   } catch (error) {
