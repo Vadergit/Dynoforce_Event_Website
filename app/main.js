@@ -2337,12 +2337,12 @@ async function downloadPdf() {
 
 function leaderboardTable(items, limit) {
   return `
-    <tr><th>#</th><th>Name</th><th>Richtung</th><th>Resultat</th></tr>
+    <tr><th>#</th><th>Name</th><th class="direction-column">Richtung</th><th>Resultat</th></tr>
     ${items.slice(0, limit).map((item, index) => `
       <tr>
         <td><span class="rank-pill">${medalForRank(index)}</span></td>
         <td>${item.participantName || item.name}</td>
-        <td>${formatEntryDirection(item)}</td>
+        <td class="direction-column">${formatEntryDirection(item)}</td>
         <td>${Number(item.value).toFixed(1)} kg</td>
       </tr>
     `).join("")}
