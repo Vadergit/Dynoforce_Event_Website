@@ -656,11 +656,9 @@ a {
   align-items: center;
   margin-top: 14px;
   padding: 14px 18px 12px;
-  border: 1px solid rgba(31, 79, 70, 0.2);
-  border-left: 6px solid var(--primary);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(31, 79, 70, 0.09), rgba(255, 255, 255, 0.88));
-  box-shadow: 0 12px 28px rgba(31, 79, 70, 0.08);
+  background: var(--surface-muted);
 }
 
 .live-force-main {
