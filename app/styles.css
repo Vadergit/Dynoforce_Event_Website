@@ -624,6 +624,144 @@ a {
   margin-bottom: 18px;
 }
 
+.live-compact {
+  gap: 14px;
+  align-items: start;
+}
+
+.live-compact .grid {
+  gap: 12px;
+}
+
+.live-compact .card {
+  padding: 18px;
+}
+
+.live-compact .card-header {
+  margin-bottom: 12px;
+}
+
+.live-compact .card-header p {
+  margin: 4px 0 0;
+}
+
+.live-compact .measurement-work-card {
+  padding: 20px;
+}
+
+.live-compact .measure-wrap {
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+}
+
+.live-compact .force-value {
+  font-size: 88px;
+}
+
+.live-compact .progress {
+  margin-top: 12px;
+}
+
+.live-compact .metric-line {
+  padding: 9px 0;
+}
+
+.live-compact .metric-line strong {
+  font-size: 22px;
+}
+
+.live-compact .mini-stats {
+  margin-top: 12px;
+  gap: 10px;
+}
+
+.live-compact .mini-card {
+  padding: 12px 14px;
+}
+
+.live-compact .mini-card small {
+  margin-bottom: 5px;
+}
+
+.live-compact .mini-card strong {
+  font-size: 21px;
+}
+
+.live-save-hint {
+  margin: 10px 0 0;
+}
+
+.live-compact .measurement-divider {
+  margin: 14px -20px;
+}
+
+.live-compact .participant-entry-head {
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.live-compact .participant-entry-head h3 {
+  margin: 2px 0 0;
+  font-size: 22px;
+}
+
+.live-compact .participant-entry-head p {
+  font-size: 14px;
+  text-align: right;
+}
+
+.live-compact .participant-fields {
+  padding: 10px;
+  border-radius: 15px;
+}
+
+.live-compact .participant-fields .field label {
+  font-size: 15px;
+}
+
+.live-compact .participant-fields .field input {
+  min-height: 46px;
+  padding: 9px 12px;
+  font-size: 16px;
+}
+
+.live-side-column {
+  gap: 12px;
+}
+
+.live-qr-card .qr {
+  width: 96px;
+  min-width: 96px;
+  border-radius: 14px;
+}
+
+.live-qr-card .qr-block {
+  gap: 14px;
+}
+
+.live-qr-card .qr-block p {
+  margin: 6px 0 0;
+}
+
+.live-leaderboard-sections {
+  gap: 10px;
+}
+
+.live-leaderboard-sections h4 {
+  margin: 0 0 4px;
+}
+
+.live-leaderboard-card th,
+.live-leaderboard-card td {
+  padding: 7px 5px;
+}
+
+.live-leaderboard-card .rank-pill {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+}
+
 .upload-hint {
   margin-top: 10px;
   padding: 12px 14px;
@@ -1667,6 +1805,14 @@ th {
     font-size: 72px;
   }
 
+  .live-compact .measure-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .live-compact .force-value {
+    font-size: 72px;
+  }
+
   .display-title {
     font-size: 38px;
   }
@@ -1850,6 +1996,16 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
   .content,
   .focus-shell .content {
     padding: 10px;
+  }
+
+  .live-compact .participant-entry-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .live-compact .participant-entry-head p {
+    text-align: left;
   }
 
   .focus-shell .content-inner,
