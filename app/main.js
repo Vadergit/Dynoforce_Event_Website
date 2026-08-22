@@ -120,6 +120,8 @@ const state = {
   liveEntry: {
     firstName: "",
     lastName: "",
+    draftFirstName: "",
+    draftLastName: "",
     attempts: [],
     participantKey: "",
     readyForAttempt: false,
@@ -428,8 +430,8 @@ function isDirectionAllowed(direction) {
 function readLiveParticipantInputs() {
   const firstNameInput = document.getElementById("participantFirstNameInput");
   const lastNameInput = document.getElementById("participantLastNameInput");
-  const firstName = String(firstNameInput?.value ?? state.liveEntry.firstName ?? "").trim();
-  const lastName = String(lastNameInput?.value ?? state.liveEntry.lastName ?? "").trim();
+  const firstName = String(firstNameInput?.value ?? state.liveEntry.draftFirstName ?? "").trim();
+  const lastName = String(lastNameInput?.value ?? state.liveEntry.draftLastName ?? "").trim();
   return { firstName, lastName, participantName: [firstName, lastName].filter(Boolean).join(" ").trim() };
 }
 
@@ -446,30 +448,66 @@ function resetAttemptsForParticipantChange() {
   resetLivePlacementPreview();
 }
 
-function syncLiveEntryFromInputs() {
+function syncParticipantDraftFromInputs() {
   const { firstName, lastName } = readLiveParticipantInputs();
-  const participantKey = firstName && lastName
+  state.liveEntry.draftFirstName = firstName;
+  state.liveEntry.draftLastName = lastName;
+  return { firstName, lastName };
+}
+
+function getParticipantDraftKey() {
+  const { firstName, lastName } = syncParticipantDraftFromInputs();
+  return firstName && lastName
     ? normalizeParticipantNameForMatch(firstName, lastName)
     : "";
-  const identityChanged = participantKey !== state.liveEntry.participantKey;
+}
 
-  if (identityChanged) {
-    resetAttemptsForParticipantChange();
-    state.liveEntry.participantKey = participantKey;
-    state.liveEntry.readyForAttempt = Boolean(participantKey) && state.currentForce < ATTEMPT_END_THRESHOLD;
+function updateParticipantActivationButton() {
+  const button = document.getElementById("activateParticipantButton");
+  if (!button) return;
+
+  const participantKey = getParticipantDraftKey();
+  const isActive = Boolean(participantKey) && participantKey === state.liveEntry.participantKey;
+  button.disabled = !participantKey || isActive;
+  button.textContent = isActive ? "Teilnehmer aktiv" : "Teilnehmer aktivieren";
+}
+
+function activateParticipantFromInputs() {
+  const { firstName, lastName, participantName } = readLiveParticipantInputs();
+  if (!firstName || !lastName) {
+    setError("Bitte Vorname und Name vollständig eingeben.");
+    render();
+    return;
   }
 
+  const participantKey = normalizeParticipantNameForMatch(firstName, lastName);
+  if (participantKey === state.liveEntry.participantKey) {
+    updateParticipantActivationButton();
+    return;
+  }
+
+  resetAttemptsForParticipantChange();
   state.liveEntry.firstName = firstName;
   state.liveEntry.lastName = lastName;
+  state.liveEntry.draftFirstName = firstName;
+  state.liveEntry.draftLastName = lastName;
+  state.liveEntry.participantKey = participantKey;
+  state.liveEntry.readyForAttempt = state.currentForce < ATTEMPT_END_THRESHOLD;
+  clearError();
+  setFlash(
+    state.liveEntry.readyForAttempt
+      ? `${participantName} ist aktiv. Die Versuchserfassung ist gestartet.`
+      : `${participantName} ist aktiv. Bitte die Kraft vollständig lösen.`,
+    "success",
+  );
+  render();
 }
 
 function getLiveParticipantDisplayName() {
-  syncLiveEntryFromInputs();
   return [state.liveEntry.firstName, state.liveEntry.lastName].filter(Boolean).join(" ");
 }
 
 function getParticipantNameParts() {
-  syncLiveEntryFromInputs();
   return {
     firstName: state.liveEntry.firstName,
     lastName: state.liveEntry.lastName,
@@ -697,6 +735,8 @@ function getDirectionalResultGroups(attempts) {
 function resetLiveEntryState() {
   state.liveEntry.firstName = "";
   state.liveEntry.lastName = "";
+  state.liveEntry.draftFirstName = "";
+  state.liveEntry.draftLastName = "";
   state.liveEntry.attempts = [];
   state.liveEntry.participantKey = "";
   state.liveEntry.readyForAttempt = false;
@@ -3259,7 +3299,7 @@ function template(page) {
               <div class="grid live-primary-column">
                 <div class="card measurement-work-card">
                   <div class="measurement-section">
-                    <div class="card-header"><div><h3>Live-Messung</h3><p>Nach Eingabe von Vor- und Nachname werden die Versuche automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
+                    <div class="card-header"><div><h3>Live-Messung</h3><p>Vor- und Nachname eingeben und aktivieren. Danach werden die Versuche automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
                     <div class="live-force-hero">
                       <div class="live-force-main">
                         <span class="live-force-eyebrow">Aktuelle Kraft</span>
@@ -3279,11 +3319,12 @@ function template(page) {
                         <div class="eyebrow">Nächster Teilnehmer</div>
                         <h3>Vorname und Name eingeben</h3>
                       </div>
-                      <p>Danach kann direkt gestartet werden.</p>
+                      <p>Eingeben, aktivieren, danach messen.</p>
                     </div>
-                    <div class="field-grid two participant-fields">
-                      <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.firstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
-                      <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.lastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
+                    <div class="field-grid participant-fields">
+                      <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.draftFirstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
+                      <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.draftLastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
+                      <div class="field participant-activate-field"><label>Freigabe</label><button class="button primary participant-activate-button" id="activateParticipantButton" type="button">Teilnehmer aktivieren</button></div>
                     </div>
                     ${lastCompletedResultMarkup()}
                   </div>
@@ -3449,7 +3490,11 @@ function bindDashboardActions() {
     state.liveEntry = {
       firstName: "",
       lastName: "",
+      draftFirstName: "",
+      draftLastName: "",
       attempts: [],
+      participantKey: "",
+      readyForAttempt: false,
     };
     await saveEvent();
     syncUrl("setup", state.event.id);
@@ -3674,14 +3719,22 @@ function bindBrandingActions() {
 
 function bindLiveActions() {
   const syncParticipantInputs = () => {
-    syncLiveEntryFromInputs();
-    updateLiveMeasurementDom();
+    syncParticipantDraftFromInputs();
+    updateParticipantActivationButton();
   };
 
   root.querySelector("#participantFirstNameInput")?.addEventListener("input", syncParticipantInputs);
   root.querySelector("#participantFirstNameInput")?.addEventListener("change", syncParticipantInputs);
   root.querySelector("#participantLastNameInput")?.addEventListener("input", syncParticipantInputs);
   root.querySelector("#participantLastNameInput")?.addEventListener("change", syncParticipantInputs);
+  root.querySelector("#activateParticipantButton")?.addEventListener("click", activateParticipantFromInputs);
+  ["#participantFirstNameInput", "#participantLastNameInput"].forEach((selector) => {
+    root.querySelector(selector)?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !document.getElementById("activateParticipantButton")?.disabled) {
+        activateParticipantFromInputs();
+      }
+    });
+  });
   syncParticipantInputs();
   root.querySelector("#saveResult")?.addEventListener("click", saveLiveResult);
   root.querySelector("#closeEvent")?.addEventListener("click", async () => {
