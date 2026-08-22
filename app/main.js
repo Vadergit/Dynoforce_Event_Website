@@ -3300,15 +3300,20 @@ function template(page) {
                 <div class="card measurement-work-card">
                   <div class="measurement-section">
 <div class="card-header live-measurement-header">
-  <div>
-    <h3>So funktioniert's</h3>
-    <p><strong>1. Name eingeben &amp; aktivieren</strong> &nbsp;→&nbsp; <strong>2. ${state.event.attempts}× so kräftig wie möglich ziehen oder drücken</strong> &nbsp;→&nbsp; <strong>3. Der beste Versuch zählt</strong></p>
+  <div class="live-instructions-block">
+    <h3>Ablauf</h3>
+    <div class="live-instruction-steps">
+      <div class="live-instruction-step"><span>1</span><div><strong>Teilnehmer aktivieren</strong><small>Name eingeben und bestätigen</small></div></div>
+      <div class="live-instruction-step"><span>2</span><div><strong>${state.event.attempts} Versuche absolvieren</strong><small>So kräftig wie möglich ziehen oder drücken</small></div></div>
+      <div class="live-instruction-step"><span>3</span><div><strong>Bestwert zählt</strong><small>Der stärkste Versuch kommt in die Rangliste</small></div></div>
+    </div>
   </div>
   <div class="live-attempt-counter">
     <span>Versuche</span>
     <strong id="liveAttemptDisplay">${getCompletedAttemptsCount()} / ${state.event.attempts}</strong>
   </div>
-</div>                    <div class="live-force-hero">
+</div>
+                    <div class="live-force-hero">
                       <div class="live-force-main">
                         <span class="live-force-eyebrow">Aktuelle Kraft</span>
                         <div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit">kg</span></div>

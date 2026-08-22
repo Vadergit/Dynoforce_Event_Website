@@ -639,6 +639,69 @@ a {
   margin-bottom: 18px;
 }
 
+.live-measurement-header {
+  align-items: stretch;
+  gap: 12px;
+}
+
+.live-instructions-block {
+  min-width: 0;
+  flex: 1;
+}
+
+.live-instructions-block h3 {
+  font-size: 18px;
+}
+
+.live-instruction-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.live-instruction-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid rgba(31, 79, 70, 0.22);
+  border-radius: 13px;
+  background: var(--primary-soft);
+}
+
+.live-instruction-step > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.live-instruction-step strong,
+.live-instruction-step small {
+  display: block;
+}
+
+.live-instruction-step strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.live-instruction-step small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .live-attempt-counter {
   display: grid;
   min-width: 118px;
@@ -696,6 +759,11 @@ a {
 
 .live-compact .live-attempt-counter strong {
   font-size: 25px;
+}
+
+.live-compact .live-instruction-step {
+  min-height: 52px;
+  padding: 7px 8px;
 }
 
 .live-compact .measurement-work-card {
@@ -2201,6 +2269,19 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
 }
 
 @media (max-width: 760px) {
+  .live-measurement-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .live-instruction-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .live-attempt-counter {
+    align-self: start;
+  }
+
   .live-force-hero {
     grid-template-columns: 1fr;
     gap: 14px;
