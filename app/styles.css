@@ -587,6 +587,8 @@ a {
 }
 
 .participant-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(180px, 0.7fr);
+  align-items: end;
   padding: 16px;
   border: 1px solid rgba(31, 79, 70, 0.16);
   border-radius: 20px;
@@ -612,6 +614,19 @@ a {
   outline: 3px solid rgba(31, 79, 70, 0.2);
   border-color: #171717;
   box-shadow: 0 0 0 2px var(--primary);
+}
+
+.participant-activate-button {
+  width: 100%;
+  min-height: 58px;
+  padding-inline: 18px;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.participant-activate-button:disabled {
+  cursor: default;
+  opacity: 0.62;
 }
 
 .measurement-divider {
@@ -773,6 +788,12 @@ a {
   min-height: 46px;
   padding: 9px 12px;
   font-size: 16px;
+}
+
+.live-compact .participant-activate-button {
+  min-height: 46px;
+  padding: 9px 12px;
+  font-size: 15px;
 }
 
 .last-result-strip {
@@ -2179,6 +2200,14 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
     text-align: left;
   }
 
+  .participant-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .participant-activate-field {
+    grid-column: 1 / -1;
+  }
+
   .last-result-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2374,5 +2403,15 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
 
   .branding-live-copy h3 {
     font-size: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .participant-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .participant-activate-field {
+    grid-column: auto;
   }
 }
