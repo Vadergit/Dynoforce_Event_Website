@@ -639,6 +639,35 @@ a {
   margin-bottom: 18px;
 }
 
+.live-attempt-counter {
+  display: grid;
+  min-width: 118px;
+  padding: 10px 16px;
+  border: 2px solid var(--primary);
+  border-radius: 16px;
+  background: var(--primary);
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 8px 18px rgba(31, 79, 70, 0.2);
+}
+
+.live-attempt-counter span {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.live-attempt-counter strong {
+  margin-top: 4px;
+  color: #fff;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .live-compact {
   gap: 14px;
   align-items: start;
@@ -658,6 +687,15 @@ a {
 
 .live-compact .card-header p {
   margin: 4px 0 0;
+}
+
+.live-compact .live-attempt-counter {
+  min-width: 108px;
+  padding: 8px 14px;
+}
+
+.live-compact .live-attempt-counter strong {
+  font-size: 25px;
 }
 
 .live-compact .measurement-work-card {

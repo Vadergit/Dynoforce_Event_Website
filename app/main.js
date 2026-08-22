@@ -2576,7 +2576,7 @@ function updateLiveMeasurementDom() {
   setText("sidebarDeviceLabel", state.ble.device?.name || "Kein Gerät");
   setText("topChipLabel", getDeviceConnectionLabel());
   const completedAttempts = getCompletedAttemptsCount();
-  setText("liveAttemptDisplay", `Versuche ${completedAttempts} / ${state.event.attempts}`);
+  setText("liveAttemptDisplay", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
   const liveSaveHint = document.getElementById("liveSaveHint");
@@ -3299,7 +3299,7 @@ function template(page) {
               <div class="grid live-primary-column">
                 <div class="card measurement-work-card">
                   <div class="measurement-section">
-                    <div class="card-header"><div><h3>Live-Messung</h3><p>Vor- und Nachname eingeben und aktivieren. Danach werden die Versuche automatisch erfasst.</p></div><span id="liveAttemptDisplay">Versuche ${getCompletedAttemptsCount()} / ${state.event.attempts}</span></div>
+                    <div class="card-header live-measurement-header"><div><h3>Live-Messung</h3><p>Vor- und Nachname eingeben und aktivieren. Danach werden die Versuche automatisch erfasst.</p></div><div class="live-attempt-counter"><span>Versuche</span><strong id="liveAttemptDisplay">${getCompletedAttemptsCount()} / ${state.event.attempts}</strong></div></div>
                     <div class="live-force-hero">
                       <div class="live-force-main">
                         <span class="live-force-eyebrow">Aktuelle Kraft</span>
