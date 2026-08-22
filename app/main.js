@@ -3299,8 +3299,16 @@ function template(page) {
               <div class="grid live-primary-column">
                 <div class="card measurement-work-card">
                   <div class="measurement-section">
-                    <div class="card-header live-measurement-header"><div><h3>Live-Messung</h3><p>Vor- und Nachname eingeben und aktivieren. Danach werden die Versuche automatisch erfasst.</p></div><div class="live-attempt-counter"><span>Versuche</span><strong id="liveAttemptDisplay">${getCompletedAttemptsCount()} / ${state.event.attempts}</strong></div></div>
-                    <div class="live-force-hero">
+<div class="card-header live-measurement-header">
+  <div>
+    <h3>So funktioniert's</h3>
+    <p><strong>1. Name eingeben &amp; aktivieren</strong> &nbsp;→&nbsp; <strong>2. ${state.event.attempts}× so kräftig wie möglich ziehen oder drücken</strong> &nbsp;→&nbsp; <strong>3. Der beste Versuch zählt</strong></p>
+  </div>
+  <div class="live-attempt-counter">
+    <span>Versuche</span>
+    <strong id="liveAttemptDisplay">${getCompletedAttemptsCount()} / ${state.event.attempts}</strong>
+  </div>
+</div>                    <div class="live-force-hero">
                       <div class="live-force-main">
                         <span class="live-force-eyebrow">Aktuelle Kraft</span>
                         <div class="force-value"><span id="liveForceValue">${getDisplayForceValue().toFixed(1)}</span><span class="force-unit">kg</span></div>
