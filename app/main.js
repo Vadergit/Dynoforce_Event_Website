@@ -1167,9 +1167,15 @@ function getAuthErrorMessage(error) {
   if (code === "auth/cancelled-popup-request") return "Die Google-Anmeldung wurde durch eine neue Anfrage ersetzt.";
   if (code === "auth/unauthorized-domain") return "Die Domain ist in Firebase Authentication noch nicht als autorisierte Domain eingetragen.";
   if (code === "auth/operation-not-allowed") return "Google Login ist im Firebase-Projekt noch nicht aktiviert.";
-  if (code === "auth/invalid-credential") return "Die erhaltenen Anmeldedaten sind ungültig.";
+  if (code === "auth/invalid-credential") return "Die Anmeldedaten sind ungültig. Bitte Benutzername und Passwort prüfen.";
 
   return error?.message || "Unbekannter Firebase-Auth-Fehler.";
+}
+
+function normalizeOrganizerLogin(value) {
+  const login = String(value || "").trim().toLowerCase();
+  if (!login) return "";
+  return login.includes("@") ? login : `${login}@dynoforce.ch`;
 }
 
 function safeUnsub(key) {
@@ -2069,8 +2075,8 @@ async function saveLiveResult() {
   await finalizeParticipantResult(true);
 }
 
-async function signInEmail(email, password) {
-  await signInWithEmailAndPassword(auth, email, password);
+async function signInEmail(login, password) {
+  await signInWithEmailAndPassword(auth, normalizeOrganizerLogin(login), password);
 }
 
 async function signInGoogle() {
@@ -2669,16 +2675,16 @@ function loginCard() {
           <div>
             <div class="eyebrow">Organisator Login</div>
             <h3>Anmelden</h3>
-            <p>Mit bestehendem DynoForce Account anmelden und alle Funktionen freischalten.</p>
+            <p>Mit dem persönlichen Hallen-Zugang oder einem bestehenden DynoForce Account anmelden.</p>
           </div>
           <button class="icon-button" id="closeLoginModal" aria-label="Login schliessen">×</button>
         </div>
         <div class="field-grid">
-          <div class="field"><label>E-Mail</label><input id="loginEmail" type="email" placeholder="name@domain.ch" /></div>
+          <div class="field"><label>Benutzername oder E-Mail</label><input id="loginEmail" type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="z. B. bouba" /></div>
           <div class="field"><label>Passwort</label><input id="loginPassword" type="password" placeholder="Passwort" /></div>
         </div>
         <div class="action-row">
-          <button class="button primary" id="loginButton">Mit E-Mail anmelden</button>
+          <button class="button primary" id="loginButton">Anmelden</button>
           <button class="button" id="googleLoginButton">Mit Google anmelden</button>
         </div>
       </div>
