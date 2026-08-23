@@ -519,6 +519,16 @@ function getCompletedAttemptsCount() {
   return Math.min(state.liveEntry.attempts?.length || 0, state.event.attempts || 0);
 }
 
+function getLastCompletedAttemptValue() {
+  const attempts = state.liveEntry.attempts || [];
+  return Number(attempts.at(-1)?.value || 0);
+}
+
+function getCurrentRunScoreValue() {
+  const attempts = state.liveEntry.attempts || [];
+  return Number(getFinalAttemptValue(attempts) || 0);
+}
+
 function getLiveStatusHint() {
   const hasParticipant = Boolean(state.liveEntry.firstName && state.liveEntry.lastName);
   if (!hasParticipant) return "";
@@ -2566,7 +2576,8 @@ function updateLiveMeasurementDom() {
   setText("liveForceValue", getDisplayForceValue().toFixed(1));
   setText("livePlacementValue", getLivePlacement());
   setText("liveDirectionValue", formatDirectionLabel(state.forceDirection));
-  setText("livePeakValue", `${state.peak.toFixed(1)} kg`);
+  setText("liveLastAttemptValue", `${getLastCompletedAttemptValue().toFixed(1)} kg`);
+  setText("liveRunScoreValue", `${getCurrentRunScoreValue().toFixed(1)} kg`);
   setText("liveConnectionValue", state.connecting ? "Verbinde..." : state.connected ? "Verbunden" : "Nicht verbunden");
   setText("liveBatteryValue", getDeviceBatteryLabel());
   setText("liveSignalValue", state.deviceInfo ? `${state.signal} · FW ${state.deviceInfo.fwVersion}` : state.signal);
@@ -3321,7 +3332,7 @@ function template(page) {
                       </div>
                       <div class="live-placement-card"><span>Aktuelle Platzierung</span><strong id="livePlacementValue">${getLivePlacement()}</strong></div>
                     </div>
-                    <div class="mini-stats"><div class="mini-card"><small>Aktueller Peak</small><strong id="livePeakValue">${state.peak.toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>Wertung</small><strong>${state.event.scoringMode}</strong></div></div>
+                    <div class="mini-stats"><div class="mini-card"><small>Letzter Versuch</small><strong id="liveLastAttemptValue">${getLastCompletedAttemptValue().toFixed(1)} kg</strong></div><div class="mini-card"><small>Erfasste Versuche</small><strong id="liveCapturedAttempts">${state.liveEntry.attempts.length} / ${state.event.attempts}</strong></div><div class="mini-card"><small>${state.event.scoringMode}</small><strong id="liveRunScoreValue">${getCurrentRunScoreValue().toFixed(1)} kg</strong></div></div>
                     ${isDailyChallengeType() ? `<div class="mini-stats">${dailyWinnerCardsMarkup()}</div>` : ""}
                     <p class="muted live-save-hint" id="liveSaveHint" ${getLiveStatusHint() ? "" : "hidden"}>${getLiveStatusHint()}</p>
                   </div>
