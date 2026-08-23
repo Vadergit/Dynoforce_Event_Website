@@ -83,3 +83,20 @@ Genutzt werden:
 - Firebase Storage
 
 Die Web-App nutzt standardmässig das bestehende DynoForce Firebase-Projekt `dynoforce`.
+
+## Hallen-Zugänge und Branding-Vorlagen
+
+Für jede vorbereitete Halle gibt es einen separaten Firebase-Zugang und eine eigene, nur diesem Konto zugeordnete Branding-Vorlage. Beim Login kann entweder der kurze Benutzername oder die vollständige E-Mail-Adresse eingegeben werden:
+
+| Halle | Benutzername | E-Mail | Vorlage |
+|---|---|---|---|
+| BOUBA Boulder Baden | `bouba` | `bouba@dynoforce.ch` | BOUBA Boulder Baden |
+| BoulderLounge Schlieren | `boulderlounge` | `boulderlounge@dynoforce.ch` | BoulderLounge Schlieren |
+| GrindelBoulder Bassersdorf | `grindelboulder` | `grindelboulder@dynoforce.ch` | GrindelBoulder Bassersdorf |
+| Kraftreaktor Lenzburg/Aarau | `kraftreaktor` | `kraftreaktor@dynoforce.ch` | Kraftreaktor Lenzburg/Aarau |
+| Minimum Zürich | `minimum` | `minimum@dynoforce.ch` | Minimum Zürich |
+| MITO Bouldering Zürich | `mito` | `mito@dynoforce.ch` | MITO Bouldering Zürich |
+
+Passwörter werden absichtlich nicht im Repository gespeichert. Konten und Vorlagen lassen sich idempotent mit `npm run provision:venues` einrichten oder aktualisieren. Das Skript erwartet die Passwörter ausschliesslich zur Laufzeit in `DYNOFORCE_VENUE_PASSWORDS`, beispielsweise als JSON-Objekt mit den sechs Benutzernamen als Schlüssel.
+
+Die veröffentlichten Bilddateien liegen unter `public/branding/`. Private Schlüssel, Service-Account-Dateien und Passwörter dürfen nicht committed werden.
