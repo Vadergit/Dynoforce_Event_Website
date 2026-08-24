@@ -64,6 +64,7 @@ const DEVICE_TONES = {
     { frequency: 659, duration: 120 },
   ],
 };
+const USE_GUIDED_LIVE_UI = true;
 
 const emptyBranding = {
   eventLogo: DEFAULT_DYNOFORCE_LOGO,
@@ -127,6 +128,8 @@ const state = {
     readyForAttempt: false,
   },
   lastCompletedResult: null,
+  guidedLiveStep: "start",
+  guidedResultExpiresAt: 0,
   dashboardLoaded: false,
   publicEventsLoaded: false,
   eventLoaded: false,
@@ -205,6 +208,7 @@ const APP_BASE = (import.meta.env.BASE_URL || "/")
   .replace(/\/+$/, "");
 const PUBLIC_ORIGIN = "https://event.dynoforce.ch";
 let attemptDetectionTimer = null;
+let guidedResultCountdownTimer = null;
 
 function updateDeviceLayoutClass() {
   const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -468,8 +472,15 @@ function updateParticipantActivationButton() {
 
   const participantKey = getParticipantDraftKey();
   const isActive = Boolean(participantKey) && participantKey === state.liveEntry.participantKey;
-  button.disabled = !participantKey || isActive;
-  button.textContent = isActive ? "Teilnehmer aktiv" : "Teilnehmer aktivieren";
+  button.disabled = !participantKey
+    || isActive
+    || !isLiveOnline()
+    || (USE_GUIDED_LIVE_UI && (!state.connected || !canWriteCurrentEvent()));
+  button.textContent = isActive
+    ? "Teilnehmer aktiv"
+    : USE_GUIDED_LIVE_UI
+      ? "Bestätigen und starten"
+      : "Teilnehmer aktivieren";
 }
 
 function activateParticipantFromInputs() {
@@ -500,6 +511,9 @@ function activateParticipantFromInputs() {
       : `${participantName} ist aktiv. Bitte die Kraft vollständig lösen.`,
     "success",
   );
+  if (USE_GUIDED_LIVE_UI) {
+    state.guidedLiveStep = "attempts";
+  }
   render();
 }
 
@@ -706,6 +720,185 @@ function lastCompletedResultMarkup() {
   `;
 }
 
+function isLiveOnline() {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function canWriteCurrentEvent() {
+  return Boolean(state.user?.uid && state.event.id && state.event.ownerUid === state.user.uid);
+}
+
+function getGuidedLiveStep() {
+  if (state.guidedLiveStep === "result" && state.lastCompletedResult?.eventId === state.event.id) return "result";
+  if (state.guidedLiveStep === "attempts" && state.liveEntry.participantKey) return "attempts";
+  if (state.guidedLiveStep === "name") return "name";
+  return "start";
+}
+
+function guidedDirectionSymbol(direction) {
+  return direction === "push" ? "→ ←" : "← →";
+}
+
+function guidedAttemptCardsMarkup() {
+  const total = Math.max(1, Number(state.event.attempts || 1));
+  return Array.from({ length: total }, (_, index) => {
+    const attempt = state.liveEntry.attempts?.[index];
+    const isCurrent = !attempt && index === getCompletedAttemptsCount();
+    return `
+      <div class="guided-attempt-card ${attempt ? "is-complete" : ""} ${isCurrent ? "is-current" : ""}">
+        <span>${index + 1}</span>
+        <strong>${attempt ? `${Number(attempt.value || 0).toFixed(1)} kg` : "—"}</strong>
+        <small>${attempt ? formatDirectionLabel(attempt.direction) : isCurrent ? "Bereit" : "Offen"}</small>
+      </div>
+    `;
+  }).join("");
+}
+
+function guidedLeaderboardMarkup() {
+  return leaderboardSections(5).map((section) => `
+    <section class="guided-ranking-section">
+      <h4><span aria-hidden="true">${guidedDirectionSymbol(section.key)}</span> ${escapeHtml(section.title)}</h4>
+      <ol class="guided-ranking-list">
+        ${section.items.length ? section.items.map((entry, index) => `
+          <li>
+            <span class="guided-rank-number rank-${index + 1}">${index + 1}</span>
+            <strong>${escapeHtml(entry.participantName || entry.name || "Teilnehmer")}</strong>
+            <span>${Number(entry.value || 0).toFixed(1)} kg</span>
+          </li>
+        `).join("") : `<li class="is-empty">Noch keine Resultate</li>`}
+      </ol>
+    </section>
+  `).join("");
+}
+
+function guidedTopThreeMessage(result) {
+  const topResults = (result?.directionResults || [])
+    .map((entry) => ({ ...entry, rank: Number(String(entry.placement || "").replace("#", "")) }))
+    .filter((entry) => entry.rank >= 1 && entry.rank <= 3);
+  if (!topResults.length) return "Starker Einsatz – dein Resultat ist jetzt in der Rangliste gespeichert.";
+  const rankings = topResults
+    .map((entry) => `Rang ${entry.rank} beim ${entry.direction === "pull" ? "Ziehen" : "Drücken"}`)
+    .join(" und ");
+  return `Glückwunsch, ${escapeHtml(result.participantName || "")}! Du liegst aktuell auf ${rankings} und gehörst damit zu den Top 3.`;
+}
+
+function guidedResultMarkup() {
+  const result = state.lastCompletedResult;
+  const directionResults = result?.directionResults || [];
+  return `
+    <div class="guided-screen guided-result-screen">
+      <div class="eyebrow">Challenge abgeschlossen</div>
+      <h2>Dein Resultat</h2>
+      <p class="guided-result-name">${escapeHtml(result?.participantName || "Teilnehmer")}</p>
+      <div class="guided-result-grid">
+        ${directionResults.map((entry) => `
+          <div class="guided-result-card">
+            <span>${guidedDirectionSymbol(entry.direction)} ${formatDirectionLabel(entry.direction)}</span>
+            <strong>${Number(entry.value || 0).toFixed(1)} <small>kg</small></strong>
+            <b>${escapeHtml(entry.placement || "—")}</b>
+          </div>
+        `).join("")}
+      </div>
+      <p class="guided-congratulations">${guidedTopThreeMessage(result)}</p>
+      <button class="button primary guided-countdown-button" id="guidedReturnToStart" type="button">
+        <span id="guidedResultCountdownFill" aria-hidden="true"></span>
+        <b>Zurück zum Start · <span id="guidedResultCountdownLabel">20</span> s</b>
+      </button>
+    </div>
+  `;
+}
+
+function guidedStageMarkup() {
+  const step = getGuidedLiveStep();
+  const online = isLiveOnline();
+  const writable = canWriteCurrentEvent();
+  const mode = normalizeForceMode(state.event.forceMode);
+  const forceInstruction = mode === "Ziehen" ? "ziehen" : mode === "Drücken" ? "drücken" : "ziehen oder drücken";
+  if (step === "result") return guidedResultMarkup();
+  if (step === "name") {
+    return `
+      <div class="guided-screen guided-name-screen">
+        <div class="eyebrow">Teilnehmer erfassen</div>
+        <h2>Wie heisst du?</h2>
+        <p>Gib deinen Namen ein. Danach starten deine ${state.event.attempts} Versuche.</p>
+        <div class="guided-name-form">
+          <div class="field"><label for="participantFirstNameInput">Vorname</label><input id="participantFirstNameInput" value="${escapeHtml(state.liveEntry.draftFirstName || "")}" placeholder="Vorname" autocomplete="given-name" enterkeyhint="next" /></div>
+          <div class="field"><label for="participantLastNameInput">Name</label><input id="participantLastNameInput" value="${escapeHtml(state.liveEntry.draftLastName || "")}" placeholder="Nachname" autocomplete="family-name" enterkeyhint="done" /></div>
+          <button class="button primary" id="activateParticipantButton" type="button" ${!online || !state.connected || !writable ? "disabled" : ""}>Bestätigen und starten</button>
+        </div>
+        <button class="button subtle guided-secondary-action" id="guidedBackToStart" type="button">Zurück</button>
+      </div>
+    `;
+  }
+  if (step === "attempts") {
+    const completed = getCompletedAttemptsCount();
+    const nextAttempt = Math.min(completed + 1, Number(state.event.attempts || 1));
+    const isComplete = completed >= Number(state.event.attempts || 1);
+    return `
+      <div class="guided-screen guided-attempt-screen">
+        <div class="eyebrow">${escapeHtml(getLiveParticipantDisplayName())}</div>
+        <h2 id="guidedAttemptTitle">Versuch ${nextAttempt} von ${state.event.attempts}</h2>
+        <p id="guidedInstructionText">Greifen, kräftig ${forceInstruction} und danach vollständig lösen. Der Peak wird automatisch erfasst.</p>
+        <div class="guided-attempt-grid" id="guidedAttemptDots">${guidedAttemptCardsMarkup()}</div>
+        <div class="guided-measuring-status"><span class="dot"></span><strong id="guidedMeasuringLabel">${isComplete ? "Resultat wird gespeichert …" : "Bereit für den nächsten Versuch"}</strong></div>
+        ${isComplete ? `<button class="button primary guided-retry-save" id="guidedRetrySave" type="button" ${!online ? "disabled" : ""}>Resultat speichern</button>` : ""}
+        <button class="button subtle guided-secondary-action" id="guidedCancelParticipant" type="button">Teilnehmer abbrechen</button>
+      </div>
+    `;
+  }
+  const primaryLabel = !writable
+    ? "Event nicht diesem Konto zugeordnet"
+    : !online
+    ? "Offline – Start nicht möglich"
+    : state.connected
+      ? "Jetzt Kraft testen"
+      : state.connecting
+        ? "DynoGrip verbindet …"
+        : "DynoGrip verbinden";
+  return `
+    <div class="guided-screen guided-start-screen">
+      <div class="eyebrow">Offene Challenge</div>
+      <h2>Wie stark bist du?</h2>
+      <p>Teste deine ${mode === "Ziehen" ? "Zugkraft" : mode === "Drücken" ? "Druckkraft" : "Zug- oder Druckkraft"}. Du hast ${state.event.attempts} Versuche – dein bester Wert kommt in die Rangliste.</p>
+      <button class="button primary guided-primary-action" id="guidedPrimaryAction" type="button" ${!writable || !online || state.connecting ? "disabled" : ""}>${primaryLabel}</button>
+      <div class="guided-safety-box"><strong>! &nbsp; Sicher testen</strong><span>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</span></div>
+    </div>
+  `;
+}
+
+function guidedLivePageMarkup(publicUrl) {
+  const online = isLiveOnline();
+  return `
+    <div class="guided-live-layout">
+      <aside class="card guided-force-column">
+        <div class="eyebrow">Aktuelle Kraft</div>
+        <div class="guided-force-panel ${state.connected ? "" : "is-disconnected"}">
+          ${state.connected ? `
+            <div class="guided-force-reading"><strong id="liveForceValue">${getDisplayForceValue().toFixed(1)}</strong><span>kg</span></div>
+            <p id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</p>
+          ` : `
+            <strong>Bitte DynoGrip verbinden</strong>
+            <span>DynoGrip einschalten, dann oben rechts «Verbinden» drücken.</span>
+          `}
+        </div>
+        <div class="guided-qr-block">
+          <strong>Rangliste der Teilnehmer</strong>
+          <span>Scannen und alle Resultate ansehen.</span>
+          <a href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Rangliste der Teilnehmer" /></a>
+          <a href="${publicUrl}" target="_blank" rel="noopener noreferrer">Rangliste öffnen</a>
+        </div>
+      </aside>
+      <section class="card guided-stage-column" aria-live="polite">${guidedStageMarkup()}</section>
+      <aside class="card guided-leaderboard-column">
+        <h3>Rangliste der Teilnehmer</h3>
+        <p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Die besten 5 · separate Wertung für Ziehen und Drücken" : "Die besten 5 der aktuellen Challenge"}</p>
+        ${guidedLeaderboardMarkup()}
+      </aside>
+    </div>
+    ${!online ? `<div class="guided-offline-note" role="status">Offline: Eine Challenge kann erst nach Wiederherstellung der Internetverbindung gestartet werden.</div>` : ""}
+  `;
+}
+
 function getFinalAttemptValue(attempts) {
   if (!attempts.length) return 0;
   if (state.event.scoringMode === "Durchschnitt") {
@@ -771,10 +964,12 @@ function resetLiveEntryState() {
 }
 
 async function ensureEventWritable() {
+  if (!state.user?.uid || !state.event.id || state.event.ownerUid !== state.user.uid) {
+    throw new Error("Dieses Event gehört nicht zum angemeldeten Hallenkonto.");
+  }
   await setDoc(
     doc(db, "events", state.event.id),
     {
-      ownerUid: state.user.uid,
       updatedAt: serverTimestamp(),
       participantCount: state.results.length,
     },
@@ -783,6 +978,7 @@ async function ensureEventWritable() {
 }
 
 async function syncEventParticipantCount(participantCount = state.results.length) {
+  if (!state.user?.uid || state.event.ownerUid !== state.user.uid) return false;
   await setDoc(
     doc(db, "events", state.event.id),
     {
@@ -792,6 +988,7 @@ async function syncEventParticipantCount(participantCount = state.results.length
     },
     { merge: true },
   );
+  return true;
 }
 
 function getEditableResultNameParts(entry) {
@@ -1116,6 +1313,10 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
       directionResults,
     };
 
+    if (USE_GUIDED_LIVE_UI) {
+      state.guidedLiveStep = "result";
+      state.guidedResultExpiresAt = Date.now() + 20000;
+    }
     resetLiveEntryState();
     if (playCompletionSound) {
       void playCompletionMelody();
@@ -1688,6 +1889,7 @@ function eventDocToState(id, data) {
 }
 
 async function subscribeToEvent(eventId) {
+  const eventChanged = Boolean(state.event.id && state.event.id !== eventId);
   safeUnsub("event");
   safeUnsub("results");
   state.eventLoaded = false;
@@ -1696,6 +1898,11 @@ async function subscribeToEvent(eventId) {
   state.loadingEventId = eventId;
   if (state.lastCompletedResult?.eventId !== eventId) {
     state.lastCompletedResult = null;
+  }
+  if (eventChanged) {
+    resetLiveEntryState();
+    state.guidedLiveStep = "start";
+    state.guidedResultExpiresAt = 0;
   }
   if (!hydrateResultsFromCache(eventId)) {
     setResults([], { loaded: false, eventId, cache: false });
@@ -2596,6 +2803,15 @@ function updateLiveMeasurementDom() {
   setText("liveAttemptDisplay", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCapturedAttempts", `${completedAttempts} / ${state.event.attempts}`);
   setText("liveCurrentParticipant", getLiveParticipantDisplayName() || "Noch kein Teilnehmer erfasst");
+  setText("guidedAttemptTitle", `Versuch ${Math.min(completedAttempts + 1, state.event.attempts)} von ${state.event.attempts}`);
+  setText(
+    "guidedMeasuringLabel",
+    state.isInAttempt
+      ? `${formatDirectionLabel(state.peakDirection || state.forceDirection)} wird gemessen …`
+      : "Bereit für den nächsten Versuch",
+  );
+  const guidedAttemptDots = document.getElementById("guidedAttemptDots");
+  if (guidedAttemptDots) guidedAttemptDots.innerHTML = guidedAttemptCardsMarkup();
   const liveSaveHint = document.getElementById("liveSaveHint");
   if (liveSaveHint) {
     const hint = getLiveStatusHint();
@@ -2647,10 +2863,9 @@ function processAttemptDetectionTick() {
       ];
       state.currentAttempt = Math.min((state.liveEntry.attempts?.length || 0) + 1, state.event.attempts);
       const completedAttempts = state.liveEntry.attempts?.length || 0;
+      void playAttemptBeep();
       if (completedAttempts >= state.event.attempts) {
-        void playCompletionMelody();
-      } else {
-        void playAttemptBeep();
+        window.setTimeout(() => void playCompletionMelody(), 220);
       }
     }
 
@@ -3311,7 +3526,7 @@ function template(page) {
               ${brandingLivePreview()}
             </div>
           ` : ""}
-          ${!lockedPage && page === "live" ? `
+          ${!lockedPage && page === "live" ? (USE_GUIDED_LIVE_UI ? guidedLivePageMarkup(publicUrl) : `
             <div class="grid live live-compact">
               <div class="grid live-primary-column">
                 <div class="card measurement-work-card">
@@ -3365,7 +3580,7 @@ function template(page) {
                 <div class="card live-leaderboard-card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Top 3 für Ziehen und Drücken." : "Top 3 – automatisch aktualisiert."}</p></div></div><div class="grid live-leaderboard-sections">${leaderboardSections(3).map((section) => `<div><h4>${section.title}</h4><table class="leaderboard-table">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
               </div>
             </div>
-          ` : ""}
+          `) : ""}
           ${page === "public" ? `
             ${publicBrandingSection()}
             <div class="grid two public-summary-grid">
@@ -3747,6 +3962,39 @@ function bindBrandingActions() {
   });
 }
 
+function returnGuidedLiveToStart() {
+  if (guidedResultCountdownTimer) {
+    window.clearInterval(guidedResultCountdownTimer);
+    guidedResultCountdownTimer = null;
+  }
+  state.guidedLiveStep = "start";
+  state.guidedResultExpiresAt = 0;
+  render();
+}
+
+function bindGuidedResultCountdown() {
+  if (guidedResultCountdownTimer) {
+    window.clearInterval(guidedResultCountdownTimer);
+    guidedResultCountdownTimer = null;
+  }
+  if (getGuidedLiveStep() !== "result") return;
+  if (!state.guidedResultExpiresAt) state.guidedResultExpiresAt = Date.now() + 20000;
+
+  const updateCountdown = () => {
+    const remainingMs = Math.max(0, state.guidedResultExpiresAt - Date.now());
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    const progress = Math.max(0, Math.min(100, (remainingMs / 20000) * 100));
+    const label = document.getElementById("guidedResultCountdownLabel");
+    const fill = document.getElementById("guidedResultCountdownFill");
+    if (label) label.textContent = String(remainingSeconds);
+    if (fill) fill.style.width = `${progress}%`;
+    if (remainingMs <= 0) returnGuidedLiveToStart();
+  };
+  updateCountdown();
+  guidedResultCountdownTimer = window.setInterval(updateCountdown, 100);
+  root.querySelector("#guidedReturnToStart")?.addEventListener("click", returnGuidedLiveToStart);
+}
+
 function bindLiveActions() {
   const syncParticipantInputs = () => {
     syncParticipantDraftFromInputs();
@@ -3758,14 +4006,44 @@ function bindLiveActions() {
   root.querySelector("#participantLastNameInput")?.addEventListener("input", syncParticipantInputs);
   root.querySelector("#participantLastNameInput")?.addEventListener("change", syncParticipantInputs);
   root.querySelector("#activateParticipantButton")?.addEventListener("click", activateParticipantFromInputs);
-  ["#participantFirstNameInput", "#participantLastNameInput"].forEach((selector) => {
-    root.querySelector(selector)?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !document.getElementById("activateParticipantButton")?.disabled) {
-        activateParticipantFromInputs();
-      }
-    });
+  root.querySelector("#participantFirstNameInput")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    root.querySelector("#participantLastNameInput")?.focus();
+  });
+  root.querySelector("#participantLastNameInput")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.currentTarget.blur();
+    if (!document.getElementById("activateParticipantButton")?.disabled) activateParticipantFromInputs();
+  });
+  root.querySelectorAll("#participantFirstNameInput, #participantLastNameInput").forEach((input) => {
+    input.addEventListener("focus", () => window.setTimeout(() => input.scrollIntoView({ block: "center", behavior: "smooth" }), 180));
   });
   syncParticipantInputs();
+  root.querySelector("#guidedPrimaryAction")?.addEventListener("click", async () => {
+    if (!isLiveOnline()) {
+      setError("Offline: Die Challenge kann momentan nicht gestartet werden.");
+      render();
+      return;
+    }
+    if (!state.connected) {
+      const connected = await connectToDevice();
+      if (!connected) return;
+    }
+    state.guidedLiveStep = "name";
+    clearError();
+    render();
+  });
+  root.querySelector("#guidedBackToStart")?.addEventListener("click", returnGuidedLiveToStart);
+  root.querySelector("#guidedCancelParticipant")?.addEventListener("click", () => {
+    resetLiveEntryState();
+    returnGuidedLiveToStart();
+  });
+  root.querySelector("#guidedRetrySave")?.addEventListener("click", () => {
+    if (isLiveOnline()) void finalizeParticipantResult(false, { playCompletionSound: false });
+  });
+  bindGuidedResultCountdown();
   root.querySelector("#saveResult")?.addEventListener("click", saveLiveResult);
   root.querySelector("#closeEvent")?.addEventListener("click", async () => {
     state.event.status = "Abgeschlossen";
@@ -3904,7 +4182,13 @@ try {
 
 window.addEventListener("popstate", routeAndLoad);
 window.addEventListener("focus", resumeAutoReconnect);
-window.addEventListener("online", resumeAutoReconnect);
+window.addEventListener("online", () => {
+  resumeAutoReconnect();
+  if (state.currentPage === "live") render();
+});
+window.addEventListener("offline", () => {
+  if (state.currentPage === "live") render();
+});
 document.addEventListener("visibilitychange", resumeAutoReconnect);
 await routeAndLoad();
 
