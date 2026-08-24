@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DynoForce Event Flow – Prototyp</title>
+  <style>
+    :root {
+      --bg: #f3f4f0;
+      --surface: #fff;
+      --soft: #eef2ef;
+      --line: #d9ddd7;
+      --text: #151817;
+      --muted: #68716d;
+      --primary: #2f6471;
+      --primary-dark: #234e58;
+      --accent: #e1a93f;
+      --danger: #a84239;
+      --success: #397d54;
+      --shadow: 0 18px 45px rgba(26, 43, 38, .09);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 6%, rgba(47,100,113,.09), transparent 28%),
+        var(--bg);
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .app { min-height: 100vh; padding: 14px; display: grid; grid-template-rows: auto 1fr; gap: 14px; }
+    .header {
+      min-height: 76px;
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255,255,255,.93);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 8px 25px rgba(26,43,38,.04);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .logo {
+      width: 48px; height: 48px; display: grid; place-items: center;
+      border: 1px solid var(--line); border-radius: 15px; background: #fff;
+      font-size: 20px; font-weight: 950; font-style: italic;
+    }
+    .brand h1 { margin: 0; font-size: clamp(17px, 2vw, 22px); letter-spacing: -.025em; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .connection { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .status { padding: 11px 14px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; background: #fff; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 8px; }
+    .outline, .primary, .ghost {
+      min-height: 46px; border-radius: 14px; padding: 0 18px; font-weight: 800; border: 1px solid transparent;
+    }
+    .primary { color: #fff; background: var(--primary); box-shadow: 0 8px 18px rgba(47,100,113,.2); }
+    .primary:hover { background: var(--primary-dark); }
+    .outline { color: var(--primary-dark); background: #fff; border-color: var(--line); }
+    .ghost { color: var(--muted); background: transparent; }
+    .primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+
+    .layout { min-height: 0; display: grid; grid-template-columns: minmax(300px, .78fr) minmax(560px, 1.5fr) minmax(340px, .92fr); gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
+
+    .force-card { padding: 22px; display: flex; flex-direction: column; min-height: 590px; }
+    .eyebrow { color: var(--muted); font-weight: 850; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .force-value { margin-top: 14px; font-size: clamp(72px, 8vw, 122px); line-height: .88; font-weight: 950; letter-spacing: -.075em; }
+    .force-value small { font-size: .25em; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
+    .direction { min-height: 25px; margin: 15px 0 0; color: var(--primary); font-weight: 900; font-size: 18px; }
+    .meter { height: 14px; border-radius: 999px; overflow: hidden; background: #e3e7e4; margin-top: 18px; }
+    .meter-fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #56a29a, var(--accent)); transition: width .15s ease; }
+    .force-hint { margin: 12px 0 24px; color: var(--muted); line-height: 1.45; }
+    .force-spacer { flex: 1; }
+    .demo-control { padding: 16px; border-radius: 18px; background: var(--soft); }
+    .demo-control label { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .demo-control small { display: block; margin-top: 7px; color: var(--muted); line-height: 1.35; }
+    input[type="range"] { width: 100%; margin: 14px 0 2px; accent-color: var(--primary); }
+
+    .stage { min-height: 590px; overflow: hidden; position: relative; }
+    .screen { min-height: 100%; padding: clamp(24px, 4vw, 52px); display: none; animation: fade .28s ease; }
+    .screen.active { display: flex; flex-direction: column; }
+    @keyframes fade { from { opacity: 0; transform: translateY(7px); } }
+    .step { color: var(--primary); font-size: 13px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .screen h2 { margin: 12px 0 12px; font-size: clamp(38px, 5vw, 67px); line-height: .98; letter-spacing: -.055em; max-width: 760px; }
+    .lead { margin: 0; max-width: 650px; color: var(--muted); font-size: clamp(17px, 2vw, 21px); line-height: 1.5; }
+    .start-actions { margin-top: 34px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .start-actions .primary { min-height: 62px; padding-inline: 28px; font-size: 18px; }
+    .safety {
+      margin-top: auto; padding: 16px 18px; border-radius: 18px; background: #fbf4e6;
+      border: 1px solid #ead7ad; color: #6d531e; display: flex; gap: 12px; align-items: flex-start; line-height: 1.45;
+    }
+    .safety b { display: block; margin-bottom: 3px; }
+    .safety-icon { font-size: 21px; }
+
+    .form { margin-top: 28px; display: grid; gap: 18px; }
+    .field label { display: block; font-weight: 850; margin-bottom: 8px; }
+    .field input {
+      width: 100%; min-height: 58px; padding: 0 17px; border: 2px solid var(--line); border-radius: 15px;
+      outline: none; font-size: 18px; background: #fff;
+    }
+    .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(47,100,113,.11); }
+    .form-actions { margin-top: 8px; display: flex; gap: 10px; justify-content: space-between; }
+
+    .attempt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .attempt-top h2 { font-size: clamp(34px, 4vw, 54px); }
+    .attempt-count { flex: 0 0 auto; color: var(--primary); background: var(--soft); padding: 12px 16px; border-radius: 16px; font-weight: 900; }
+    .attempt-dots { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 28px 0; }
+    .attempt-dot { border: 2px solid var(--line); border-radius: 18px; padding: 17px 12px; text-align: center; color: var(--muted); font-weight: 800; }
+    .attempt-dot.active { border-color: var(--primary); color: var(--primary); background: var(--soft); }
+    .attempt-dot.done { border-color: #b8d9c3; color: var(--success); background: #edf7f0; }
+    .attempt-dot strong { display: block; font-size: 24px; color: var(--text); margin-top: 3px; }
+    .instruction { padding: 20px; background: var(--soft); border-radius: 20px; text-align: center; }
+    .instruction strong { display: block; font-size: 25px; margin-bottom: 7px; }
+    .instruction span { color: var(--muted); line-height: 1.45; }
+    .record { margin-top: 20px; min-height: 58px; font-size: 17px; width: 100%; }
+
+    .result-screen { text-align: center; align-items: center; justify-content: center; }
+    .result-screen h2 { margin-inline: auto; }
+    .result-number { color: var(--primary); font-size: clamp(74px, 10vw, 132px); line-height: .9; font-weight: 950; letter-spacing: -.07em; }
+    .result-number small { color: var(--muted); font-size: .24em; letter-spacing: 0; }
+    .result-meta { margin: 18px 0 27px; color: var(--muted); font-size: 18px; }
+
+    .side { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-height: 590px; }
+    .qr-card { padding: 18px; display: grid; grid-template-columns: 1fr 106px; gap: 15px; align-items: center; }
+    .qr-card h3, .leaderboard h3 { margin: 0 0 6px; font-size: 20px; }
+    .qr-card p { margin: 0; color: var(--muted); line-height: 1.4; font-size: 14px; }
+    .qr-card a { color: var(--primary-dark); font-weight: 850; }
+    .qr { width: 106px; height: 106px; padding: 5px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 13px; }
+    .leaderboard { padding: 20px; overflow: hidden; }
+    .leaderboard-sub { color: var(--muted); margin: 0 0 15px; }
+    .rank-list { list-style: none; margin: 0; padding: 0; }
+    .rank { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 13px 2px; border-top: 1px solid var(--line); }
+    .rank:first-child { border-top: 0; }
+    .medal { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); font-weight: 900; }
+    .rank-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-value { font-weight: 950; }
+    .rank.new { margin-inline: -10px; padding-inline: 12px; border-radius: 13px; background: #fff7df; border: 1px solid #edcf79; }
+    .result-banner { display: none; margin: 0 0 14px; padding: 14px 16px; border-radius: 16px; background: #edf7f0; color: #245f3c; font-weight: 800; }
+    .result-banner.show { display: block; }
+
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 300px 1fr; }
+      .side { grid-column: 1 / -1; grid-template-columns: .8fr 1.2fr; grid-template-rows: 1fr; min-height: auto; }
+    }
+    @media (max-width: 760px) {
+      .app { padding: 8px; }
+      .header { border-radius: 18px; }
+      .brand p, .status { display: none; }
+      .layout { grid-template-columns: 1fr; }
+      .force-card { min-height: auto; }
+      .force-spacer { display: none; }
+      .stage { min-height: 570px; }
+      .side { grid-column: auto; grid-template-columns: 1fr; }
+      .screen { padding: 26px 21px; }
+      .qr-card { grid-template-columns: 1fr 92px; }
+      .qr { width: 92px; height: 92px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">DF</div>
+        <div><h1>BOUBA DynoForce Challenge</h1><p>Maximalkraft · Drei Versuche · Der beste zählt</p></div>
+      </div>
+      <div class="connection">
+        <div class="status"><span class="dot"></span>DynoGrip verbunden</div>
+        <button class="outline" type="button">Gerät</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section class="card force-card" aria-label="Aktuelle Kraft">
+        <div class="eyebrow">Aktuelle Kraft</div>
+        <div class="force-value"><span id="forceValue">0.0</span><small>kg</small></div>
+        <div class="direction" id="direction">Bereit</div>
+        <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+        <p class="force-hint">Die Kraft bleibt auf jeder Seite sichtbar. Probiere den DynoGrip ruhig zuerst aus.</p>
+        <div class="force-spacer"></div>
+        <div class="demo-control">
+          <label><span>Demo-Kraft</span><span id="sliderLabel">0.0 kg</span></label>
+          <input id="forceSlider" type="range" min="-70" max="70" value="0" step="0.1" />
+          <small>Nur für diesen Prototyp: nach rechts ziehen, nach links drücken. Später kommen diese Werte direkt via Bluetooth.</small>
+        </div>
+      </section>
+
+      <section class="card stage">
+        <div class="screen active" data-screen="start">
+          <span class="step">Offene Challenge</span>
+          <h2>Wie stark bist du?</h2>
+          <p class="lead">Teste deine Zug- oder Druckkraft. Du hast drei Versuche – dein bester Wert kommt ins Leaderboard.</p>
+          <div class="start-actions">
+            <button class="primary" id="startButton" type="button">Jetzt Kraft testen</button>
+          </div>
+          <div class="safety">
+            <span class="safety-icon">!</span>
+            <div><b>Sicher testen</b>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</div>
+          </div>
+        </div>
+
+        <div class="screen" data-screen="name">
+          <span class="step">Schritt 1 von 2</span>
+          <h2>Wie heisst du?</h2>
+          <p class="lead">Dein Name wird zusammen mit deinem besten Versuch im öffentlichen Leaderboard angezeigt.</p>
+          <form class="form" id="nameForm">
+            <div class="field"><label for="firstName">Vorname</label><input id="firstName" autocomplete="given-name" placeholder="Vorname eingeben" required /></div>
+            <div class="field"><label for="lastName">Name</label><input id="lastName" autocomplete="family-name" placeholder="Nachname eingeben" required /></div>
+            <div class="form-actions">
+              <button class="ghost" type="button" data-back>Zurück</button>
+              <button class="primary" id="confirmName" type="submit">Bestätigen und starten</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="screen" data-screen="attempts">
+          <div class="attempt-top">
+            <div><span class="step">Schritt 2 von 2</span><h2 id="attemptTitle">Versuch 1 von 3</h2></div>
+            <div class="attempt-count" id="bestBadge">Bestwert: –</div>
+          </div>
+          <p class="lead" id="participantGreeting">Du bist bereit.</p>
+          <div class="attempt-dots" id="attemptDots"></div>
+          <div class="instruction"><strong>Jetzt kräftig ziehen oder drücken</strong><span>Löse den DynoGrip danach wieder vollständig. Der höchste Wert dieses Versuchs wird übernommen.</span></div>
+          <button class="primary record" id="recordButton" type="button">Aktuellen Wert als Versuch erfassen</button>
+          <button class="ghost" id="cancelButton" type="button">Teilnahme abbrechen</button>
+        </div>
+
+        <div class="screen result-screen" data-screen="result">
+          <span class="step">Geschafft</span>
+          <h2 id="resultName">Starker Versuch!</h2>
+          <div class="result-number"><span id="resultValue">0.0</span><small>kg</small></div>
+          <div class="result-meta" id="resultMeta">Dein bester Wert aus drei Versuchen.</div>
+          <button class="primary" id="finishButton" type="button">Zum Startbildschirm</button>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="card qr-card">
+          <div><h3>Live mitverfolgen</h3><p>Leaderboard auf dem eigenen Gerät öffnen.</p><p><a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">event.dynoforce.ch</a></p></div>
+          <img class="qr" alt="QR-Code zum Zuschauer-Leaderboard" src="https://quickchart.io/qr?size=200&margin=1&text=https%3A%2F%2Fevent.dynoforce.ch%2F%23%2Fe%2Fevent-1787502725553" />
+        </section>
+        <section class="card leaderboard">
+          <div class="result-banner" id="resultBanner"></div>
+          <h3>Leaderboard</h3><p class="leaderboard-sub">Die stärksten Versuche der Challenge</p>
+          <ol class="rank-list" id="rankList"></ol>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const screens = [...document.querySelectorAll('.screen')];
+    const slider = document.getElementById('forceSlider');
+    const forceValue = document.getElementById('forceValue');
+    const sliderLabel = document.getElementById('sliderLabel');
+    const direction = document.getElementById('direction');
+    const meterFill = document.getElementById('meterFill');
+    const attemptDots = document.getElementById('attemptDots');
+    const attemptTitle = document.getElementById('attemptTitle');
+    const bestBadge = document.getElementById('bestBadge');
+    const rankList = document.getElementById('rankList');
+    const resultBanner = document.getElementById('resultBanner');
+
+    const state = {
+      participant: '', attempts: [], latestName: '',
+      ranks: [
+        { name: 'Gusti Brösmeli', value: 42.5 },
+        { name: 'Domi 1337', value: 38.6 },
+        { name: 'Sepp Ziehnicht', value: 34.2 },
+        { name: 'Lena Kraft', value: 31.8 },
+        { name: 'Nico Boulder', value: 29.7 }
+      ]
+    };
+
+    function showScreen(name) {
+      screens.forEach(screen => screen.classList.toggle('active', screen.dataset.screen === name));
+      if (name === 'name') setTimeout(() => document.getElementById('firstName').focus(), 80);
+    }
+
+    function readForce() { return Math.abs(Number(slider.value)); }
+
+    function updateForce() {
+      const signed = Number(slider.value);
+      const value = Math.abs(signed);
+      forceValue.textContent = value.toFixed(1);
+      sliderLabel.textContent = `${value.toFixed(1)} kg`;
+      direction.textContent = value < .5 ? 'Bereit' : signed > 0 ? 'Ziehen' : 'Drücken';
+      meterFill.style.width = `${Math.min(100, value / 70 * 100)}%`;
+    }
+
+    function renderAttempts() {
+      const best = Math.max(0, ...state.attempts);
+      const next = Math.min(state.attempts.length + 1, 3);
+      attemptTitle.textContent = `Versuch ${next} von 3`;
+      bestBadge.textContent = `Bestwert: ${best ? best.toFixed(1) + ' kg' : '–'}`;
+      attemptDots.innerHTML = [0,1,2].map(i => {
+        const done = i < state.attempts.length;
+        const active = i === state.attempts.length;
+        return `<div class="attempt-dot ${done ? 'done' : active ? 'active' : ''}">Versuch ${i+1}<strong>${done ? state.attempts[i].toFixed(1) + ' kg' : active ? 'Bereit' : '–'}</strong></div>`;
+      }).join('');
+    }
+
+    function renderRanks(highlight = '') {
+      state.ranks.sort((a,b) => b.value - a.value);
+      rankList.innerHTML = state.ranks.slice(0, 6).map((entry, index) => `
+        <li class="rank ${entry.name === highlight ? 'new' : ''}">
+          <span class="medal">${index + 1}</span><span class="rank-name">${entry.name}</span><span class="rank-value">${entry.value.toFixed(1)} kg</span>
+        </li>`).join('');
+    }
+
+    function goHomeWithResult() {
+      const best = Math.max(...state.attempts);
+      showScreen('start');
+      resultBanner.textContent = `${state.participant}: ${best.toFixed(1)} kg – dein Resultat wurde ins Leaderboard übernommen.`;
+      resultBanner.classList.add('show');
+      renderRanks(state.participant);
+      setTimeout(() => resultBanner.classList.remove('show'), 12000);
+      state.attempts = [];
+      slider.value = 0;
+      updateForce();
+    }
+
+    slider.addEventListener('input', updateForce);
+    document.getElementById('startButton').addEventListener('click', () => showScreen('name'));
+    document.querySelector('[data-back]').addEventListener('click', () => showScreen('start'));
+    document.getElementById('cancelButton').addEventListener('click', () => { state.attempts = []; showScreen('start'); });
+
+    document.getElementById('nameForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const first = document.getElementById('firstName').value.trim();
+      const last = document.getElementById('lastName').value.trim();
+      if (!first || !last) return;
+      state.participant = `${first} ${last}`;
+      state.attempts = [];
+      document.getElementById('participantGreeting').textContent = `${first}, du hast drei Versuche. Dein bester Wert zählt.`;
+      renderAttempts();
+      showScreen('attempts');
+    });
+
+    document.getElementById('recordButton').addEventListener('click', () => {
+      if (readForce() < 2) {
+        document.querySelector('.instruction strong').textContent = 'Bitte zuerst Kraft aufbauen';
+        setTimeout(() => document.querySelector('.instruction strong').textContent = 'Jetzt kräftig ziehen oder drücken', 1700);
+        return;
+      }
+      state.attempts.push(readForce());
+      if (state.attempts.length < 3) {
+        slider.value = 0; updateForce(); renderAttempts();
+        return;
+      }
+      const best = Math.max(...state.attempts);
+      state.ranks = state.ranks.filter(entry => entry.name !== state.participant);
+      state.ranks.push({ name: state.participant, value: best });
+      const placement = [...state.ranks].sort((a,b) => b.value-a.value).findIndex(x => x.name === state.participant) + 1;
+      document.getElementById('resultName').textContent = `Stark, ${state.participant.split(' ')[0]}!`;
+      document.getElementById('resultValue').textContent = best.toFixed(1);
+      document.getElementById('resultMeta').textContent = `Bester Wert aus drei Versuchen · aktuell Rang ${placement}`;
+      showScreen('result');
+    });
+
+    document.getElementById('finishButton').addEventListener('click', goHomeWithResult);
+    updateForce(); renderRanks();
+  </script>
+</body>
+</html>
