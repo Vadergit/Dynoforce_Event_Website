@@ -814,6 +814,7 @@ function guidedStageMarkup() {
   const writable = canWriteCurrentEvent();
   const mode = normalizeForceMode(state.event.forceMode);
   const forceInstruction = mode === "Ziehen" ? "ziehen" : mode === "Drücken" ? "drücken" : "ziehen oder drücken";
+  const attemptLabel = Number(state.event.attempts || 1) === 1 ? "1 Versuch" : `${state.event.attempts} Versuche`;
   if (step === "result") return guidedResultMarkup();
   if (step === "name") {
     return `
@@ -855,7 +856,7 @@ function guidedStageMarkup() {
     <div class="guided-screen guided-start-screen">
       <div class="eyebrow">Offene Challenge</div>
       <h2>Wie stark bist du?</h2>
-      <p>Teste deine ${mode === "Ziehen" ? "Zugkraft" : mode === "Drücken" ? "Druckkraft" : "Zug- oder Druckkraft"}. Du hast ${state.event.attempts} Versuche – dein bester Wert kommt in die Rangliste.</p>
+      <p>Teste deine ${mode === "Ziehen" ? "Zugkraft" : mode === "Drücken" ? "Druckkraft" : "Zug- oder Druckkraft"}. ${attemptLabel}, der beste zählt.</p>
       <button class="button primary guided-primary-action" id="guidedPrimaryAction" type="button" ${!writable || !online || !state.connected || state.connecting ? "disabled" : ""}>${primaryLabel}</button>
       <div class="guided-safety-box"><strong>! &nbsp; Sicher testen</strong><span>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</span></div>
     </div>
