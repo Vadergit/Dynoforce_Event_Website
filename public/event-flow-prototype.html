@@ -68,7 +68,7 @@
     .ghost { color: var(--muted); background: transparent; }
     .primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 
-    .layout { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, .90fr) minmax(0, 1.35fr) minmax(0, .94fr); gap: 10px; overflow: hidden; }
+    .layout { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, .78fr) minmax(0, 1.43fr) minmax(0, .98fr); gap: 10px; overflow: hidden; }
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
 
     .force-card { padding: clamp(15px, 1.7vw, 22px); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
@@ -81,7 +81,7 @@
     .force-disconnected strong { display: block; font-size: 20px; margin-bottom: 5px; }
     .force-disconnected span { display: block; line-height: 1.4; }
     .force-measurement[hidden], .force-disconnected[hidden] { display: none; }
-    .force-qr { margin-top: 24px; padding: 15px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+    .force-qr { min-height: 350px; margin-top: 24px; padding: 14px 5px 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; text-align: center; }
     .force-qr h3 { margin: 0 0 6px; font-size: 19px; }
     .force-qr p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.35; }
     .force-qr a { color: var(--primary-dark); font-weight: 850; }
@@ -184,8 +184,9 @@
     @media (max-height: 720px) and (orientation: landscape) {
       .header { min-height: 58px; }
       .logo { width: 42px; height: 42px; }
+      .force-card { padding: 14px; }
       .force-measurement { padding: 14px; }
-      .force-qr { padding: 12px; gap: 7px; }
+      .force-qr { min-height: 305px; padding: 10px 3px 12px; gap: 7px; }
       .force-qr img { width: 206px; height: 206px; }
       .screen { padding: 18px 22px; }
       .start-actions { margin-top: 22px; }
