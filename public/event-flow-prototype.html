@@ -163,15 +163,18 @@
     .qr-card p { margin: 0; color: var(--muted); line-height: 1.4; font-size: 14px; }
     .qr-card a { color: var(--primary-dark); font-weight: 850; }
     .qr { width: 112px; height: 112px; padding: 4px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
-    .leaderboard { height: 100%; padding: 16px; min-height: 0; overflow-y: auto; }
+    .leaderboard { height: 100%; padding: 16px; min-height: 0; overflow-y: auto; border: 2px solid rgba(47, 100, 113, .35); background: linear-gradient(180deg, #fff 0%, #f7faf9 100%); box-shadow: 0 18px 42px rgba(47, 100, 113, .13); }
     .leaderboard-sub { color: var(--muted); margin: 0 0 15px; }
     .leader-section + .leader-section { margin-top: 18px; padding-top: 16px; border-top: 2px solid var(--line); }
-    .leader-section h4 { margin: 0 0 7px; font-size: 16px; }
+    .leader-section h4 { margin: 0 0 7px; padding: 9px 11px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-dark); font-size: 16px; }
     .leader-section h4 span { color: var(--primary); }
     .rank-list { list-style: none; margin: 0; padding: 0; }
     .rank { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 10px 2px; border-top: 1px solid var(--line); }
     .rank:first-child { border-top: 0; }
     .medal { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); font-weight: 900; }
+    .rank:nth-child(1) .medal { background: #f4d36a; color: #5e4600; }
+    .rank:nth-child(2) .medal { background: #dfe3e5; color: #4c565b; }
+    .rank:nth-child(3) .medal { background: #e5bd91; color: #68401e; }
     .rank-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rank-value { font-weight: 950; }
     .rank.new { margin-inline: -10px; padding-inline: 12px; border-radius: 13px; background: #fff7df; border: 1px solid #edcf79; }
@@ -190,6 +193,12 @@
       .attempt-dots { margin: 18px 0; }
       .attempt-dot { padding: 11px 8px; }
       .instruction { padding: 14px; }
+      .leaderboard { padding: 12px; }
+      .leaderboard-sub { margin-bottom: 8px; }
+      .leader-section + .leader-section { margin-top: 10px; padding-top: 9px; }
+      .leader-section h4 { padding: 6px 9px; margin-bottom: 3px; }
+      .rank { padding: 4px 2px; }
+      .medal { width: 25px; height: 25px; }
     }
     @media (max-width: 899px), (orientation: portrait) {
       html, body { overflow: auto; }
@@ -296,7 +305,7 @@
       <aside class="side">
         <section class="card leaderboard">
           <div class="result-banner" id="resultBanner"></div>
-          <h3>Rangliste der Teilnehmer</h3><p class="leaderboard-sub">Die besten 3 · separate Wertung für Ziehen und Drücken</p>
+          <h3>Rangliste der Teilnehmer</h3><p class="leaderboard-sub">Die besten 5 · separate Wertung für Ziehen und Drücken</p>
           <div class="leader-section"><h4><span>↗</span> Rangliste Ziehen</h4><ol class="rank-list" id="pullRankList"></ol></div>
           <div class="leader-section"><h4><span>↘</span> Rangliste Drücken</h4><ol class="rank-list" id="pushRankList"></ol></div>
         </section>
@@ -355,9 +364,13 @@
         { name: 'Gusti Brösmeli', value: 42.5, direction: 'pull' },
         { name: 'Domi 1337', value: 38.6, direction: 'pull' },
         { name: 'Sepp Ziehnicht', value: 34.2, direction: 'pull' },
+        { name: 'Lena Kraft', value: 31.8, direction: 'pull' },
+        { name: 'Nico Boulder', value: 29.7, direction: 'pull' },
         { name: 'Domi 1337', value: 58.6, direction: 'push' },
         { name: 'Gusti Brösmeli', value: 42.5, direction: 'push' },
-        { name: 'Lena Kraft', value: 31.8, direction: 'push' }
+        { name: 'Lena Kraft', value: 31.8, direction: 'push' },
+        { name: 'Nico Boulder', value: 28.4, direction: 'push' },
+        { name: 'Sepp Ziehnicht', value: 25.2, direction: 'push' }
       ]
     };
 
@@ -499,7 +512,7 @@
     }
 
     function rankMarkup(direction, highlight = '') {
-      return state.ranks.filter(entry => entry.direction === direction).sort((a,b) => b.value - a.value).slice(0, 3).map((entry, index) => `
+      return state.ranks.filter(entry => entry.direction === direction).sort((a,b) => b.value - a.value).slice(0, 5).map((entry, index) => `
         <li class="rank ${entry.name === highlight ? 'new' : ''}">
           <span class="medal">${index + 1}</span><span class="rank-name">${entry.name}</span><span class="rank-value">${entry.value.toFixed(1)} kg</span>
         </li>`).join('');
