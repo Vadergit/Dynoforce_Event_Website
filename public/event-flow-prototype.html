@@ -81,12 +81,11 @@
     .force-disconnected strong { display: block; font-size: 20px; margin-bottom: 5px; }
     .force-disconnected span { display: block; line-height: 1.4; }
     .force-measurement[hidden], .force-disconnected[hidden] { display: none; }
-    .force-spacer { flex: 1; }
-    .force-qr { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 14px; align-items: center; }
+    .force-qr { margin-top: 14px; padding: 15px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
     .force-qr h3 { margin: 0 0 6px; font-size: 19px; }
-    .force-qr p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .force-qr p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.35; }
     .force-qr a { color: var(--primary-dark); font-weight: 850; }
-    .force-qr img { width: 150px; height: 150px; padding: 5px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+    .force-qr img { width: 168px; height: 168px; padding: 5px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
 
     .stage { min-width: 0; min-height: 0; height: 100%; overflow: hidden; position: relative; }
     .screen { min-height: 100%; height: 100%; padding: clamp(20px, 3vw, 42px); display: none; animation: fade .28s ease; overflow-y: auto; }
@@ -183,8 +182,8 @@
       .header { min-height: 58px; }
       .logo { width: 42px; height: 42px; }
       .force-measurement { padding: 14px; }
-      .force-qr { grid-template-columns: minmax(0, 1fr) 122px; padding: 12px; }
-      .force-qr img { width: 122px; height: 122px; }
+      .force-qr { padding: 12px; gap: 7px; }
+      .force-qr img { width: 150px; height: 150px; }
       .screen { padding: 18px 22px; }
       .start-actions { margin-top: 22px; }
       .safety { padding: 12px 14px; }
@@ -201,7 +200,6 @@
       .layout { grid-template-columns: 1fr; }
       .layout { overflow: visible; }
       .force-card { min-height: 360px; }
-      .force-spacer { display: none; }
       .stage { min-height: 570px; }
       .side { grid-column: auto; grid-template-columns: 1fr; height: auto; overflow: visible; }
       .screen { padding: 26px 21px; }
@@ -209,7 +207,6 @@
       .result-grid { grid-template-columns: 1fr; }
       .qr-card { grid-template-columns: 1fr 92px; }
       .qr { width: 92px; height: 92px; }
-      .force-qr { grid-template-columns: minmax(0, 1fr) 130px; }
       .force-qr img { width: 130px; height: 130px; }
     }
   </style>
@@ -238,10 +235,10 @@
           <div class="force-value"><span id="forceValue">0.0</span><small>kg</small></div>
           <div class="direction" id="direction">Bereit</div>
         </div>
-        <div class="force-spacer"></div>
         <div class="force-qr">
-          <div><h3>Rangliste der Teilnehmer</h3><p>QR-Code scannen und alle Resultate ansehen.</p><p><a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">Rangliste öffnen</a></p></div>
+          <div><h3>Rangliste der Teilnehmer</h3><p>Scannen und alle Resultate ansehen.</p></div>
           <img alt="QR-Code zur Rangliste der Teilnehmer" src="https://quickchart.io/qr?size=300&margin=1&text=https%3A%2F%2Fevent.dynoforce.ch%2F%23%2Fe%2Fevent-1787502725553" />
+          <a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">Rangliste öffnen</a>
         </div>
       </section>
 
@@ -588,9 +585,9 @@
         push?.rank <= 3 && { label: 'Drücken', rank: push.rank }
       ].filter(Boolean);
       if (topThree.length === 1) {
-        topThreeMessage.textContent = `Glückwunsch, ${firstName}! Rang ${topThree[0].rank} beim ${topThree[0].label} – du gehörst zu den besten 3.`;
+        topThreeMessage.textContent = `Glückwunsch, ${firstName}! Du liegst aktuell auf Rang ${topThree[0].rank} beim ${topThree[0].label} und gehörst damit zu den Top 3.`;
       } else if (topThree.length === 2) {
-        topThreeMessage.textContent = `Glückwunsch, ${firstName}! Rang ${topThree[0].rank} beim ${topThree[0].label} und Rang ${topThree[1].rank} beim ${topThree[1].label}.`;
+        topThreeMessage.textContent = `Glückwunsch, ${firstName}! Du liegst aktuell auf Rang ${topThree[0].rank} beim ${topThree[0].label} und Rang ${topThree[1].rank} beim ${topThree[1].label}.`;
       } else {
         topThreeMessage.textContent = '';
       }
