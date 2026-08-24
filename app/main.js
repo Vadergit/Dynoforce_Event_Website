@@ -868,15 +868,15 @@ function guidedLivePageMarkup(publicUrl) {
     <div class="guided-live-layout">
       <aside class="card guided-force-column">
         <div class="eyebrow">Aktuelle Kraft</div>
-        <div class="guided-force-panel ${state.connected ? "" : "is-disconnected"}">
+        <${state.connected ? "div" : "button"} class="guided-force-panel ${state.connected ? "" : "is-disconnected"}" ${state.connected ? "" : `id="guidedConnectPanel" type="button"`}>
           ${state.connected ? `
             <div class="guided-force-reading"><strong id="liveForceValue">${getDisplayForceValue().toFixed(1)}</strong><span>kg</span></div>
             <p id="liveDirectionValue">${formatDirectionLabel(state.forceDirection)}</p>
           ` : `
             <strong>Bitte DynoGrip verbinden</strong>
-            <span>DynoGrip einschalten, dann oben rechts «Verbinden» drücken.</span>
+            <span>DynoGrip einschalten und hier antippen.</span>
           `}
-        </div>
+        </${state.connected ? "div" : "button"}>
         <div class="guided-qr-block">
           <strong>Rangliste der Teilnehmer</strong>
           <span>Scannen und alle Resultate ansehen.</span>
@@ -4027,6 +4027,10 @@ function bindLiveActions() {
     state.guidedLiveStep = "name";
     clearError();
     render();
+  });
+  root.querySelector("#guidedConnectPanel")?.addEventListener("click", async () => {
+    if (!isLiveOnline() || state.connecting || state.connected) return;
+    await connectToDevice();
   });
   root.querySelector("#guidedBackToStart")?.addEventListener("click", returnGuidedLiveToStart);
   root.querySelector("#guidedCancelParticipant")?.addEventListener("click", () => {

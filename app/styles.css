@@ -2578,7 +2578,21 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
 .guided-force-panel.is-disconnected {
   gap: 10px;
   justify-content: center;
+  width: 100%;
+  text-align: left;
   color: #38574f;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.guided-force-panel.is-disconnected:hover,
+.guided-force-panel.is-disconnected:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 8px 22px rgba(31, 79, 70, 0.13);
+}
+
+.guided-force-panel.is-disconnected:active {
+  transform: translateY(1px);
 }
 
 .guided-force-panel.is-disconnected strong {
