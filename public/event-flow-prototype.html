@@ -21,7 +21,7 @@
     }
 
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
     body {
       font-family: Inter, "Segoe UI", Arial, sans-serif;
       color: var(--text);
@@ -32,10 +32,10 @@
     button, input { font: inherit; }
     button { cursor: pointer; }
 
-    .app { min-height: 100vh; padding: 14px; display: grid; grid-template-rows: auto 1fr; gap: 14px; }
+    .app { width: 100%; height: 100dvh; padding: 10px; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; overflow: hidden; }
     .header {
-      min-height: 76px;
-      padding: 12px 16px;
+      min-height: 66px;
+      padding: 9px 14px;
       border: 1px solid var(--line);
       border-radius: 24px;
       background: rgba(255,255,255,.93);
@@ -56,6 +56,7 @@
     .connection { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
     .status { padding: 11px 14px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; background: #fff; }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 8px; }
+    .dot.off { background: var(--danger); }
     .outline, .primary, .ghost {
       min-height: 46px; border-radius: 14px; padding: 0 18px; font-weight: 800; border: 1px solid transparent;
     }
@@ -65,12 +66,12 @@
     .ghost { color: var(--muted); background: transparent; }
     .primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 
-    .layout { min-height: 0; display: grid; grid-template-columns: minmax(300px, .78fr) minmax(560px, 1.5fr) minmax(340px, .92fr); gap: 14px; }
+    .layout { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, .78fr) minmax(0, 1.43fr) minmax(0, .98fr); gap: 10px; overflow: hidden; }
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
 
-    .force-card { padding: 22px; display: flex; flex-direction: column; min-height: 590px; }
+    .force-card { padding: clamp(15px, 1.7vw, 22px); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
     .eyebrow { color: var(--muted); font-weight: 850; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
-    .force-value { margin-top: 14px; font-size: clamp(72px, 8vw, 122px); line-height: .88; font-weight: 950; letter-spacing: -.075em; }
+    .force-value { margin-top: 12px; font-size: clamp(62px, 7vw, 108px); line-height: .88; font-weight: 950; letter-spacing: -.075em; white-space: nowrap; }
     .force-value small { font-size: .25em; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
     .direction { min-height: 25px; margin: 15px 0 0; color: var(--primary); font-weight: 900; font-size: 18px; }
     .meter { height: 14px; border-radius: 999px; overflow: hidden; background: #e3e7e4; margin-top: 18px; }
@@ -82,12 +83,12 @@
     .demo-control small { display: block; margin-top: 7px; color: var(--muted); line-height: 1.35; }
     input[type="range"] { width: 100%; margin: 14px 0 2px; accent-color: var(--primary); }
 
-    .stage { min-height: 590px; overflow: hidden; position: relative; }
-    .screen { min-height: 100%; padding: clamp(24px, 4vw, 52px); display: none; animation: fade .28s ease; }
+    .stage { min-width: 0; min-height: 0; height: 100%; overflow: hidden; position: relative; }
+    .screen { min-height: 100%; height: 100%; padding: clamp(20px, 3vw, 42px); display: none; animation: fade .28s ease; overflow-y: auto; }
     .screen.active { display: flex; flex-direction: column; }
     @keyframes fade { from { opacity: 0; transform: translateY(7px); } }
     .step { color: var(--primary); font-size: 13px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-    .screen h2 { margin: 12px 0 12px; font-size: clamp(38px, 5vw, 67px); line-height: .98; letter-spacing: -.055em; max-width: 760px; }
+    .screen h2 { margin: 10px 0 10px; font-size: clamp(34px, 4.5vw, 61px); line-height: .98; letter-spacing: -.055em; max-width: 760px; }
     .lead { margin: 0; max-width: 650px; color: var(--muted); font-size: clamp(17px, 2vw, 21px); line-height: 1.5; }
     .start-actions { margin-top: 34px; display: flex; gap: 12px; flex-wrap: wrap; }
     .start-actions .primary { min-height: 62px; padding-inline: 28px; font-size: 18px; }
@@ -134,19 +135,19 @@
     .countdown-fill { position: absolute; inset: 0; width: 100%; background: var(--primary); transform-origin: left center; }
     .countdown-label { position: relative; z-index: 1; }
 
-    .side { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-height: 590px; }
-    .qr-card { padding: 18px; display: grid; grid-template-columns: 1fr 106px; gap: 15px; align-items: center; }
+    .side { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; overflow: hidden; }
+    .qr-card { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 11px; align-items: center; }
     .qr-card h3, .leaderboard h3 { margin: 0 0 6px; font-size: 20px; }
     .qr-card p { margin: 0; color: var(--muted); line-height: 1.4; font-size: 14px; }
     .qr-card a { color: var(--primary-dark); font-weight: 850; }
-    .qr { width: 106px; height: 106px; padding: 5px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 13px; }
-    .leaderboard { padding: 20px; overflow: hidden; }
+    .qr { width: 92px; height: 92px; padding: 4px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+    .leaderboard { padding: 16px; min-height: 0; overflow-y: auto; }
     .leaderboard-sub { color: var(--muted); margin: 0 0 15px; }
     .leader-section + .leader-section { margin-top: 18px; padding-top: 16px; border-top: 2px solid var(--line); }
     .leader-section h4 { margin: 0 0 7px; font-size: 16px; }
     .leader-section h4 span { color: var(--primary); }
     .rank-list { list-style: none; margin: 0; padding: 0; }
-    .rank { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 13px 2px; border-top: 1px solid var(--line); }
+    .rank { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 10px 2px; border-top: 1px solid var(--line); }
     .rank:first-child { border-top: 0; }
     .medal { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); font-weight: 900; }
     .rank-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -155,19 +156,30 @@
     .result-banner { display: none; margin: 0 0 14px; padding: 14px 16px; border-radius: 16px; background: #edf7f0; color: #245f3c; font-weight: 800; }
     .result-banner.show { display: block; }
 
-    @media (max-width: 1100px) {
-      .layout { grid-template-columns: 300px 1fr; }
-      .side { grid-column: 1 / -1; grid-template-columns: .8fr 1.2fr; grid-template-rows: 1fr; min-height: auto; }
+    @media (max-height: 720px) and (orientation: landscape) {
+      .header { min-height: 58px; }
+      .logo { width: 42px; height: 42px; }
+      .force-hint { margin-bottom: 12px; }
+      .demo-control { padding: 12px; }
+      .screen { padding: 18px 22px; }
+      .start-actions { margin-top: 22px; }
+      .safety { padding: 12px 14px; }
+      .attempt-dots { margin: 18px 0; }
+      .attempt-dot { padding: 11px 8px; }
+      .instruction { padding: 14px; }
     }
-    @media (max-width: 760px) {
+    @media (max-width: 899px), (orientation: portrait) {
+      html, body { overflow: auto; }
+      .app { height: auto; min-height: 100dvh; overflow: visible; }
       .app { padding: 8px; }
       .header { border-radius: 18px; }
       .brand p, .status { display: none; }
       .layout { grid-template-columns: 1fr; }
-      .force-card { min-height: auto; }
+      .layout { overflow: visible; }
+      .force-card { min-height: 360px; }
       .force-spacer { display: none; }
       .stage { min-height: 570px; }
-      .side { grid-column: auto; grid-template-columns: 1fr; }
+      .side { grid-column: auto; grid-template-columns: 1fr; height: auto; overflow: visible; }
       .screen { padding: 26px 21px; }
       .result-grid { grid-template-columns: 1fr; }
       .qr-card { grid-template-columns: 1fr 92px; }
@@ -183,8 +195,8 @@
         <div><h1>BOUBA DynoForce Challenge</h1><p>Maximalkraft · Drei Versuche · Der beste zählt</p></div>
       </div>
       <div class="connection">
-        <div class="status"><span class="dot"></span>DynoGrip verbunden</div>
-        <button class="outline" type="button">Gerät</button>
+        <div class="status" id="connectionStatus"><span class="dot off" id="connectionDot"></span><span id="connectionText">DynoGrip nicht verbunden</span></div>
+        <button class="primary" id="connectButton" type="button">DynoGrip verbinden</button>
       </div>
     </header>
 
@@ -196,7 +208,7 @@
         <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
         <p class="force-hint">Die Kraft bleibt auf jeder Seite sichtbar. Probiere den DynoGrip ruhig zuerst aus.</p>
         <div class="force-spacer"></div>
-        <div class="demo-control">
+        <div class="demo-control" id="demoControl">
           <label><span>Demo-Kraft</span><span id="sliderLabel">0.0 kg</span></label>
           <input id="forceSlider" type="range" min="-70" max="70" value="0" step="0.1" />
           <small>Nur für diesen Prototyp: nach rechts ziehen, nach links drücken. Später kommen diese Werte direkt via Bluetooth.</small>
@@ -267,6 +279,10 @@
   </main>
 
   <script>
+    const BLE = {
+      serviceUuid: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+      stateCharacteristicUuid: '6e400003-b5a3-f393-e0a9-e50e24dcca9e'
+    };
     const screens = [...document.querySelectorAll('.screen')];
     const slider = document.getElementById('forceSlider');
     const forceValue = document.getElementById('forceValue');
@@ -281,13 +297,18 @@
     const resultBanner = document.getElementById('resultBanner');
     const instructionTitle = document.getElementById('instructionTitle');
     const instructionText = document.getElementById('instructionText');
+    const connectionDot = document.getElementById('connectionDot');
+    const connectionText = document.getElementById('connectionText');
+    const connectButton = document.getElementById('connectButton');
+    const demoControl = document.getElementById('demoControl');
     const ATTEMPT_START = 2;
     const ATTEMPT_END = 1;
     const RELEASE_DELAY = 650;
     const RESULT_SECONDS = 20;
 
     const state = {
-      participant: '', attempts: [], latestName: '', inAttempt: false, attemptPeak: 0, attemptDirection: '', releaseTimer: null, countdownTimer: null,
+      participant: '', attempts: [], latestName: '', inAttempt: false, attemptPeak: 0, attemptDirection: '', releaseTimer: null,
+      countdownTimer: null, countdownTimeout: null, signedForce: 0, connected: false, connecting: false, bleDevice: null,
       ranks: [
         { name: 'Gusti Brösmeli', value: 42.5, direction: 'pull' },
         { name: 'Domi 1337', value: 38.6, direction: 'pull' },
@@ -303,15 +324,76 @@
       if (name === 'name') setTimeout(() => document.getElementById('firstName').focus(), 80);
     }
 
-    function readForce() { return Math.abs(Number(slider.value)); }
-
-    function updateForce() {
-      const signed = Number(slider.value);
+    function updateForce(signed = state.signedForce) {
       const value = Math.abs(signed);
       forceValue.textContent = value.toFixed(1);
       sliderLabel.textContent = `${value.toFixed(1)} kg`;
       direction.textContent = value < .5 ? 'Bereit' : signed > 0 ? 'Ziehen' : 'Drücken';
       meterFill.style.width = `${Math.min(100, value / 70 * 100)}%`;
+    }
+
+    function handleSignedForce(signed) {
+      if (!Number.isFinite(signed)) return;
+      state.signedForce = signed;
+      updateForce(signed);
+      detectAutomaticAttempt(signed);
+    }
+
+    function parseStatePacket(dataView) {
+      if (!dataView || dataView.byteLength < 20) return null;
+      try {
+        const force = dataView.getFloat32(4, true);
+        return Number.isFinite(force) && force >= -1000 && force <= 1000 ? { force } : null;
+      } catch { return null; }
+    }
+
+    function setConnectionState(connected, label = '') {
+      state.connected = connected;
+      state.connecting = false;
+      connectionDot.classList.toggle('off', !connected);
+      connectionText.textContent = connected ? `DynoGrip verbunden${label ? ': ' + label : ''}` : 'DynoGrip nicht verbunden';
+      connectButton.textContent = connected ? 'Verbunden' : 'DynoGrip verbinden';
+      connectButton.className = connected ? 'outline' : 'primary';
+      demoControl.style.display = connected ? 'none' : '';
+    }
+
+    function onBluetoothDisconnected() {
+      setConnectionState(false);
+      state.bleDevice = null;
+      handleSignedForce(0);
+    }
+
+    function onStateCharacteristicChanged(event) {
+      const packet = parseStatePacket(event.target.value);
+      if (!packet) return;
+      // Gleiche Vorzeichenumkehr wie in der Original-Webseite:
+      // positiv = Ziehen, negativ = Drücken.
+      handleSignedForce(-packet.force);
+    }
+
+    async function connectDynoGrip() {
+      if (state.connected || state.connecting) return;
+      if (!navigator.bluetooth) {
+        connectionText.textContent = 'Web Bluetooth nicht verfügbar';
+        return;
+      }
+      try {
+        state.connecting = true;
+        connectButton.textContent = 'Verbinde …';
+        const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE.serviceUuid] }] });
+        device.addEventListener('gattserverdisconnected', onBluetoothDisconnected);
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(BLE.serviceUuid);
+        const characteristic = await service.getCharacteristic(BLE.stateCharacteristicUuid);
+        await characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', onStateCharacteristicChanged);
+        state.bleDevice = device;
+        setConnectionState(true, device.name || '');
+      } catch (error) {
+        state.connecting = false;
+        setConnectionState(false);
+        connectionText.textContent = error?.name === 'NotFoundError' ? 'Verbindung abgebrochen' : 'Verbindung fehlgeschlagen';
+      }
     }
 
     function renderAttempts() {
@@ -356,6 +438,7 @@
 
     function goHomeWithResult() {
       clearInterval(state.countdownTimer);
+      clearTimeout(state.countdownTimeout);
       const completedName = state.participant;
       const pullBest = Math.max(0, ...state.attempts.filter(a => a.direction === 'pull').map(a => a.value));
       const pushBest = Math.max(0, ...state.attempts.filter(a => a.direction === 'push').map(a => a.value));
@@ -369,11 +452,12 @@
       clearMeasurementState();
       resetParticipantForm();
       slider.value = 0;
-      updateForce();
+      if (!state.connected) handleSignedForce(0);
     }
 
     function startResultCountdown() {
       clearInterval(state.countdownTimer);
+      clearTimeout(state.countdownTimeout);
       const started = performance.now();
       const duration = RESULT_SECONDS * 1000;
       const fill = document.getElementById('countdownFill');
@@ -384,8 +468,9 @@
         const remaining = Math.max(0, duration - (performance.now() - started));
         fill.style.width = `${remaining / duration * 100}%`;
         label.textContent = `Zum Startbildschirm · ${Math.ceil(remaining / 1000)} s`;
-        if (remaining <= 0) goHomeWithResult();
+        if (remaining <= 0) clearInterval(state.countdownTimer);
       }, 100);
+      state.countdownTimeout = setTimeout(goHomeWithResult, duration);
     }
 
     function resultForDirection(direction) {
@@ -430,9 +515,8 @@
       renderAttempts();
     }
 
-    function detectAutomaticAttempt() {
+    function detectAutomaticAttempt(signed = state.signedForce) {
       if (!document.querySelector('[data-screen="attempts"]').classList.contains('active')) return;
-      const signed = Number(slider.value);
       const absolute = Math.abs(signed);
       if (!state.inAttempt && absolute >= ATTEMPT_START && state.attempts.length < 3) {
         state.inAttempt = true;
@@ -452,7 +536,8 @@
       }
     }
 
-    slider.addEventListener('input', () => { updateForce(); detectAutomaticAttempt(); });
+    slider.addEventListener('input', () => handleSignedForce(Number(slider.value)));
+    connectButton.addEventListener('click', connectDynoGrip);
     document.getElementById('startButton').addEventListener('click', () => { resetParticipantForm(); showScreen('name'); });
     document.querySelector('[data-back]').addEventListener('click', () => showScreen('start'));
     document.getElementById('cancelButton').addEventListener('click', () => {
@@ -460,7 +545,7 @@
       clearMeasurementState();
       resetParticipantForm();
       slider.value = 0;
-      updateForce();
+      if (!state.connected) handleSignedForce(0);
       showScreen('start');
     });
 
@@ -480,7 +565,7 @@
     });
 
     document.getElementById('finishButton').addEventListener('click', goHomeWithResult);
-    updateForce(); renderRanks();
+    setConnectionState(false); updateForce(); renderRanks();
   </script>
 </body>
 </html>
