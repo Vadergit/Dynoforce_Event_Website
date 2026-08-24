@@ -102,15 +102,17 @@
     .safety-icon { font-size: 21px; }
 
     .form { margin-top: 28px; display: grid; gap: 10px; }
-    .name-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+    .name-row { width: min(100%, 520px); display: grid; grid-template-columns: 1fr; gap: 12px; }
     .field label { display: block; font-weight: 850; margin-bottom: 8px; }
     .field input {
       width: 100%; height: 54px; padding: 0 14px; border: 2px solid var(--line); border-radius: 15px;
       outline: none; font-size: 17px; background: #fff;
     }
     .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(47,100,113,.11); }
-    .name-submit { height: 54px; white-space: nowrap; padding-inline: 17px; }
+    .name-submit { width: 100%; height: 54px; white-space: nowrap; padding-inline: 17px; }
     .form-actions { display: flex; justify-content: flex-start; }
+    .name-screen { scroll-padding-block: 28px 48vh; }
+    .name-screen:focus-within { padding-bottom: 48vh; }
 
     .attempt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
     .attempt-top h2 { font-size: clamp(34px, 4vw, 54px); }
@@ -194,8 +196,7 @@
       .stage { min-height: 570px; }
       .side { grid-column: auto; grid-template-columns: 1fr; height: auto; overflow: visible; }
       .screen { padding: 26px 21px; }
-      .name-row { grid-template-columns: 1fr; }
-      .name-submit { width: 100%; }
+      .name-screen:focus-within { padding-bottom: 55vh; }
       .result-grid { grid-template-columns: 1fr; }
       .qr-card { grid-template-columns: 1fr 92px; }
       .qr { width: 92px; height: 92px; }
@@ -246,7 +247,7 @@
           </div>
         </div>
 
-        <div class="screen" data-screen="name">
+        <div class="screen name-screen" data-screen="name">
           <span class="step">Schritt 1 von 2</span>
           <h2>Wie heisst du?</h2>
           <p class="lead">Dein Name wird zusammen mit deinem besten Versuch im öffentlichen Leaderboard angezeigt.</p>
@@ -330,6 +331,8 @@
     const confirmNameButton = document.getElementById('confirmName');
     const offlineMessage = document.getElementById('offlineMessage');
     const nameOfflineMessage = document.getElementById('nameOfflineMessage');
+    const firstNameInput = document.getElementById('firstName');
+    const lastNameInput = document.getElementById('lastName');
     const forceDisconnected = document.getElementById('forceDisconnected');
     const forceMeasurement = document.getElementById('forceMeasurement');
     const ATTEMPT_START = 2;
@@ -363,6 +366,11 @@
       startButton.textContent = online ? 'Jetzt Kraft testen' : 'Offline – Start nicht möglich';
       offlineMessage.hidden = online;
       nameOfflineMessage.hidden = online;
+    }
+
+    function keepNameFieldVisible(event) {
+      const field = event.currentTarget;
+      setTimeout(() => field.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }), 180);
     }
 
     function updateForce(signed = state.signedForce) {
@@ -651,6 +659,22 @@
     document.getElementById('finishButton').addEventListener('click', goHomeWithResult);
     window.addEventListener('online', updateOnlineState);
     window.addEventListener('offline', updateOnlineState);
+    firstNameInput.addEventListener('focus', keepNameFieldVisible);
+    lastNameInput.addEventListener('focus', keepNameFieldVisible);
+    firstNameInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        lastNameInput.focus();
+      }
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        const active = document.activeElement;
+        if (active === firstNameInput || active === lastNameInput) {
+          setTimeout(() => active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }), 80);
+        }
+      });
+    }
     setConnectionState(false); updateOnlineState(); updateForce(); renderRanks();
   </script>
 </body>
