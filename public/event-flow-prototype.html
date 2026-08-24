@@ -68,7 +68,7 @@
     .ghost { color: var(--muted); background: transparent; }
     .primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 
-    .layout { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, .78fr) minmax(0, 1.43fr) minmax(0, .98fr); gap: 10px; overflow: hidden; }
+    .layout { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, .90fr) minmax(0, 1.35fr) minmax(0, .94fr); gap: 10px; overflow: hidden; }
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
 
     .force-card { padding: clamp(15px, 1.7vw, 22px); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
@@ -81,11 +81,11 @@
     .force-disconnected strong { display: block; font-size: 20px; margin-bottom: 5px; }
     .force-disconnected span { display: block; line-height: 1.4; }
     .force-measurement[hidden], .force-disconnected[hidden] { display: none; }
-    .force-qr { margin-top: 14px; padding: 15px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+    .force-qr { margin-top: 24px; padding: 15px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
     .force-qr h3 { margin: 0 0 6px; font-size: 19px; }
     .force-qr p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.35; }
     .force-qr a { color: var(--primary-dark); font-weight: 850; }
-    .force-qr img { width: 190px; height: 190px; padding: 5px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+    .force-qr img { width: 228px; height: 228px; padding: 5px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
 
     .stage { min-width: 0; min-height: 0; height: 100%; overflow: hidden; position: relative; }
     .screen { min-height: 100%; height: 100%; padding: clamp(20px, 3vw, 42px); display: none; animation: fade .28s ease; overflow-y: auto; }
@@ -186,7 +186,7 @@
       .logo { width: 42px; height: 42px; }
       .force-measurement { padding: 14px; }
       .force-qr { padding: 12px; gap: 7px; }
-      .force-qr img { width: 172px; height: 172px; }
+      .force-qr img { width: 206px; height: 206px; }
       .screen { padding: 18px 22px; }
       .start-actions { margin-top: 22px; }
       .safety { padding: 12px 14px; }
@@ -216,7 +216,7 @@
       .result-grid { grid-template-columns: 1fr; }
       .qr-card { grid-template-columns: 1fr 92px; }
       .qr { width: 92px; height: 92px; }
-      .force-qr img { width: 150px; height: 150px; }
+      .force-qr img { width: 180px; height: 180px; }
     }
   </style>
 </head>
