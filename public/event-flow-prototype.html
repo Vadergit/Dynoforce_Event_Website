@@ -92,6 +92,8 @@
     .lead { margin: 0; max-width: 650px; color: var(--muted); font-size: clamp(17px, 2vw, 21px); line-height: 1.5; }
     .start-actions { margin-top: 34px; display: flex; gap: 12px; flex-wrap: wrap; }
     .start-actions .primary { min-height: 62px; padding-inline: 28px; font-size: 18px; }
+    .offline-message { margin: 10px 0 0; color: var(--danger); font-weight: 800; }
+    .offline-message[hidden] { display: none; }
     .safety {
       margin-top: 22px; padding: 16px 18px; border-radius: 18px; background: #fbf4e6;
       border: 1px solid #ead7ad; color: #6d531e; display: flex; gap: 12px; align-items: flex-start; line-height: 1.45;
@@ -237,6 +239,7 @@
           <div class="start-actions">
             <button class="primary" id="startButton" type="button">Jetzt Kraft testen</button>
           </div>
+          <p class="offline-message" id="offlineMessage" hidden>Keine Internetverbindung – Challenge kann nicht gestartet werden.</p>
           <div class="safety">
             <span class="safety-icon">!</span>
             <div><b>Sicher testen</b>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</div>
@@ -253,6 +256,7 @@
               <div class="field"><label for="lastName">Name</label><input id="lastName" autocomplete="family-name" enterkeyhint="done" placeholder="Nachname eingeben" required /></div>
               <button class="primary name-submit" id="confirmName" type="submit">Bestätigen und starten</button>
             </div>
+            <p class="offline-message" id="nameOfflineMessage" hidden>Keine Internetverbindung – Challenge kann nicht gestartet werden.</p>
             <div class="form-actions"><button class="ghost" type="button" data-back>Zurück</button></div>
           </form>
         </div>
@@ -322,6 +326,10 @@
     const connectionDot = document.getElementById('connectionDot');
     const connectionText = document.getElementById('connectionText');
     const connectButton = document.getElementById('connectButton');
+    const startButton = document.getElementById('startButton');
+    const confirmNameButton = document.getElementById('confirmName');
+    const offlineMessage = document.getElementById('offlineMessage');
+    const nameOfflineMessage = document.getElementById('nameOfflineMessage');
     const forceDisconnected = document.getElementById('forceDisconnected');
     const forceMeasurement = document.getElementById('forceMeasurement');
     const ATTEMPT_START = 2;
@@ -346,6 +354,15 @@
     function showScreen(name) {
       screens.forEach(screen => screen.classList.toggle('active', screen.dataset.screen === name));
       if (name === 'name') setTimeout(() => document.getElementById('firstName').focus(), 80);
+    }
+
+    function updateOnlineState() {
+      const online = navigator.onLine;
+      startButton.disabled = !online;
+      confirmNameButton.disabled = !online;
+      startButton.textContent = online ? 'Jetzt Kraft testen' : 'Offline – Start nicht möglich';
+      offlineMessage.hidden = online;
+      nameOfflineMessage.hidden = online;
     }
 
     function updateForce(signed = state.signedForce) {
@@ -597,7 +614,11 @@
     }
 
     connectButton.addEventListener('click', connectDynoGrip);
-    document.getElementById('startButton').addEventListener('click', () => { resetParticipantForm(); showScreen('name'); });
+    startButton.addEventListener('click', () => {
+      if (!navigator.onLine) return;
+      resetParticipantForm();
+      showScreen('name');
+    });
     document.querySelector('[data-back]').addEventListener('click', () => showScreen('start'));
     document.getElementById('cancelButton').addEventListener('click', () => {
       state.attempts = [];
@@ -609,6 +630,10 @@
 
     document.getElementById('nameForm').addEventListener('submit', event => {
       event.preventDefault();
+      if (!navigator.onLine) {
+        updateOnlineState();
+        return;
+      }
       const first = document.getElementById('firstName').value.trim();
       const last = document.getElementById('lastName').value.trim();
       if (!first || !last) return;
@@ -624,7 +649,9 @@
     });
 
     document.getElementById('finishButton').addEventListener('click', goHomeWithResult);
-    setConnectionState(false); updateForce(); renderRanks();
+    window.addEventListener('online', updateOnlineState);
+    window.addEventListener('offline', updateOnlineState);
+    setConnectionState(false); updateOnlineState(); updateForce(); renderRanks();
   </script>
 </body>
 </html>
