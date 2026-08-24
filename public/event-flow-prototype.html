@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DynoForce Event Flow – Prototyp</title>
+  <link rel="icon" type="image/png" href="/dynoforce-icon.png" />
+  <link rel="apple-touch-icon" href="/dynoforce-icon.png" />
   <style>
     :root {
       --bg: #f3f4f0;
@@ -71,17 +73,22 @@
 
     .force-card { padding: clamp(15px, 1.7vw, 22px); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
     .eyebrow { color: var(--muted); font-weight: 850; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
-    .force-value { margin-top: 12px; font-size: clamp(62px, 7vw, 108px); line-height: .88; font-weight: 950; letter-spacing: -.075em; white-space: nowrap; }
+    .force-measurement { margin-top: 14px; padding: 18px; border: 2px solid var(--line); border-radius: 22px; background: linear-gradient(180deg, #fff 0%, #f4f6f4 100%); }
+    .force-value { font-size: clamp(78px, 8vw, 126px); line-height: .88; font-weight: 950; letter-spacing: -.075em; white-space: nowrap; }
     .force-value small { font-size: .25em; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
     .direction { min-height: 25px; margin: 15px 0 0; color: var(--primary); font-weight: 900; font-size: 18px; }
     .meter { height: 14px; border-radius: 999px; overflow: hidden; background: #e3e7e4; margin-top: 18px; }
     .meter-fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #56a29a, var(--accent)); transition: width .15s ease; }
-    .force-hint { margin: 12px 0 24px; color: var(--muted); line-height: 1.45; }
     .force-disconnected { margin-top: 18px; padding: 18px; border: 1px solid #e3c3c0; border-radius: 18px; background: #fbefee; color: #80352f; }
     .force-disconnected strong { display: block; font-size: 20px; margin-bottom: 5px; }
     .force-disconnected span { display: block; line-height: 1.4; }
     .force-measurement[hidden], .force-disconnected[hidden] { display: none; }
     .force-spacer { flex: 1; }
+    .force-qr { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft); display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 14px; align-items: center; }
+    .force-qr h3 { margin: 0 0 6px; font-size: 19px; }
+    .force-qr p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .force-qr a { color: var(--primary-dark); font-weight: 850; }
+    .force-qr img { width: 150px; height: 150px; padding: 5px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
 
     .stage { min-width: 0; min-height: 0; height: 100%; overflow: hidden; position: relative; }
     .screen { min-height: 100%; height: 100%; padding: clamp(20px, 3vw, 42px); display: none; animation: fade .28s ease; overflow-y: auto; }
@@ -151,13 +158,13 @@
     .countdown-fill { position: absolute; inset: 0; width: 100%; background: var(--primary); transform-origin: left center; }
     .countdown-label { position: relative; z-index: 1; }
 
-    .side { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; overflow: hidden; }
+    .side { min-width: 0; min-height: 0; height: 100%; display: block; overflow: hidden; }
     .qr-card { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 12px; align-items: center; }
     .qr-card h3, .leaderboard h3 { margin: 0 0 6px; font-size: 20px; }
     .qr-card p { margin: 0; color: var(--muted); line-height: 1.4; font-size: 14px; }
     .qr-card a { color: var(--primary-dark); font-weight: 850; }
     .qr { width: 112px; height: 112px; padding: 4px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
-    .leaderboard { padding: 16px; min-height: 0; overflow-y: auto; }
+    .leaderboard { height: 100%; padding: 16px; min-height: 0; overflow-y: auto; }
     .leaderboard-sub { color: var(--muted); margin: 0 0 15px; }
     .leader-section + .leader-section { margin-top: 18px; padding-top: 16px; border-top: 2px solid var(--line); }
     .leader-section h4 { margin: 0 0 7px; font-size: 16px; }
@@ -175,7 +182,9 @@
     @media (max-height: 720px) and (orientation: landscape) {
       .header { min-height: 58px; }
       .logo { width: 42px; height: 42px; }
-      .force-hint { margin-bottom: 12px; }
+      .force-measurement { padding: 14px; }
+      .force-qr { grid-template-columns: minmax(0, 1fr) 122px; padding: 12px; }
+      .force-qr img { width: 122px; height: 122px; }
       .screen { padding: 18px 22px; }
       .start-actions { margin-top: 22px; }
       .safety { padding: 12px 14px; }
@@ -200,6 +209,8 @@
       .result-grid { grid-template-columns: 1fr; }
       .qr-card { grid-template-columns: 1fr 92px; }
       .qr { width: 92px; height: 92px; }
+      .force-qr { grid-template-columns: minmax(0, 1fr) 130px; }
+      .force-qr img { width: 130px; height: 130px; }
     }
   </style>
 </head>
@@ -227,9 +238,12 @@
           <div class="force-value"><span id="forceValue">0.0</span><small>kg</small></div>
           <div class="direction" id="direction">Bereit</div>
           <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
-          <p class="force-hint">Kraft und Messrichtung bleiben während des gesamten Ablaufs sichtbar.</p>
         </div>
         <div class="force-spacer"></div>
+        <div class="force-qr">
+          <div><h3>Rangliste der Teilnehmer</h3><p>QR-Code scannen und alle Resultate ansehen.</p><p><a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">Rangliste öffnen</a></p></div>
+          <img alt="QR-Code zur Rangliste der Teilnehmer" src="https://quickchart.io/qr?size=300&margin=1&text=https%3A%2F%2Fevent.dynoforce.ch%2F%23%2Fe%2Fevent-1787502725553" />
+        </div>
       </section>
 
       <section class="card stage">
@@ -283,13 +297,9 @@
       </section>
 
       <aside class="side">
-        <section class="card qr-card">
-          <div><h3>Zuschauer-Rangliste</h3><p>QR-Code scannen und alle Resultate auf dem eigenen Gerät ansehen.</p><p><a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">Rangliste öffnen</a></p></div>
-          <img class="qr" alt="QR-Code zum Zuschauer-Leaderboard" src="https://quickchart.io/qr?size=200&margin=1&text=https%3A%2F%2Fevent.dynoforce.ch%2F%23%2Fe%2Fevent-1787502725553" />
-        </section>
         <section class="card leaderboard">
           <div class="result-banner" id="resultBanner"></div>
-          <h3>Leaderboard</h3><p class="leaderboard-sub">Separate Wertung für beide Richtungen</p>
+          <h3>Rangliste der Teilnehmer</h3><p class="leaderboard-sub">Separate Wertung für beide Richtungen</p>
           <div class="leader-section"><h4><span>↗</span> Rangliste Ziehen</h4><ol class="rank-list" id="pullRankList"></ol></div>
           <div class="leader-section"><h4><span>↘</span> Rangliste Drücken</h4><ol class="rank-list" id="pushRankList"></ol></div>
         </section>
