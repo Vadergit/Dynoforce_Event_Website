@@ -77,8 +77,6 @@
     .force-value { font-size: clamp(78px, 8vw, 126px); line-height: .88; font-weight: 950; letter-spacing: -.075em; white-space: nowrap; }
     .force-value small { font-size: .25em; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
     .direction { min-height: 25px; margin: 15px 0 0; color: var(--primary); font-weight: 900; font-size: 18px; }
-    .meter { height: 14px; border-radius: 999px; overflow: hidden; background: #e3e7e4; margin-top: 18px; }
-    .meter-fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #56a29a, var(--accent)); transition: width .15s ease; }
     .force-disconnected { margin-top: 18px; padding: 18px; border: 1px solid #e3c3c0; border-radius: 18px; background: #fbefee; color: #80352f; }
     .force-disconnected strong { display: block; font-size: 20px; margin-bottom: 5px; }
     .force-disconnected span { display: block; line-height: 1.4; }
@@ -237,7 +235,6 @@
         <div class="force-measurement" id="forceMeasurement" hidden>
           <div class="force-value"><span id="forceValue">0.0</span><small>kg</small></div>
           <div class="direction" id="direction">Bereit</div>
-          <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
         </div>
         <div class="force-spacer"></div>
         <div class="force-qr">
@@ -325,7 +322,6 @@
     const screens = [...document.querySelectorAll('.screen')];
     const forceValue = document.getElementById('forceValue');
     const direction = document.getElementById('direction');
-    const meterFill = document.getElementById('meterFill');
     const attemptDots = document.getElementById('attemptDots');
     const attemptTitle = document.getElementById('attemptTitle');
     const bestBadge = document.getElementById('bestBadge');
@@ -387,7 +383,6 @@
       const value = Math.abs(signed);
       forceValue.textContent = value.toFixed(1);
       direction.textContent = value < .5 ? 'Bereit' : signed > 0 ? 'Ziehen' : 'Drücken';
-      meterFill.style.width = `${Math.min(100, value / 70 * 100)}%`;
     }
 
     function handleSignedForce(signed) {
