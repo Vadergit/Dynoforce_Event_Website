@@ -856,7 +856,7 @@ function guidedStageMarkup() {
       <div class="eyebrow">Offene Challenge</div>
       <h2>Wie stark bist du?</h2>
       <p>Teste deine ${mode === "Ziehen" ? "Zugkraft" : mode === "Drücken" ? "Druckkraft" : "Zug- oder Druckkraft"}. Du hast ${state.event.attempts} Versuche – dein bester Wert kommt in die Rangliste.</p>
-      <button class="button primary guided-primary-action" id="guidedPrimaryAction" type="button" ${!writable || !online || state.connecting ? "disabled" : ""}>${primaryLabel}</button>
+      <button class="button primary guided-primary-action" id="guidedPrimaryAction" type="button" ${!writable || !online || !state.connected || state.connecting ? "disabled" : ""}>${primaryLabel}</button>
       <div class="guided-safety-box"><strong>! &nbsp; Sicher testen</strong><span>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</span></div>
     </div>
   `;
@@ -4023,10 +4023,7 @@ function bindLiveActions() {
       render();
       return;
     }
-    if (!state.connected) {
-      const connected = await connectToDevice();
-      if (!connected) return;
-    }
+    if (!state.connected) return;
     state.guidedLiveStep = "name";
     clearError();
     render();
