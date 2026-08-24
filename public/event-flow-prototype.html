@@ -125,6 +125,14 @@
     .result-number { color: var(--primary); font-size: clamp(74px, 10vw, 132px); line-height: .9; font-weight: 950; letter-spacing: -.07em; }
     .result-number small { color: var(--muted); font-size: .24em; letter-spacing: 0; }
     .result-meta { margin: 18px 0 27px; color: var(--muted); font-size: 18px; }
+    .result-grid { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0 24px; }
+    .result-item { padding: 18px; border: 1px solid var(--line); border-radius: 19px; background: var(--soft); }
+    .result-item span { display: block; color: var(--muted); font-weight: 850; }
+    .result-item strong { display: block; margin: 6px 0 3px; font-size: clamp(27px, 4vw, 42px); letter-spacing: -.045em; }
+    .result-item small { color: var(--primary); font-weight: 900; }
+    .countdown-button { position: relative; min-width: 250px; overflow: hidden; background: #dfe8e8; color: #fff; }
+    .countdown-fill { position: absolute; inset: 0; width: 100%; background: var(--primary); transform-origin: left center; }
+    .countdown-label { position: relative; z-index: 1; }
 
     .side { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-height: 590px; }
     .qr-card { padding: 18px; display: grid; grid-template-columns: 1fr 106px; gap: 15px; align-items: center; }
@@ -134,6 +142,9 @@
     .qr { width: 106px; height: 106px; padding: 5px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 13px; }
     .leaderboard { padding: 20px; overflow: hidden; }
     .leaderboard-sub { color: var(--muted); margin: 0 0 15px; }
+    .leader-section + .leader-section { margin-top: 18px; padding-top: 16px; border-top: 2px solid var(--line); }
+    .leader-section h4 { margin: 0 0 7px; font-size: 16px; }
+    .leader-section h4 span { color: var(--primary); }
     .rank-list { list-style: none; margin: 0; padding: 0; }
     .rank { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 13px 2px; border-top: 1px solid var(--line); }
     .rank:first-child { border-top: 0; }
@@ -158,6 +169,7 @@
       .stage { min-height: 570px; }
       .side { grid-column: auto; grid-template-columns: 1fr; }
       .screen { padding: 26px 21px; }
+      .result-grid { grid-template-columns: 1fr; }
       .qr-card { grid-template-columns: 1fr 92px; }
       .qr { width: 92px; height: 92px; }
     }
@@ -226,29 +238,29 @@
           </div>
           <p class="lead" id="participantGreeting">Du bist bereit.</p>
           <div class="attempt-dots" id="attemptDots"></div>
-          <div class="instruction"><strong>Jetzt kräftig ziehen oder drücken</strong><span>Löse den DynoGrip danach wieder vollständig. Der höchste Wert dieses Versuchs wird übernommen.</span></div>
-          <button class="primary record" id="recordButton" type="button">Aktuellen Wert als Versuch erfassen</button>
+          <div class="instruction"><strong id="instructionTitle">Jetzt kräftig ziehen oder drücken</strong><span id="instructionText">Der Versuch wird automatisch erkannt. Baue Kraft auf und löse den DynoGrip danach wieder vollständig.</span></div>
           <button class="ghost" id="cancelButton" type="button">Teilnahme abbrechen</button>
         </div>
 
         <div class="screen result-screen" data-screen="result">
           <span class="step">Geschafft</span>
           <h2 id="resultName">Starker Versuch!</h2>
-          <div class="result-number"><span id="resultValue">0.0</span><small>kg</small></div>
-          <div class="result-meta" id="resultMeta">Dein bester Wert aus drei Versuchen.</div>
-          <button class="primary" id="finishButton" type="button">Zum Startbildschirm</button>
+          <div class="result-grid" id="resultGrid"></div>
+          <div class="result-meta" id="resultMeta">Deine besten Werte aus drei Versuchen.</div>
+          <button class="primary countdown-button" id="finishButton" type="button"><span class="countdown-fill" id="countdownFill"></span><span class="countdown-label" id="countdownLabel">Zum Startbildschirm · 20 s</span></button>
         </div>
       </section>
 
       <aside class="side">
         <section class="card qr-card">
-          <div><h3>Live mitverfolgen</h3><p>Leaderboard auf dem eigenen Gerät öffnen.</p><p><a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">event.dynoforce.ch</a></p></div>
+          <div><h3>Zuschauer-Rangliste</h3><p>QR-Code scannen und alle Resultate auf dem eigenen Gerät ansehen.</p><p><a href="https://event.dynoforce.ch/#/e/event-1787502725553" target="_blank" rel="noreferrer">Rangliste öffnen</a></p></div>
           <img class="qr" alt="QR-Code zum Zuschauer-Leaderboard" src="https://quickchart.io/qr?size=200&margin=1&text=https%3A%2F%2Fevent.dynoforce.ch%2F%23%2Fe%2Fevent-1787502725553" />
         </section>
         <section class="card leaderboard">
           <div class="result-banner" id="resultBanner"></div>
-          <h3>Leaderboard</h3><p class="leaderboard-sub">Die stärksten Versuche der Challenge</p>
-          <ol class="rank-list" id="rankList"></ol>
+          <h3>Leaderboard</h3><p class="leaderboard-sub">Separate Wertung für beide Richtungen</p>
+          <div class="leader-section"><h4><span>↗</span> Rangliste Ziehen</h4><ol class="rank-list" id="pullRankList"></ol></div>
+          <div class="leader-section"><h4><span>↘</span> Rangliste Drücken</h4><ol class="rank-list" id="pushRankList"></ol></div>
         </section>
       </aside>
     </div>
@@ -264,17 +276,25 @@
     const attemptDots = document.getElementById('attemptDots');
     const attemptTitle = document.getElementById('attemptTitle');
     const bestBadge = document.getElementById('bestBadge');
-    const rankList = document.getElementById('rankList');
+    const pullRankList = document.getElementById('pullRankList');
+    const pushRankList = document.getElementById('pushRankList');
     const resultBanner = document.getElementById('resultBanner');
+    const instructionTitle = document.getElementById('instructionTitle');
+    const instructionText = document.getElementById('instructionText');
+    const ATTEMPT_START = 2;
+    const ATTEMPT_END = 1;
+    const RELEASE_DELAY = 650;
+    const RESULT_SECONDS = 20;
 
     const state = {
-      participant: '', attempts: [], latestName: '',
+      participant: '', attempts: [], latestName: '', inAttempt: false, attemptPeak: 0, attemptDirection: '', releaseTimer: null, countdownTimer: null,
       ranks: [
-        { name: 'Gusti Brösmeli', value: 42.5 },
-        { name: 'Domi 1337', value: 38.6 },
-        { name: 'Sepp Ziehnicht', value: 34.2 },
-        { name: 'Lena Kraft', value: 31.8 },
-        { name: 'Nico Boulder', value: 29.7 }
+        { name: 'Gusti Brösmeli', value: 42.5, direction: 'pull' },
+        { name: 'Domi 1337', value: 38.6, direction: 'pull' },
+        { name: 'Sepp Ziehnicht', value: 34.2, direction: 'pull' },
+        { name: 'Domi 1337', value: 58.6, direction: 'push' },
+        { name: 'Gusti Brösmeli', value: 42.5, direction: 'push' },
+        { name: 'Lena Kraft', value: 31.8, direction: 'push' }
       ]
     };
 
@@ -295,41 +315,154 @@
     }
 
     function renderAttempts() {
-      const best = Math.max(0, ...state.attempts);
+      const pullBest = Math.max(0, ...state.attempts.filter(a => a.direction === 'pull').map(a => a.value));
+      const pushBest = Math.max(0, ...state.attempts.filter(a => a.direction === 'push').map(a => a.value));
       const next = Math.min(state.attempts.length + 1, 3);
       attemptTitle.textContent = `Versuch ${next} von 3`;
-      bestBadge.textContent = `Bestwert: ${best ? best.toFixed(1) + ' kg' : '–'}`;
+      bestBadge.textContent = `Ziehen ${pullBest ? pullBest.toFixed(1) : '–'} · Drücken ${pushBest ? pushBest.toFixed(1) : '–'}`;
       attemptDots.innerHTML = [0,1,2].map(i => {
         const done = i < state.attempts.length;
         const active = i === state.attempts.length;
-        return `<div class="attempt-dot ${done ? 'done' : active ? 'active' : ''}">Versuch ${i+1}<strong>${done ? state.attempts[i].toFixed(1) + ' kg' : active ? 'Bereit' : '–'}</strong></div>`;
+        const result = state.attempts[i];
+        const directionLabel = result?.direction === 'pull' ? 'Ziehen' : 'Drücken';
+        return `<div class="attempt-dot ${done ? 'done' : active ? 'active' : ''}">Versuch ${i+1}<strong>${done ? result.value.toFixed(1) + ' kg' : active ? 'Bereit' : '–'}</strong>${done ? directionLabel : ''}</div>`;
       }).join('');
     }
 
-    function renderRanks(highlight = '') {
-      state.ranks.sort((a,b) => b.value - a.value);
-      rankList.innerHTML = state.ranks.slice(0, 6).map((entry, index) => `
+    function rankMarkup(direction, highlight = '') {
+      return state.ranks.filter(entry => entry.direction === direction).sort((a,b) => b.value - a.value).slice(0, 3).map((entry, index) => `
         <li class="rank ${entry.name === highlight ? 'new' : ''}">
           <span class="medal">${index + 1}</span><span class="rank-name">${entry.name}</span><span class="rank-value">${entry.value.toFixed(1)} kg</span>
         </li>`).join('');
     }
 
+    function renderRanks(highlight = '') {
+      pullRankList.innerHTML = rankMarkup('pull', highlight);
+      pushRankList.innerHTML = rankMarkup('push', highlight);
+    }
+
+    function clearMeasurementState() {
+      clearTimeout(state.releaseTimer);
+      state.inAttempt = false;
+      state.attemptPeak = 0;
+      state.attemptDirection = '';
+      state.releaseTimer = null;
+    }
+
+    function resetParticipantForm() {
+      document.getElementById('nameForm').reset();
+      state.participant = '';
+    }
+
     function goHomeWithResult() {
-      const best = Math.max(...state.attempts);
+      clearInterval(state.countdownTimer);
+      const completedName = state.participant;
+      const pullBest = Math.max(0, ...state.attempts.filter(a => a.direction === 'pull').map(a => a.value));
+      const pushBest = Math.max(0, ...state.attempts.filter(a => a.direction === 'push').map(a => a.value));
       showScreen('start');
-      resultBanner.textContent = `${state.participant}: ${best.toFixed(1)} kg – dein Resultat wurde ins Leaderboard übernommen.`;
+      const summary = [pullBest && `Ziehen ${pullBest.toFixed(1)} kg`, pushBest && `Drücken ${pushBest.toFixed(1)} kg`].filter(Boolean).join(' · ');
+      resultBanner.textContent = `${completedName}: ${summary} – ins Leaderboard übernommen.`;
       resultBanner.classList.add('show');
-      renderRanks(state.participant);
+      renderRanks(completedName);
       setTimeout(() => resultBanner.classList.remove('show'), 12000);
       state.attempts = [];
+      clearMeasurementState();
+      resetParticipantForm();
       slider.value = 0;
       updateForce();
     }
 
-    slider.addEventListener('input', updateForce);
-    document.getElementById('startButton').addEventListener('click', () => showScreen('name'));
+    function startResultCountdown() {
+      clearInterval(state.countdownTimer);
+      const started = performance.now();
+      const duration = RESULT_SECONDS * 1000;
+      const fill = document.getElementById('countdownFill');
+      const label = document.getElementById('countdownLabel');
+      fill.style.width = '100%';
+      label.textContent = `Zum Startbildschirm · ${RESULT_SECONDS} s`;
+      state.countdownTimer = setInterval(() => {
+        const remaining = Math.max(0, duration - (performance.now() - started));
+        fill.style.width = `${remaining / duration * 100}%`;
+        label.textContent = `Zum Startbildschirm · ${Math.ceil(remaining / 1000)} s`;
+        if (remaining <= 0) goHomeWithResult();
+      }, 100);
+    }
+
+    function resultForDirection(direction) {
+      const values = state.attempts.filter(a => a.direction === direction).map(a => a.value);
+      if (!values.length) return null;
+      const value = Math.max(...values);
+      const ranking = state.ranks.filter(r => r.direction === direction).sort((a,b) => b.value-a.value);
+      return { value, rank: ranking.findIndex(r => r.name === state.participant) + 1 };
+    }
+
+    function completeParticipation() {
+      clearMeasurementState();
+      ['pull', 'push'].forEach(directionKey => {
+        const values = state.attempts.filter(a => a.direction === directionKey).map(a => a.value);
+        if (!values.length) return;
+        const best = Math.max(...values);
+        state.ranks = state.ranks.filter(entry => !(entry.name === state.participant && entry.direction === directionKey));
+        state.ranks.push({ name: state.participant, value: best, direction: directionKey });
+      });
+      const pull = resultForDirection('pull');
+      const push = resultForDirection('push');
+      document.getElementById('resultName').textContent = `Stark, ${state.participant.split(' ')[0]}!`;
+      document.getElementById('resultGrid').innerHTML = [
+        `<div class="result-item"><span>Ziehen</span><strong>${pull ? pull.value.toFixed(1) + ' kg' : '–'}</strong><small>${pull ? 'Rang ' + pull.rank : 'Kein Versuch'}</small></div>`,
+        `<div class="result-item"><span>Drücken</span><strong>${push ? push.value.toFixed(1) + ' kg' : '–'}</strong><small>${push ? 'Rang ' + push.rank : 'Kein Versuch'}</small></div>`
+      ].join('');
+      showScreen('result');
+      startResultCountdown();
+    }
+
+    function finalizeAutomaticAttempt() {
+      if (!state.inAttempt || state.attempts.length >= 3) return;
+      const captured = { value: state.attemptPeak, direction: state.attemptDirection };
+      clearMeasurementState();
+      state.attempts.push(captured);
+      if (state.attempts.length >= 3) {
+        completeParticipation();
+        return;
+      }
+      instructionTitle.textContent = `${captured.direction === 'pull' ? 'Ziehen' : 'Drücken'} mit ${captured.value.toFixed(1)} kg erfasst`;
+      instructionText.textContent = 'DynoGrip vollständig gelöst. Du bist bereit für den nächsten Versuch.';
+      renderAttempts();
+    }
+
+    function detectAutomaticAttempt() {
+      if (!document.querySelector('[data-screen="attempts"]').classList.contains('active')) return;
+      const signed = Number(slider.value);
+      const absolute = Math.abs(signed);
+      if (!state.inAttempt && absolute >= ATTEMPT_START && state.attempts.length < 3) {
+        state.inAttempt = true;
+        state.attemptPeak = absolute;
+        state.attemptDirection = signed >= 0 ? 'pull' : 'push';
+        instructionTitle.textContent = state.attemptDirection === 'pull' ? 'Ziehen wird gemessen …' : 'Drücken wird gemessen …';
+        instructionText.textContent = 'Halte kurz deinen stärksten Wert und löse den DynoGrip danach vollständig.';
+      }
+      if (!state.inAttempt) return;
+      const sameDirection = (signed >= 0 ? 'pull' : 'push') === state.attemptDirection;
+      if (sameDirection && absolute > state.attemptPeak) state.attemptPeak = absolute;
+      if (absolute < ATTEMPT_END) {
+        if (!state.releaseTimer) state.releaseTimer = setTimeout(finalizeAutomaticAttempt, RELEASE_DELAY);
+      } else if (state.releaseTimer) {
+        clearTimeout(state.releaseTimer);
+        state.releaseTimer = null;
+      }
+    }
+
+    slider.addEventListener('input', () => { updateForce(); detectAutomaticAttempt(); });
+    document.getElementById('startButton').addEventListener('click', () => { resetParticipantForm(); showScreen('name'); });
     document.querySelector('[data-back]').addEventListener('click', () => showScreen('start'));
-    document.getElementById('cancelButton').addEventListener('click', () => { state.attempts = []; showScreen('start'); });
+    document.getElementById('cancelButton').addEventListener('click', () => {
+      state.attempts = [];
+      clearMeasurementState();
+      resetParticipantForm();
+      slider.value = 0;
+      updateForce();
+      showScreen('start');
+    });
 
     document.getElementById('nameForm').addEventListener('submit', event => {
       event.preventDefault();
@@ -338,30 +471,12 @@
       if (!first || !last) return;
       state.participant = `${first} ${last}`;
       state.attempts = [];
+      clearMeasurementState();
       document.getElementById('participantGreeting').textContent = `${first}, du hast drei Versuche. Dein bester Wert zählt.`;
+      instructionTitle.textContent = 'Jetzt kräftig ziehen oder drücken';
+      instructionText.textContent = 'Der Versuch wird automatisch erkannt. Baue Kraft auf und löse den DynoGrip danach wieder vollständig.';
       renderAttempts();
       showScreen('attempts');
-    });
-
-    document.getElementById('recordButton').addEventListener('click', () => {
-      if (readForce() < 2) {
-        document.querySelector('.instruction strong').textContent = 'Bitte zuerst Kraft aufbauen';
-        setTimeout(() => document.querySelector('.instruction strong').textContent = 'Jetzt kräftig ziehen oder drücken', 1700);
-        return;
-      }
-      state.attempts.push(readForce());
-      if (state.attempts.length < 3) {
-        slider.value = 0; updateForce(); renderAttempts();
-        return;
-      }
-      const best = Math.max(...state.attempts);
-      state.ranks = state.ranks.filter(entry => entry.name !== state.participant);
-      state.ranks.push({ name: state.participant, value: best });
-      const placement = [...state.ranks].sort((a,b) => b.value-a.value).findIndex(x => x.name === state.participant) + 1;
-      document.getElementById('resultName').textContent = `Stark, ${state.participant.split(' ')[0]}!`;
-      document.getElementById('resultValue').textContent = best.toFixed(1);
-      document.getElementById('resultMeta').textContent = `Bester Wert aus drei Versuchen · aktuell Rang ${placement}`;
-      showScreen('result');
     });
 
     document.getElementById('finishButton').addEventListener('click', goHomeWithResult);
