@@ -2617,7 +2617,7 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
 }
 
 .guided-qr-block {
-  margin-top: 52px;
+  margin-top: auto;
   padding: 12px 4px 14px;
   min-height: 292px;
   border: 1px solid var(--line);
@@ -2681,14 +2681,17 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
 }
 
 .guided-primary-action {
-  margin-top: 24px;
-  min-height: 54px;
-  padding-inline: 24px;
+  display: block;
+  width: min(100%, 310px);
+  min-height: 62px;
+  margin: 30px auto 0;
+  padding-inline: 30px;
+  font-size: 17px;
   font-weight: 800;
 }
 
 .guided-safety-box {
-  margin-top: 16px;
+  margin-top: 28px;
   padding: 13px 16px;
   border: 1px solid #e4d7ba;
   border-radius: 15px;
@@ -2875,10 +2878,20 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
   font-size: 13px;
 }
 
+.guided-ranking-section {
+  padding: 12px 13px 10px;
+  border: 1px solid #dcded8;
+  border-radius: 15px;
+  background: #f7f8f5;
+}
+
+.guided-ranking-section:nth-of-type(2) {
+  background: #f3f7f6;
+  border-color: #d2dfdb;
+}
+
 .guided-ranking-section + .guided-ranking-section {
-  margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
+  margin-top: 14px;
 }
 
 .guided-ranking-section h4 {

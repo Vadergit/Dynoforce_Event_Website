@@ -851,7 +851,7 @@ function guidedStageMarkup() {
     : !online
     ? "Offline – Start nicht möglich"
     : state.connected
-      ? "Jetzt Kraft testen"
+      ? "Jetzt meine Kraft testen"
       : state.connecting
         ? "DynoGrip verbindet …"
         : "DynoGrip verbinden";
