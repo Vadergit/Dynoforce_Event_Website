@@ -850,11 +850,7 @@ function guidedStageMarkup() {
     ? "Event nicht diesem Konto zugeordnet"
     : !online
     ? "Offline – Start nicht möglich"
-    : state.connected
-      ? "Jetzt meine Kraft testen"
-      : state.connecting
-        ? "DynoGrip verbindet …"
-        : "DynoGrip verbinden";
+    : "Jetzt meine Kraft testen";
   return `
     <div class="guided-screen guided-start-screen">
       <div class="eyebrow">Offene Challenge</div>
