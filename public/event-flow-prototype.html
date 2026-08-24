@@ -74,7 +74,7 @@
     .force-card { padding: clamp(15px, 1.7vw, 22px); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
     .eyebrow { color: var(--muted); font-weight: 850; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
     .force-measurement { margin-top: 14px; padding: 18px; border: 2px solid var(--line); border-radius: 22px; background: linear-gradient(180deg, #fff 0%, #f4f6f4 100%); }
-    .force-value { font-size: clamp(78px, 8vw, 126px); line-height: .88; font-weight: 950; letter-spacing: -.075em; white-space: nowrap; }
+    .force-value { font-size: clamp(88px, 9vw, 142px); line-height: .86; font-weight: 950; letter-spacing: -.075em; white-space: nowrap; }
     .force-value small { font-size: .25em; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
     .direction { min-height: 25px; margin: 15px 0 0; color: var(--primary); font-weight: 900; font-size: 18px; }
     .force-disconnected { margin-top: 18px; padding: 18px; border: 1px solid #e3c3c0; border-radius: 18px; background: #fbefee; color: #80352f; }
@@ -146,6 +146,8 @@
     .result-number { color: var(--primary); font-size: clamp(74px, 10vw, 132px); line-height: .9; font-weight: 950; letter-spacing: -.07em; }
     .result-number small { color: var(--muted); font-size: .24em; letter-spacing: 0; }
     .result-meta { margin: 18px 0 27px; color: var(--muted); font-size: 18px; }
+    .top-three-message { width: 100%; margin: 8px 0 0; padding: 13px 16px; border: 1px solid #e4c66a; border-radius: 16px; background: #fff7da; color: #6d5312; font-size: 17px; font-weight: 900; line-height: 1.4; }
+    .top-three-message[hidden] { display: none; }
     .result-grid { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0 24px; }
     .result-grid.single { grid-template-columns: minmax(260px, 420px); justify-content: center; }
     .result-item { padding: 18px; border: 1px solid var(--line); border-radius: 19px; background: var(--soft); }
@@ -287,6 +289,7 @@
         <div class="screen result-screen" data-screen="result">
           <span class="step">Geschafft</span>
           <h2 id="resultName">Starker Versuch!</h2>
+          <div class="top-three-message" id="topThreeMessage" hidden></div>
           <div class="result-grid" id="resultGrid"></div>
           <div class="result-meta" id="resultMeta">Deine besten Werte aus drei Versuchen.</div>
           <button class="primary countdown-button" id="finishButton" type="button"><span class="countdown-fill" id="countdownFill"></span><span class="countdown-label" id="countdownLabel">Zum Startbildschirm · 20 s</span></button>
@@ -296,7 +299,7 @@
       <aside class="side">
         <section class="card leaderboard">
           <div class="result-banner" id="resultBanner"></div>
-          <h3>Rangliste der Teilnehmer</h3><p class="leaderboard-sub">Separate Wertung für beide Richtungen</p>
+          <h3>Rangliste der Teilnehmer</h3><p class="leaderboard-sub">Die besten 3 · separate Wertung für Ziehen und Drücken</p>
           <div class="leader-section"><h4><span>↗</span> Rangliste Ziehen</h4><ol class="rank-list" id="pullRankList"></ol></div>
           <div class="leader-section"><h4><span>↘</span> Rangliste Drücken</h4><ol class="rank-list" id="pushRankList"></ol></div>
         </section>
@@ -337,6 +340,7 @@
     const confirmNameButton = document.getElementById('confirmName');
     const offlineMessage = document.getElementById('offlineMessage');
     const nameOfflineMessage = document.getElementById('nameOfflineMessage');
+    const topThreeMessage = document.getElementById('topThreeMessage');
     const firstNameInput = document.getElementById('firstName');
     const lastNameInput = document.getElementById('lastName');
     const forceDisconnected = document.getElementById('forceDisconnected');
@@ -577,7 +581,20 @@
       });
       const pull = resultForDirection('pull');
       const push = resultForDirection('push');
-      document.getElementById('resultName').textContent = `Stark, ${state.participant.split(' ')[0]}!`;
+      const firstName = state.participant.split(' ')[0];
+      document.getElementById('resultName').textContent = `Stark, ${firstName}!`;
+      const topThree = [
+        pull?.rank <= 3 && { label: 'Ziehen', rank: pull.rank },
+        push?.rank <= 3 && { label: 'Drücken', rank: push.rank }
+      ].filter(Boolean);
+      if (topThree.length === 1) {
+        topThreeMessage.textContent = `Glückwunsch, ${firstName}! Rang ${topThree[0].rank} beim ${topThree[0].label} – du gehörst zu den besten 3.`;
+      } else if (topThree.length === 2) {
+        topThreeMessage.textContent = `Glückwunsch, ${firstName}! Rang ${topThree[0].rank} beim ${topThree[0].label} und Rang ${topThree[1].rank} beim ${topThree[1].label}.`;
+      } else {
+        topThreeMessage.textContent = '';
+      }
+      topThreeMessage.hidden = topThree.length === 0;
       const resultCards = [
         pull && `<div class="result-item"><span>Ziehen</span><strong>${pull.value.toFixed(1)} kg</strong><small>Rang ${pull.rank}</small></div>`,
         push && `<div class="result-item"><span>Drücken</span><strong>${push.value.toFixed(1)} kg</strong><small>Rang ${push.rank}</small></div>`
