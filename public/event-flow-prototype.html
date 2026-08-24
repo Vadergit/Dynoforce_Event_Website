@@ -281,6 +281,7 @@
               <button class="primary name-submit" id="confirmName" type="submit">Bestätigen und starten</button>
             </div>
             <p class="offline-message" id="nameOfflineMessage" hidden>Keine Internetverbindung – Challenge kann nicht gestartet werden.</p>
+            <p class="offline-message" id="nameDeviceMessage" hidden>DynoGrip nicht verbunden – bitte zuerst verbinden.</p>
             <div class="form-actions"><button class="ghost" type="button" data-back>Zurück</button></div>
           </form>
         </div>
@@ -350,6 +351,7 @@
     const confirmNameButton = document.getElementById('confirmName');
     const offlineMessage = document.getElementById('offlineMessage');
     const nameOfflineMessage = document.getElementById('nameOfflineMessage');
+    const nameDeviceMessage = document.getElementById('nameDeviceMessage');
     const topThreeMessage = document.getElementById('topThreeMessage');
     const firstNameInput = document.getElementById('firstName');
     const lastNameInput = document.getElementById('lastName');
@@ -386,10 +388,15 @@
     function updateOnlineState() {
       const online = navigator.onLine;
       startButton.disabled = !online;
-      confirmNameButton.disabled = !online;
-      startButton.textContent = online ? 'Jetzt Kraft testen' : 'Offline – Start nicht möglich';
+      confirmNameButton.disabled = !online || !state.connected;
+      startButton.textContent = !online
+        ? 'Offline – Start nicht möglich'
+        : state.connected
+          ? 'Jetzt Kraft testen'
+          : 'DynoGrip verbinden';
       offlineMessage.hidden = online;
       nameOfflineMessage.hidden = online;
+      nameDeviceMessage.hidden = !online || state.connected;
     }
 
     function keepNameFieldVisible(event) {
@@ -427,6 +434,7 @@
       connectButton.className = connected ? 'outline' : 'primary';
       forceDisconnected.hidden = connected;
       forceMeasurement.hidden = !connected;
+      updateOnlineState();
     }
 
     function onBluetoothDisconnected() {
@@ -658,8 +666,12 @@
     }
 
     connectButton.addEventListener('click', connectDynoGrip);
-    startButton.addEventListener('click', () => {
+    startButton.addEventListener('click', async () => {
       if (!navigator.onLine) return;
+      if (!state.connected) {
+        await connectDynoGrip();
+        return;
+      }
       resetParticipantForm();
       showScreen('name');
     });
@@ -674,7 +686,7 @@
 
     document.getElementById('nameForm').addEventListener('submit', event => {
       event.preventDefault();
-      if (!navigator.onLine) {
+      if (!navigator.onLine || !state.connected) {
         updateOnlineState();
         return;
       }
