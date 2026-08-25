@@ -24,7 +24,10 @@ async function contain(input, width, height) {
 
 async function boubaLogo(width, height) {
   return sharp(boubaLogoPath)
-    .resize(width, height, { fit: 'contain' })
+    .resize(width, height, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    })
     .png()
     .toBuffer();
 }
