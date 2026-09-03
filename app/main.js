@@ -1031,8 +1031,7 @@ function guidedLivePageMarkup(publicUrl) {
       </aside>
       <section class="card guided-stage-column" aria-live="polite">${guidedStageMarkup()}</section>
       <aside class="card guided-leaderboard-column">
-        <h3>Rangliste der Teilnehmer</h3>
-        <p>Top 3 · getrennt nach Mann/Frau${normalizeForceMode(state.event.forceMode) === "Beide" ? " sowie Ziehen/Drücken" : ""}</p>
+        <h3>Rangliste der 3 besten Teilnehmer</h3>
         ${guidedLeaderboardMarkup()}
       </aside>
     </div>
