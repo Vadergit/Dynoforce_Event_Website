@@ -1,0 +1,80 @@
+/* Visuelle Ausrichtung der gefuehrten Live-Ansicht. Kleine Eyebrow-Labels bleiben links, Hauptinhalte werden zentriert. */
+.guided-force-column > .eyebrow,
+.guided-screen > .eyebrow {
+  text-align: left;
+}
+
+.guided-force-panel {
+  text-align: center;
+}
+
+.guided-force-reading {
+  justify-content: center;
+}
+
+.guided-force-panel p {
+  text-align: center;
+}
+
+.guided-stage-column {
+  align-items: center;
+  text-align: center;
+}
+
+.guided-screen > p {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.guided-start-screen .guided-primary-action {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.guided-warmup-actions {
+  justify-content: center;
+}
+
+.guided-safety-box {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+  row-gap: 3px;
+}
+
+/* Formulare bleiben fuer gute Lesbarkeit linksbuendig. */
+.guided-name-form,
+.guided-name-form .field,
+.guided-gender-field {
+  text-align: left;
+}
+
+.guided-leaderboard-column > h3 {
+  margin: 4px 0 18px;
+  text-align: center;
+  line-height: 1.18;
+}
+
+.guided-direction-heading {
+  justify-content: center;
+}
+
+.guided-direction-categories .guided-ranking-section h4 {
+  text-align: center;
+}
+
+.guided-daily-leaders-heading {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .guided-daily-leaders-heading {
+    align-items: center;
+  }
+}
