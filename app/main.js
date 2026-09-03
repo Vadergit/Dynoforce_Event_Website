@@ -65,6 +65,7 @@ const DEVICE_TONES = {
   ],
 };
 const USE_GUIDED_LIVE_UI = true;
+const EVENT_TIME_ZONE = "Europe/Zurich";
 
 const emptyBranding = {
   eventLogo: DEFAULT_DYNOFORCE_LOGO,
@@ -175,6 +176,7 @@ const state = {
     gripType: "Standard",
     attempts: 3,
     scoringMode: "Bester Versuch",
+    showDailyLeaders: true,
     status: "Inaktiv",
     primaryColor: "#1f4f46",
     ownerUid: "",
@@ -347,8 +349,7 @@ function isActiveEventStatus(status) {
   return normalizeEventStatus(status) === "Aktiv";
 }
 
-function resultCreatedAtDate(result) {
-  const value = result?.createdAt;
+function timestampValueToDate(value) {
   if (!value) return null;
   if (typeof value?.toDate === "function") return value.toDate();
   if (value instanceof Date) return value;
@@ -359,12 +360,34 @@ function resultCreatedAtDate(result) {
   return null;
 }
 
-function toLocalDayKey(date) {
+function resultCreatedAtDate(result) {
+  return timestampValueToDate(result?.createdAt);
+}
+
+function resultDailyBestAtDate(result) {
+  return timestampValueToDate(result?.dailyBestAt);
+}
+
+function toEventDayKey(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: EVENT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function formatEventDayLabel(date = new Date()) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("de-CH", {
+    timeZone: EVENT_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
 function resultDirectionKey(result) {
@@ -404,14 +427,84 @@ function getResultsForCategory(direction = "all", gender = "all") {
   });
 }
 
+function getTodayResultValue(entry, todayKey = toEventDayKey(new Date())) {
+  const dailyBestAt = resultDailyBestAtDate(entry);
+  const dailyBestValue = Number(entry?.dailyBestValue);
+  if (dailyBestAt && toEventDayKey(dailyBestAt) === todayKey && Number.isFinite(dailyBestValue)) {
+    return dailyBestValue;
+  }
+  if (!dailyBestAt && entry?.dailyBestDay === todayKey && Number.isFinite(dailyBestValue)) {
+    return dailyBestValue;
+  }
+  const createdAt = resultCreatedAtDate(entry);
+  if (createdAt && toEventDayKey(createdAt) === todayKey) {
+    return Number(entry.value || 0);
+  }
+  return null;
+}
+
+function getTodayResults() {
+  const todayKey = toEventDayKey(new Date());
+  return state.results
+    .map((entry) => ({ entry, todayValue: getTodayResultValue(entry, todayKey) }))
+    .filter(({ todayValue }) => Number.isFinite(todayValue) && todayValue >= 0)
+    .sort((a, b) => b.todayValue - a.todayValue);
+}
+
 function getTodayWinnersByDirection() {
-  const todayKey = toLocalDayKey(new Date());
-  const todaysResults = state.results.filter((entry) => toLocalDayKey(resultCreatedAtDate(entry)) === todayKey);
+  const todaysResults = getTodayResults();
+  const asTodayEntry = (item) => item ? { ...item.entry, value: item.todayValue } : null;
   return {
-    all: todaysResults[0] || null,
-    pull: todaysResults.find((entry) => resultDirectionKey(entry) === "pull") || null,
-    push: todaysResults.find((entry) => resultDirectionKey(entry) === "push") || null,
+    all: asTodayEntry(todaysResults[0]),
+    pull: asTodayEntry(todaysResults.find(({ entry }) => resultDirectionKey(entry) === "pull")),
+    push: asTodayEntry(todaysResults.find(({ entry }) => resultDirectionKey(entry) === "push")),
   };
+}
+
+function getTodayCategoryLeaders() {
+  const mode = normalizeForceMode(state.event.forceMode);
+  const directions = mode === "Beide"
+    ? [{ key: "pull", label: "Ziehen" }, { key: "push", label: "Drücken" }]
+    : mode === "Ziehen"
+      ? [{ key: "pull", label: "Ziehen" }]
+      : [{ key: "push", label: "Drücken" }];
+  const genders = [{ key: "male", label: "Mann" }, { key: "female", label: "Frau" }];
+  const todaysResults = getTodayResults();
+
+  return directions.flatMap((direction) => genders.map((gender) => {
+    const leader = todaysResults.find(({ entry }) =>
+      resultDirectionKey(entry) === direction.key && resultGenderKey(entry) === gender.key);
+    return {
+      key: `${direction.key}-${gender.key}`,
+      direction: direction.key,
+      gender: gender.key,
+      label: `${gender.label} · ${direction.label}`,
+      participantName: leader?.entry?.participantName || leader?.entry?.name || "",
+      value: leader?.todayValue ?? null,
+    };
+  }));
+}
+
+function guidedDailyLeadersMarkup() {
+  if (state.event.showDailyLeaders === false) return "";
+  const leaders = getTodayCategoryLeaders();
+  return `
+    <section class="guided-daily-leaders" aria-label="Heutige Rekordhalter">
+      <div class="guided-daily-leaders-heading">
+        <strong>Heutige Rekordhalter</strong>
+        <span>${escapeHtml(formatEventDayLabel())} · nur heute</span>
+      </div>
+      <div class="guided-daily-leaders-grid">
+        ${leaders.map((leader) => `
+          <div class="guided-daily-leader-card">
+            <small>${escapeHtml(leader.label)}</small>
+            <strong>${leader.participantName ? escapeHtml(leader.participantName) : "Noch offen"}</strong>
+            <span>${leader.value === null ? "Noch kein Resultat" : `${Number(leader.value).toFixed(1)} kg`}</span>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
 }
 
 function getOverallWinnersByDirection() {
@@ -1003,6 +1096,7 @@ function guidedStageMarkup() {
       <p>Teste deine ${mode === "Ziehen" ? "Zugkraft" : mode === "Drücken" ? "Druckkraft" : "Zug- oder Druckkraft"}. ${attemptLabel}, der beste zählt.</p>
       <button class="button primary guided-primary-action" id="guidedPrimaryAction" type="button" ${!writable || !online || !state.connected || state.connecting ? "disabled" : ""}>${primaryLabel}</button>
       <div class="guided-safety-box"><strong>! &nbsp; Sicher testen</strong><span>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</span></div>
+      ${guidedDailyLeadersMarkup()}
     </div>
   `;
 }
@@ -1404,6 +1498,11 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
         nextResults,
       );
       const leaderboardValue = Math.max(group.finalValue, Number(existingResult?.value || 0));
+      const todayKey = toEventDayKey(new Date());
+      const previousDailyAt = resultDailyBestAtDate(existingResult);
+      const previousDailyDay = previousDailyAt ? toEventDayKey(previousDailyAt) : String(existingResult?.dailyBestDay || "");
+      const previousDailyValue = previousDailyDay === todayKey ? Number(existingResult?.dailyBestValue || 0) : 0;
+      const dailyBestValue = Math.max(group.finalValue, previousDailyValue);
       const resultPayload = {
         eventId: state.event.id,
         ownerUid: state.user.uid,
@@ -1418,6 +1517,9 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
         attemptsCompleted: group.attempts.length,
         attemptsValues: group.attempts.map((attempt) => Number(attempt.value.toFixed(1))),
         scoringMode: "Bester Versuch",
+        dailyBestDay: todayKey,
+        dailyBestValue,
+        dailyBestAt: serverTimestamp(),
       };
 
       if (!existingResult) {
@@ -1429,23 +1531,45 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
           id: resultRef.id,
           ...createdPayload,
           createdAt: new Date(),
+          dailyBestAt: new Date(),
         });
-      } else if (group.finalValue > Number(existingResult.value || 0)) {
-        const updatedPayload = {
-          ...resultPayload,
-          createdAt: existingResult.createdAt || serverTimestamp(),
+      } else {
+        const previousBestValue = Number(existingResult.value || 0);
+        const improvedOverallBest = group.finalValue > previousBestValue;
+        const dailyUpdate = {
+          dailyBestDay: todayKey,
+          dailyBestValue,
+          dailyBestAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          previousBestValue: Number(existingResult.value || 0),
         };
+        const updatedPayload = improvedOverallBest
+          ? {
+              ...resultPayload,
+              value: leaderboardValue,
+              createdAt: existingResult.createdAt || serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              previousBestValue,
+            }
+          : dailyUpdate;
         batch.update(doc(db, "results", existingResult.id), updatedPayload);
         pendingWrites += 1;
         nextResults = nextResults.map((entry) => (entry.id === existingResult.id
-          ? {
-            ...entry,
-            ...resultPayload,
-            updatedAt: new Date(),
-            previousBestValue: Number(existingResult.value || 0),
-          }
+          ? improvedOverallBest
+            ? {
+                ...entry,
+                ...resultPayload,
+                value: leaderboardValue,
+                dailyBestAt: new Date(),
+                updatedAt: new Date(),
+                previousBestValue,
+              }
+            : {
+                ...entry,
+                dailyBestDay: todayKey,
+                dailyBestValue,
+                dailyBestAt: new Date(),
+                updatedAt: new Date(),
+              }
           : entry));
       }
 
@@ -2018,6 +2142,7 @@ function eventDocToState(id, data) {
     gripType: data.gripType || "Standard",
     attempts: Number(data.attempts || 3),
     scoringMode: data.scoringMode || "Bester Versuch",
+    showDailyLeaders: data.showDailyLeaders !== false,
     status: normalizeEventStatus(data.status),
     primaryColor: data.primaryColor || "#1f4f46",
     ownerUid: data.ownerUid || "",
@@ -2080,6 +2205,7 @@ async function subscribeToEvent(eventId) {
     gripType: "Standard",
     attempts: 3,
     scoringMode: "Bester Versuch",
+    showDailyLeaders: true,
     status: "Inaktiv",
     participantCount: 0,
     createdAt: null,
@@ -2342,6 +2468,7 @@ async function saveEvent(overrides = {}) {
       gripType: state.event.gripType,
       attempts: state.event.attempts,
       scoringMode: state.event.scoringMode,
+      showDailyLeaders: state.event.showDailyLeaders !== false,
       status: state.event.status,
       ownerUid: state.user.uid,
       primaryColor: state.event.primaryColor,
@@ -3658,6 +3785,10 @@ function template(page) {
                   <div class="field"><label>Versuche</label><select id="attemptsInput"><option ${state.event.attempts === 1 ? "selected" : ""}>1 Versuch</option><option ${state.event.attempts === 3 ? "selected" : ""}>3 Versuche</option><option ${state.event.attempts === 5 ? "selected" : ""}>5 Versuche</option></select></div>
                   <div class="field"><label>Wertung</label><select id="scoringModeInput"><option ${state.event.scoringMode === "Bester Versuch" ? "selected" : ""}>Bester Versuch</option><option ${state.event.scoringMode === "Durchschnitt" ? "selected" : ""}>Durchschnitt</option><option ${state.event.scoringMode === "Letzter Versuch" ? "selected" : ""}>Letzter Versuch</option></select></div>
                 </div>
+                <label class="setup-feature-toggle">
+                  <input type="checkbox" id="showDailyLeadersInput" ${state.event.showDailyLeaders === false ? "" : "checked"} />
+                  <span><strong>Heutige Rekordhalter anzeigen</strong><small>Zeigt in der Live-Mitte ausschliesslich die besten Resultate des heutigen Tages, getrennt nach Mann/Frau und Ziehen/Drücken.</small></span>
+                </label>
                 <div class="action-row"><button class="button primary" id="saveSetup">${state.saving ? "Speichert..." : "Event speichern"}</button><button class="button" id="startEvent">Event starten</button><button class="button" id="archiveEvent">Event archivieren</button></div>
               </div>
             </div>
@@ -3886,6 +4017,7 @@ function bindDashboardActions() {
       gripType: "Standard",
       attempts: 3,
       scoringMode: "Bester Versuch",
+      showDailyLeaders: true,
       status: "Inaktiv",
       ownerUid: state.user.uid,
       participantCount: 0,
@@ -3981,6 +4113,7 @@ function bindSetupActions() {
     state.event.gripType = root.querySelector("#gripTypeInput").value.trim() || state.event.gripType;
     state.event.attempts = Number(root.querySelector("#attemptsInput").value.split(" ")[0]);
     state.event.scoringMode = root.querySelector("#scoringModeInput").value;
+    state.event.showDailyLeaders = root.querySelector("#showDailyLeadersInput")?.checked !== false;
     state.event.ownerUid = state.user?.uid || state.event.ownerUid;
     await saveEvent();
   });
