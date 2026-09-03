@@ -5,6 +5,7 @@ on:
     branches: ["feature/daily-record-holders-v3"]
     paths:
       - "scripts/apply-daily-record-holders.py"
+      - ".github/workflows/apply-daily-record-holders.yml"
 
 permissions:
   contents: write
