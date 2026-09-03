@@ -1,0 +1,121 @@
+/* Optionale Tages-Rekordhalter in der geführten Live-Ansicht. */
+.setup-feature-toggle {
+  margin-top: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(31, 79, 70, 0.2);
+  border-radius: 14px;
+  background: var(--primary-soft);
+  cursor: pointer;
+}
+
+.setup-feature-toggle input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+
+.setup-feature-toggle span,
+.setup-feature-toggle strong,
+.setup-feature-toggle small {
+  display: block;
+}
+
+.setup-feature-toggle strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.setup-feature-toggle small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.guided-daily-leaders {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(31, 79, 70, 0.16);
+}
+
+.guided-daily-leaders-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.guided-daily-leaders-heading strong {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.guided-daily-leaders-heading span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.guided-daily-leaders-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.guided-daily-leader-card {
+  min-width: 0;
+  padding: 8px 7px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #f8f8f5;
+}
+
+.guided-daily-leader-card small,
+.guided-daily-leader-card strong,
+.guided-daily-leader-card span {
+  display: block;
+  min-width: 0;
+}
+
+.guided-daily-leader-card small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.guided-daily-leader-card strong {
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.guided-daily-leader-card span {
+  margin-top: 2px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 700px) {
+  .guided-daily-leaders-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guided-daily-leaders-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
