@@ -1,0 +1,44 @@
+name: Apply warmup and gender feature
+
+on:
+  push:
+    branches: ["feature/warmup-gender-leaderboards-chatgpt"]
+    paths:
+      - "scripts/apply-warmup-gender-feature.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/warmup-gender-leaderboards-chatgpt
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply feature changes
+        run: node scripts/apply-warmup-gender-feature.mjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit generated source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/main.js app/styles.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Add warmup gate and gender leaderboards"
+          git push origin HEAD:feature/warmup-gender-leaderboards-chatgpt
