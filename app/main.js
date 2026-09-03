@@ -448,6 +448,56 @@ function leaderboardSections(limit = 10) {
   })));
 }
 
+function leaderboardDirectionGroups(limit = 10) {
+  const mode = normalizeForceMode(state.event.forceMode);
+  const directions = mode === "Beide"
+    ? ["pull", "push"]
+    : mode === "Ziehen"
+      ? ["pull"]
+      : mode === "Drücken"
+        ? ["push"]
+        : ["all"];
+  const sections = leaderboardSections(limit);
+
+  return directions.map((direction) => ({
+    key: direction,
+    direction,
+    title: direction === "all" ? "Rangliste" : formatDirectionLabel(direction),
+    sections: sections.filter((section) => section.direction === direction),
+  })).filter((group) => group.sections.length);
+}
+
+function groupedLeaderboardMarkup(limit = 3, { tableClass = "", surface = "public" } = {}) {
+  return `
+    <div class="leaderboard-direction-groups is-${surface}">
+      ${leaderboardDirectionGroups(limit).map((group) => `
+        <section class="leaderboard-direction-group">
+          <header class="leaderboard-direction-header">
+            <span class="leaderboard-direction-symbol" aria-hidden="true">${guidedDirectionSymbol(group.direction)}</span>
+            <div class="leaderboard-direction-title">
+              <small>Disziplin</small>
+              <h3>${escapeHtml(group.title)}</h3>
+            </div>
+          </header>
+          <div class="leaderboard-gender-grid">
+            ${group.sections.map((section) => `
+              <section class="leaderboard-gender-card">
+                <div class="leaderboard-gender-heading">
+                  <h4>${escapeHtml(formatGenderLabel(section.gender))}</h4>
+                  <span>Kategorie</span>
+                </div>
+                <table class="leaderboard-table grouped-leaderboard-table ${tableClass}">
+                  ${leaderboardTable(section.items, section.items.length, { showDirection: false })}
+                </table>
+              </section>
+            `).join("")}
+          </div>
+        </section>
+      `).join("")}
+    </div>
+  `;
+}
+
 function normalizeForceMode(value) {
   if (value === "Ziehen" || value === "pull") return "Ziehen";
   if (value === "Drücken" || value === "push") return "Drücken";
@@ -819,18 +869,28 @@ function guidedAttemptCardsMarkup() {
 }
 
 function guidedLeaderboardMarkup() {
-  return leaderboardSections(3).map((section) => `
-    <section class="guided-ranking-section">
-      <h4><span aria-hidden="true">${guidedDirectionSymbol(section.direction)}</span> ${escapeHtml(section.title)}</h4>
-      <ol class="guided-ranking-list">
-        ${section.items.length ? section.items.map((entry, index) => `
-          <li>
-            <span class="guided-rank-number rank-${index + 1}">${index + 1}</span>
-            <strong>${escapeHtml(entry.participantName || entry.name || "Teilnehmer")}</strong>
-            <span>${Number(entry.value || 0).toFixed(1)} kg</span>
-          </li>
-        `).join("") : `<li class="is-empty">Noch keine Resultate</li>`}
-      </ol>
+  return leaderboardDirectionGroups(3).map((group) => `
+    <section class="guided-direction-group">
+      <div class="guided-direction-heading">
+        <span aria-hidden="true">${guidedDirectionSymbol(group.direction)}</span>
+        <strong>${escapeHtml(group.title)}</strong>
+      </div>
+      <div class="guided-direction-categories">
+        ${group.sections.map((section) => `
+          <section class="guided-ranking-section">
+            <h4>${escapeHtml(formatGenderLabel(section.gender))}</h4>
+            <ol class="guided-ranking-list">
+              ${section.items.length ? section.items.map((entry, index) => `
+                <li>
+                  <span class="guided-rank-number rank-${index + 1}">${index + 1}</span>
+                  <strong>${escapeHtml(entry.participantName || entry.name || "Teilnehmer")}</strong>
+                  <span>${Number(entry.value || 0).toFixed(1)} kg</span>
+                </li>
+              `).join("") : `<li class="is-empty">Noch keine Resultate</li>`}
+            </ol>
+          </section>
+        `).join("")}
+      </div>
     </section>
   `).join("");
 }
@@ -2800,23 +2860,24 @@ async function downloadPdf() {
   }
 }
 
-function leaderboardTable(items, limit) {
+function leaderboardTable(items, limit, { showDirection = true } = {}) {
+  const visibleItems = items.slice(0, limit);
   return `
     <colgroup>
-      <col class="rank-column" />
-      <col class="name-column" />
-      <col class="direction-column" />
-      <col class="result-column" />
+      <col class="${showDirection ? "rank-column" : "grouped-rank-column"}" />
+      <col class="${showDirection ? "name-column" : "grouped-name-column"}" />
+      ${showDirection ? `<col class="direction-column" />` : ""}
+      <col class="${showDirection ? "result-column" : "grouped-result-column"}" />
     </colgroup>
-    <tr><th>#</th><th>Name</th><th class="direction-column">Richtung</th><th>Resultat</th></tr>
-    ${items.slice(0, limit).map((item, index) => `
+    <tr><th>#</th><th>Name</th>${showDirection ? `<th class="direction-column">Richtung</th>` : ""}<th>Resultat</th></tr>
+    ${visibleItems.length ? visibleItems.map((item, index) => `
       <tr>
         <td><span class="rank-pill">${medalForRank(index)}</span></td>
-        <td>${item.participantName || item.name}</td>
-        <td class="direction-column">${formatEntryDirection(item)}</td>
+        <td>${escapeHtml(item.participantName || item.name || "Teilnehmer")}</td>
+        ${showDirection ? `<td class="direction-column">${formatEntryDirection(item)}</td>` : ""}
         <td>${Number(item.value).toFixed(1)} kg</td>
       </tr>
-    `).join("")}
+    `).join("") : `<tr class="leaderboard-empty-row"><td colspan="${showDirection ? 4 : 3}">Noch keine Resultate</td></tr>`}
   `;
 }
 
@@ -3677,7 +3738,7 @@ function template(page) {
               </div>
               <div class="grid live-side-column">
                 <div class="card live-qr-card"><div class="live-qr-row"><div class="live-qr-copy"><h3>Zuschauer QR-Code</h3><p>Event live auf dem eigenen Gerät verfolgen.</p><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong><span>Leaderboard und Resultate direkt öffnen.</span></div><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a></div></div>
-                <div class="card live-leaderboard-card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Top 3 für Ziehen und Drücken." : "Top 3 – automatisch aktualisiert."}</p></div></div><div class="grid live-leaderboard-sections">${leaderboardSections(3).map((section) => `<div><h4>${section.title}</h4><table class="leaderboard-table">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
+                <div class="card live-leaderboard-card"><div class="card-header"><div><h3>Leaderboard</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Top 3 · zuerst nach Ziehen/Drücken, darin nach Mann/Frau." : "Top 3 · getrennt nach Mann und Frau."}</p></div></div>${groupedLeaderboardMarkup(3, { surface: "live" })}</div>
               </div>
             </div>
           `) : ""}
@@ -3688,14 +3749,14 @@ function template(page) {
               <div class="card compact-public-card event-stats-card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list compact"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${getBestResultLabel()}</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${getAverageLabel()}</strong></div></div><div class="action-row compact"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
             </div>
             ${isDailyChallengeType() ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
-            <div class="grid" style="margin-top:18px;">
-              <div class="card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken werden separat gewertet." : "Automatische Aktualisierung während des Events."}</p></div></div><div class="grid">${leaderboardSections(state.results.length || 1).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="leaderboard-table">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
+            <div class="public-leaderboard-area" style="margin-top:18px;">
+              <div class="card public-leaderboard-card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken sind als Hauptkategorien gebündelt. Mann und Frau werden darin separat gewertet." : "Mann und Frau werden innerhalb der Disziplin separat gewertet."}</p></div></div>${groupedLeaderboardMarkup(state.results.length || 1, { surface: "public" })}</div>
             </div>
             ${publicSponsorFooter()}
           ` : ""}
           ${page === "display" ? `
             <div class="grid two">
-              <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 3 pro Kategorie · ${state.event.challengeType} · Letztes Resultat live</p>${isDailyChallengeType() ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}<div class="grid">${leaderboardSections(3).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="leaderboard-table display-board">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
+              <div class="card display-leaderboard-card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 3 pro Kategorie · ${state.event.challengeType} · gruppiert nach Disziplin</p>${isDailyChallengeType() ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}${groupedLeaderboardMarkup(3, { surface: "display", tableClass: "display-board" })}</div>
               <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
             </div>
           ` : ""}
