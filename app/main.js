@@ -3749,7 +3749,7 @@ function template(page) {
               <div class="card compact-public-card event-stats-card"><div class="card-header"><div><h3>Event Statistik</h3><p>Live aus Firestore.</p></div></div><div class="metric-list compact"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Bestwert</span><strong>${getBestResultLabel()}</strong></div><div class="metric-line"><span>Durchschnitt</span><strong>${getAverageLabel()}</strong></div></div><div class="action-row compact"><button class="button primary" id="downloadPdf">Seite drucken</button></div></div>
             </div>
             ${isDailyChallengeType() ? `<div class="mini-stats" style="margin-top:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}
-            <div class="grid" style="margin-top:18px;">
+            <div class="public-leaderboard-area" style="margin-top:18px;">
               <div class="card public-leaderboard-card"><div class="card-header"><div><h3>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Komplette Ranglisten" : "Komplette Rangliste"}</h3><p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Ziehen und Drücken sind als Hauptkategorien gebündelt. Mann und Frau werden darin separat gewertet." : "Mann und Frau werden innerhalb der Disziplin separat gewertet."}</p></div></div>${groupedLeaderboardMarkup(state.results.length || 1, { surface: "public" })}</div>
             </div>
             ${publicSponsorFooter()}
