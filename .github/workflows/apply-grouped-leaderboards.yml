@@ -1,0 +1,44 @@
+name: Apply grouped leaderboards
+
+on:
+  push:
+    branches: ["feature/grouped-leaderboards"]
+    paths:
+      - "scripts/apply-grouped-leaderboards.py"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/grouped-leaderboards
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply grouped leaderboard changes
+        run: python3 scripts/apply-grouped-leaderboards.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/main.js app/styles.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Group leaderboards by force direction"
+          git push origin HEAD:feature/grouped-leaderboards
