@@ -4,7 +4,7 @@ on:
   push:
     branches: ["feature/grouped-leaderboards"]
     paths:
-      - "scripts/apply-grouped-leaderboards.py"
+      - "scripts/fix-grouped-public-mobile.py"
       - ".github/workflows/apply-grouped-leaderboards.yml"
 
 permissions:
@@ -26,8 +26,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Apply grouped leaderboard changes
-        run: python3 scripts/apply-grouped-leaderboards.py
+      - name: Apply mobile wrapper fix
+        run: python3 scripts/fix-grouped-public-mobile.py
 
       - name: Install dependencies
         run: npm ci
@@ -41,5 +41,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/main.js app/styles.css
           git diff --cached --quiet && exit 0
-          git commit -m "Group leaderboards by force direction"
+          git commit -m "Fix grouped leaderboard mobile layout"
           git push origin HEAD:feature/grouped-leaderboards
