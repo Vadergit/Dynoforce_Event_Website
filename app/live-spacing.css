@@ -1,0 +1,29 @@
+/* Kompaktere vertikale Abstände auf der geführten Live-Messseite. */
+.focused-event-header {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.guided-live-layout {
+  height: calc(100dvh - 120px);
+}
+
+.guided-live-layout > .card {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.guided-stage-column {
+  padding: 0 !important;
+}
+
+.guided-screen {
+  padding-top: 22px;
+  padding-bottom: 18px;
+}
+
+@media (max-width: 960px) {
+  .guided-live-layout {
+    height: auto;
+  }
+}
