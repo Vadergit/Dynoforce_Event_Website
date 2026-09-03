@@ -1536,24 +1536,40 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
       } else {
         const previousBestValue = Number(existingResult.value || 0);
         const improvedOverallBest = group.finalValue > previousBestValue;
-        const updatedPayload = {
-          ...resultPayload,
-          value: leaderboardValue,
-          createdAt: existingResult.createdAt || serverTimestamp(),
+        const dailyUpdate = {
+          dailyBestDay: todayKey,
+          dailyBestValue,
+          dailyBestAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          ...(improvedOverallBest ? { previousBestValue } : {}),
         };
+        const updatedPayload = improvedOverallBest
+          ? {
+              ...resultPayload,
+              value: leaderboardValue,
+              createdAt: existingResult.createdAt || serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              previousBestValue,
+            }
+          : dailyUpdate;
         batch.update(doc(db, "results", existingResult.id), updatedPayload);
         pendingWrites += 1;
         nextResults = nextResults.map((entry) => (entry.id === existingResult.id
-          ? {
-            ...entry,
-            ...resultPayload,
-            value: leaderboardValue,
-            dailyBestAt: new Date(),
-            updatedAt: new Date(),
-            ...(improvedOverallBest ? { previousBestValue } : {}),
-          }
+          ? improvedOverallBest
+            ? {
+                ...entry,
+                ...resultPayload,
+                value: leaderboardValue,
+                dailyBestAt: new Date(),
+                updatedAt: new Date(),
+                previousBestValue,
+              }
+            : {
+                ...entry,
+                dailyBestDay: todayKey,
+                dailyBestValue,
+                dailyBestAt: new Date(),
+                updatedAt: new Date(),
+              }
           : entry));
       }
 
