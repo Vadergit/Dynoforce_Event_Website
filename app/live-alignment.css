@@ -16,9 +16,15 @@
   text-align: center;
 }
 
+/* Die einzelnen gefuehrten Seiten starten bewusst weiter oben statt vertikal zentriert. */
 .guided-stage-column {
   align-items: center;
+  justify-content: flex-start;
   text-align: center;
+}
+
+.guided-screen {
+  padding-top: 14px;
 }
 
 .guided-screen > p {
@@ -32,7 +38,16 @@
   margin-right: auto;
 }
 
+/* Der Sicherheitshinweis wird erst im Warm-up-Schritt benoetigt. Auf Seite 1 bleibt seine Hoehe als unsichtbarer Platzhalter erhalten, damit die Tagesrekorde nicht nach oben springen. */
+.guided-start-screen .guided-safety-box {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
 .guided-warmup-actions {
+  margin-left: auto;
+  margin-right: auto;
   justify-content: center;
 }
 
@@ -43,11 +58,40 @@
   row-gap: 3px;
 }
 
-/* Formulare bleiben fuer gute Lesbarkeit linksbuendig. */
-.guided-name-form,
+/* Namensseite: Eingabebereich und Aktionen als ruhiger, mittiger Block. */
+.guided-name-form {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
 .guided-name-form .field,
 .guided-gender-field {
   text-align: left;
+}
+
+.guided-name-form > .button {
+  width: min(100%, 320px);
+  justify-self: center;
+}
+
+.guided-name-screen > .guided-secondary-action {
+  display: block;
+  min-width: 180px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Im Messschritt ist der Teilnehmername kein kleines Eyebrow-Label mehr, sondern eine gut lesbare Namenszeile. */
+.guided-attempt-screen > .eyebrow {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 850;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  text-transform: none;
+  text-align: center;
 }
 
 .guided-leaderboard-column > h3 {
@@ -74,6 +118,10 @@
 }
 
 @media (max-width: 700px) {
+  .guided-screen {
+    padding-top: 12px;
+  }
+
   .guided-daily-leaders-heading {
     align-items: center;
   }
