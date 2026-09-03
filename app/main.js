@@ -488,19 +488,43 @@ function getTodayCategoryLeaders() {
 function guidedDailyLeadersMarkup() {
   if (state.event.showDailyLeaders === false) return "";
   const leaders = getTodayCategoryLeaders();
+  const directions = [...new Set(leaders.map((leader) => leader.direction))];
+  const groups = directions.map((direction) => ({
+    direction,
+    title: formatDirectionLabel(direction),
+    leaders: leaders.filter((leader) => leader.direction === direction),
+  }));
+
   return `
-    <section class="guided-daily-leaders" aria-label="Heutige Rekordhalter">
+    <section class="guided-daily-leaders" aria-label="Tagesrekorde">
       <div class="guided-daily-leaders-heading">
-        <strong>Heutige Rekordhalter</strong>
-        <span>${escapeHtml(formatEventDayLabel())} · nur heute</span>
+        <strong>Tagesrekorde</strong>
+        <span>Heute · ${escapeHtml(formatEventDayLabel())}</span>
       </div>
-      <div class="guided-daily-leaders-grid">
-        ${leaders.map((leader) => `
-          <div class="guided-daily-leader-card">
-            <small>${escapeHtml(leader.label)}</small>
-            <strong>${leader.participantName ? escapeHtml(leader.participantName) : "Noch offen"}</strong>
-            <span>${leader.value === null ? "Noch kein Resultat" : `${Number(leader.value).toFixed(1)} kg`}</span>
-          </div>
+      <div class="guided-daily-direction-grid">
+        ${groups.map((group) => `
+          <section class="guided-direction-group guided-daily-direction-group">
+            <div class="guided-direction-heading">
+              <span aria-hidden="true">${guidedDirectionSymbol(group.direction)}</span>
+              <strong>${escapeHtml(group.title)}</strong>
+            </div>
+            <div class="guided-direction-categories">
+              ${group.leaders.map((leader) => `
+                <section class="guided-ranking-section guided-daily-ranking-section">
+                  <h4>${escapeHtml(formatGenderLabel(leader.gender))}</h4>
+                  <ol class="guided-ranking-list">
+                    ${leader.participantName ? `
+                      <li>
+                        <span class="guided-rank-number rank-1">1</span>
+                        <strong>${escapeHtml(leader.participantName)}</strong>
+                        <span>${Number(leader.value).toFixed(1)} kg</span>
+                      </li>
+                    ` : `<li class="is-empty">Noch kein Tagesrekord</li>`}
+                  </ol>
+                </section>
+              `).join("")}
+            </div>
+          </section>
         `).join("")}
       </div>
     </section>
