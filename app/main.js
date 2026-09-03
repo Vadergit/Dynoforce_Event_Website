@@ -1149,7 +1149,7 @@ function guidedLivePageMarkup(publicUrl) {
       </aside>
       <section class="card guided-stage-column" aria-live="polite">${guidedStageMarkup()}</section>
       <aside class="card guided-leaderboard-column">
-        <h3>Rangliste der 3 besten Teilnehmer</h3>
+        <h3>Rangliste · Top 3 je Kategorie</h3>
         ${guidedLeaderboardMarkup()}
       </aside>
     </div>
