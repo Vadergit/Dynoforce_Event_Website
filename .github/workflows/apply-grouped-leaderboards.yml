@@ -5,6 +5,7 @@ on:
     branches: ["feature/grouped-leaderboards"]
     paths:
       - "scripts/apply-grouped-leaderboards.py"
+      - ".github/workflows/apply-grouped-leaderboards.yml"
 
 permissions:
   contents: write
