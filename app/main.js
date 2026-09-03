@@ -123,6 +123,8 @@ const state = {
     lastName: "",
     draftFirstName: "",
     draftLastName: "",
+    gender: "",
+    draftGender: "",
     attempts: [],
     participantKey: "",
     readyForAttempt: false,
@@ -371,9 +373,35 @@ function resultDirectionKey(result) {
   return "neutral";
 }
 
+function normalizeGender(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["male", "mann", "m"].includes(normalized)) return "male";
+  if (["female", "frau", "w", "f"].includes(normalized)) return "female";
+  return "unknown";
+}
+
+function formatGenderLabel(value) {
+  const gender = normalizeGender(value);
+  if (gender === "male") return "Mann";
+  if (gender === "female") return "Frau";
+  return "Nicht zugeordnet";
+}
+
+function resultGenderKey(result) {
+  return normalizeGender(result?.gender || result?.sex || result?.category);
+}
+
 function getResultsForDirection(direction = "all") {
   if (direction === "all") return [...state.results];
   return state.results.filter((entry) => resultDirectionKey(entry) === direction);
+}
+
+function getResultsForCategory(direction = "all", gender = "all") {
+  return state.results.filter((entry) => {
+    const directionMatches = direction === "all" || resultDirectionKey(entry) === direction;
+    const genderMatches = gender === "all" || resultGenderKey(entry) === gender;
+    return directionMatches && genderMatches;
+  });
 }
 
 function getTodayWinnersByDirection() {
@@ -396,19 +424,28 @@ function getOverallWinnersByDirection() {
 
 function leaderboardSections(limit = 10) {
   const mode = normalizeForceMode(state.event.forceMode);
-  if (mode === "Beide") {
-    return [
-      { key: "pull", title: "Rangliste Ziehen", items: getResultsForDirection("pull").slice(0, limit) },
-      { key: "push", title: "Rangliste Drücken", items: getResultsForDirection("push").slice(0, limit) },
-    ];
-  }
-  if (mode === "Ziehen") {
-    return [{ key: "pull", title: "Rangliste Ziehen", items: getResultsForDirection("pull").slice(0, limit) }];
-  }
-  if (mode === "Drücken") {
-    return [{ key: "push", title: "Rangliste Drücken", items: getResultsForDirection("push").slice(0, limit) }];
-  }
-  return [{ key: "all", title: "Rangliste", items: state.results.slice(0, limit) }];
+  const directions = mode === "Beide"
+    ? [
+        { key: "pull", title: "Ziehen" },
+        { key: "push", title: "Drücken" },
+      ]
+    : mode === "Ziehen"
+      ? [{ key: "pull", title: "Ziehen" }]
+      : mode === "Drücken"
+        ? [{ key: "push", title: "Drücken" }]
+        : [{ key: "all", title: "Rangliste" }];
+  const genders = [
+    { key: "male", title: "Mann" },
+    { key: "female", title: "Frau" },
+  ];
+
+  return directions.flatMap((direction) => genders.map((gender) => ({
+    key: `${direction.key}-${gender.key}`,
+    direction: direction.key,
+    gender: gender.key,
+    title: direction.key === "all" ? gender.title : `${direction.title} · ${gender.title}`,
+    items: getResultsForCategory(direction.key, gender.key).slice(0, limit),
+  })));
 }
 
 function normalizeForceMode(value) {
@@ -434,9 +471,18 @@ function isDirectionAllowed(direction) {
 function readLiveParticipantInputs() {
   const firstNameInput = document.getElementById("participantFirstNameInput");
   const lastNameInput = document.getElementById("participantLastNameInput");
+  const selectedGenderInput = document.querySelector('input[name="participantGender"]:checked');
+  const legacyGenderSelect = document.getElementById("participantGenderSelect");
   const firstName = String(firstNameInput?.value ?? state.liveEntry.draftFirstName ?? "").trim();
   const lastName = String(lastNameInput?.value ?? state.liveEntry.draftLastName ?? "").trim();
-  return { firstName, lastName, participantName: [firstName, lastName].filter(Boolean).join(" ").trim() };
+  const selectedGender = selectedGenderInput?.value ?? legacyGenderSelect?.value ?? state.liveEntry.draftGender ?? "";
+  const gender = normalizeGender(selectedGender);
+  return {
+    firstName,
+    lastName,
+    gender: gender === "unknown" ? "" : gender,
+    participantName: [firstName, lastName].filter(Boolean).join(" ").trim(),
+  };
 }
 
 function resetAttemptsForParticipantChange() {
@@ -453,16 +499,17 @@ function resetAttemptsForParticipantChange() {
 }
 
 function syncParticipantDraftFromInputs() {
-  const { firstName, lastName } = readLiveParticipantInputs();
+  const { firstName, lastName, gender } = readLiveParticipantInputs();
   state.liveEntry.draftFirstName = firstName;
   state.liveEntry.draftLastName = lastName;
-  return { firstName, lastName };
+  state.liveEntry.draftGender = gender;
+  return { firstName, lastName, gender };
 }
 
 function getParticipantDraftKey() {
-  const { firstName, lastName } = syncParticipantDraftFromInputs();
-  return firstName && lastName
-    ? normalizeParticipantNameForMatch(firstName, lastName)
+  const { firstName, lastName, gender } = syncParticipantDraftFromInputs();
+  return firstName && lastName && gender
+    ? `${normalizeParticipantNameForMatch(firstName, lastName)}|${gender}`
     : "";
 }
 
@@ -484,14 +531,19 @@ function updateParticipantActivationButton() {
 }
 
 function activateParticipantFromInputs() {
-  const { firstName, lastName, participantName } = readLiveParticipantInputs();
+  const { firstName, lastName, gender, participantName } = readLiveParticipantInputs();
   if (!firstName || !lastName) {
     setError("Bitte Vorname und Name vollständig eingeben.");
     render();
     return;
   }
+  if (!gender) {
+    setError("Bitte Mann oder Frau auswählen.");
+    render();
+    return;
+  }
 
-  const participantKey = normalizeParticipantNameForMatch(firstName, lastName);
+  const participantKey = `${normalizeParticipantNameForMatch(firstName, lastName)}|${gender}`;
   if (participantKey === state.liveEntry.participantKey) {
     updateParticipantActivationButton();
     return;
@@ -500,8 +552,10 @@ function activateParticipantFromInputs() {
   resetAttemptsForParticipantChange();
   state.liveEntry.firstName = firstName;
   state.liveEntry.lastName = lastName;
+  state.liveEntry.gender = gender;
   state.liveEntry.draftFirstName = firstName;
   state.liveEntry.draftLastName = lastName;
+  state.liveEntry.draftGender = gender;
   state.liveEntry.participantKey = participantKey;
   state.liveEntry.readyForAttempt = state.currentForce < ATTEMPT_END_THRESHOLD;
   clearError();
@@ -525,6 +579,7 @@ function getParticipantNameParts() {
   return {
     firstName: state.liveEntry.firstName,
     lastName: state.liveEntry.lastName,
+    gender: state.liveEntry.gender,
     participantName: [state.liveEntry.firstName, state.liveEntry.lastName].filter(Boolean).join(" ").trim(),
   };
 }
@@ -628,12 +683,13 @@ function resultEditorMarkup() {
               <div class="moderation-fields">
                 <div class="field"><label>Vorname</label><input data-result-first-name="${entry.id}" value="${escapeHtml(nameParts.firstName)}" /></div>
                 <div class="field"><label>Name</label><input data-result-last-name="${entry.id}" value="${escapeHtml(nameParts.lastName)}" /></div>
+                <div class="field"><label>Kategorie</label><select data-result-gender="${entry.id}"><option value="" ${resultGenderKey(entry) === "unknown" ? "selected" : ""}>Nicht zugeordnet</option><option value="male" ${resultGenderKey(entry) === "male" ? "selected" : ""}>Mann</option><option value="female" ${resultGenderKey(entry) === "female" ? "selected" : ""}>Frau</option></select></div>
                 <div class="field"><label>Resultat in kg</label><input data-result-value="${entry.id}" type="number" min="0" step="0.1" value="${Number(entry.value || 0).toFixed(1)}" /></div>
               </div>
               <div class="event-item-actions">
                 <div class="metric-stack">
                   <strong>${Number(entry.value || 0).toFixed(1)} kg</strong>
-                  <span>${escapeHtml(formatEntryDirection(entry))} · ${escapeHtml(formatDate(resultCreatedAtDate(entry)) || "ohne Datum")}</span>
+                  <span>${escapeHtml(formatEntryDirection(entry))} · ${escapeHtml(formatGenderLabel(entry.gender))} · ${escapeHtml(formatDate(resultCreatedAtDate(entry)) || "ohne Datum")}</span>
                 </div>
                 <div class="action-row compact">
                   <button class="button" data-update-result="${entry.id}">Änderungen speichern</button>
@@ -665,12 +721,14 @@ function normalizeParticipantNameForMatch(firstName, lastName, participantName =
     .trim();
 }
 
-function findExistingParticipantResult(firstName, lastName, participantName, forceMode, results = state.results) {
+function findExistingParticipantResult(firstName, lastName, participantName, gender, forceMode, results = state.results) {
   const targetName = normalizeParticipantNameForMatch(firstName, lastName, participantName);
   if (!targetName) return null;
   return results.find((entry) => {
     const entryName = normalizeParticipantNameForMatch(entry.firstName, entry.lastName, entry.participantName || entry.name);
-    return entryName === targetName && resultDirectionKey(entry) === forceMode;
+    return entryName === targetName
+      && resultGenderKey(entry) === normalizeGender(gender)
+      && resultDirectionKey(entry) === forceMode;
   }) || null;
 }
 
@@ -679,7 +737,7 @@ function getLivePlacement() {
   if (measuredValue < PEAK_MINIMUM_THRESHOLD) return "—";
   const direction = state.placementPreviewDirection;
   if (direction !== "pull" && direction !== "push") return "—";
-  return getResultPlacement(measuredValue, direction);
+  return getResultPlacement(measuredValue, direction, state.liveEntry.gender || state.liveEntry.draftGender);
 }
 
 function resetLivePlacementPreview() {
@@ -688,11 +746,16 @@ function resetLivePlacementPreview() {
   state.placementPreviewInAttempt = false;
 }
 
-function getResultPlacement(value, direction) {
+function getResultPlacement(value, direction, gender) {
   const normalizedDirection = direction || "neutral";
-  const comparableResults = normalizeForceMode(state.event.forceMode) === "Beide"
-    ? state.results.filter((entry) => resultDirectionKey(entry) === normalizedDirection)
-    : state.results;
+  const normalizedGender = normalizeGender(gender);
+  const comparableResults = state.results.filter((entry) => {
+    const directionMatches = normalizeForceMode(state.event.forceMode) === "Beide"
+      ? resultDirectionKey(entry) === normalizedDirection
+      : true;
+    const genderMatches = normalizedGender === "unknown" || resultGenderKey(entry) === normalizedGender;
+    return directionMatches && genderMatches;
+  });
   const betterResults = comparableResults.filter((entry) => Number(entry.value || 0) > Number(value || 0)).length;
   return `#${betterResults + 1}`;
 }
@@ -732,6 +795,7 @@ function getGuidedLiveStep() {
   if (state.guidedLiveStep === "result" && state.lastCompletedResult?.eventId === state.event.id) return "result";
   if (state.guidedLiveStep === "attempts" && state.liveEntry.participantKey) return "attempts";
   if (state.guidedLiveStep === "name") return "name";
+  if (state.guidedLiveStep === "warmup") return "warmup";
   return "start";
 }
 
@@ -755,9 +819,9 @@ function guidedAttemptCardsMarkup() {
 }
 
 function guidedLeaderboardMarkup() {
-  return leaderboardSections(5).map((section) => `
+  return leaderboardSections(3).map((section) => `
     <section class="guided-ranking-section">
-      <h4><span aria-hidden="true">${guidedDirectionSymbol(section.key)}</span> ${escapeHtml(section.title)}</h4>
+      <h4><span aria-hidden="true">${guidedDirectionSymbol(section.direction)}</span> ${escapeHtml(section.title)}</h4>
       <ol class="guided-ranking-list">
         ${section.items.length ? section.items.map((entry, index) => `
           <li>
@@ -816,6 +880,19 @@ function guidedStageMarkup() {
   const forceInstruction = mode === "Ziehen" ? "ziehen" : mode === "Drücken" ? "drücken" : "ziehen oder drücken";
   const attemptLabel = Number(state.event.attempts || 1) === 1 ? "1 Versuch" : `${state.event.attempts} Versuche`;
   if (step === "result") return guidedResultMarkup();
+  if (step === "warmup") {
+    return `
+      <div class="guided-screen guided-warmup-screen">
+        <div class="eyebrow">Sicher testen</div>
+        <h2>Bist du aufgewärmt?</h2>
+        <p>Ein Maximalkrafttest belastet Finger, Hände und Unterarme stark. Bitte starte nur, wenn du dich bereits gut aufgewärmt hast.</p>
+        <div class="guided-warmup-actions">
+          <button class="button primary" id="guidedWarmupYes" type="button">Ja, ich bin aufgewärmt</button>
+          <button class="button subtle" id="guidedWarmupNo" type="button">Nein, zurück zum Start</button>
+        </div>
+      </div>
+    `;
+  }
   if (step === "name") {
     return `
       <div class="guided-screen guided-name-screen">
@@ -825,6 +902,13 @@ function guidedStageMarkup() {
         <div class="guided-name-form">
           <div class="field"><label for="participantFirstNameInput">Vorname</label><input id="participantFirstNameInput" value="${escapeHtml(state.liveEntry.draftFirstName || "")}" placeholder="Vorname" autocomplete="given-name" enterkeyhint="next" /></div>
           <div class="field"><label for="participantLastNameInput">Name</label><input id="participantLastNameInput" value="${escapeHtml(state.liveEntry.draftLastName || "")}" placeholder="Nachname" autocomplete="family-name" enterkeyhint="done" /></div>
+          <div class="guided-gender-field">
+            <span>Kategorie</span>
+            <div class="guided-gender-options" role="radiogroup" aria-label="Kategorie auswählen">
+              <label class="guided-gender-option"><input type="radio" name="participantGender" value="male" ${state.liveEntry.draftGender === "male" ? "checked" : ""} /><span>Mann</span></label>
+              <label class="guided-gender-option"><input type="radio" name="participantGender" value="female" ${state.liveEntry.draftGender === "female" ? "checked" : ""} /><span>Frau</span></label>
+            </div>
+          </div>
           <button class="button primary" id="activateParticipantButton" type="button" ${!online || !state.connected || !writable ? "disabled" : ""}>Bestätigen und starten</button>
         </div>
         <button class="button subtle guided-secondary-action" id="guidedBackToStart" type="button">Zurück</button>
@@ -888,7 +972,7 @@ function guidedLivePageMarkup(publicUrl) {
       <section class="card guided-stage-column" aria-live="polite">${guidedStageMarkup()}</section>
       <aside class="card guided-leaderboard-column">
         <h3>Rangliste der Teilnehmer</h3>
-        <p>${normalizeForceMode(state.event.forceMode) === "Beide" ? "Die besten 5 · separate Wertung für Ziehen und Drücken" : "Die besten 5 der aktuellen Challenge"}</p>
+        <p>Top 3 · getrennt nach Mann/Frau${normalizeForceMode(state.event.forceMode) === "Beide" ? " sowie Ziehen/Drücken" : ""}</p>
         ${guidedLeaderboardMarkup()}
       </aside>
     </div>
@@ -937,6 +1021,8 @@ function resetLiveEntryState() {
   state.liveEntry.lastName = "";
   state.liveEntry.draftFirstName = "";
   state.liveEntry.draftLastName = "";
+  state.liveEntry.gender = "";
+  state.liveEntry.draftGender = "";
   state.liveEntry.attempts = [];
   state.liveEntry.participantKey = "";
   state.liveEntry.readyForAttempt = false;
@@ -1003,11 +1089,17 @@ function getEditableResultNameParts(entry) {
   };
 }
 
-async function updateResultEntry(resultId, firstName, lastName, value) {
+async function updateResultEntry(resultId, firstName, lastName, gender, value) {
   const cleanFirstName = firstName.trim();
   const cleanLastName = lastName.trim();
+  const cleanGender = normalizeGender(gender);
   if (!cleanFirstName || !cleanLastName) {
     setError("Vorname und Name müssen beide ausgefüllt sein.");
+    render();
+    return;
+  }
+  if (cleanGender === "unknown") {
+    setError("Bitte die Kategorie Mann oder Frau auswählen.");
     render();
     return;
   }
@@ -1027,6 +1119,7 @@ async function updateResultEntry(resultId, firstName, lastName, value) {
       firstName: cleanFirstName,
       lastName: cleanLastName,
       participantName,
+      gender: cleanGender,
       value: Number(numericValue.toFixed(1)),
       updatedAt: serverTimestamp(),
     });
@@ -1039,13 +1132,14 @@ async function updateResultEntry(resultId, firstName, lastName, value) {
             firstName: cleanFirstName,
             lastName: cleanLastName,
             participantName,
+            gender: cleanGender,
             value: Number(numericValue.toFixed(1)),
             updatedAt: new Date(),
           }
         : entry)),
     );
     clearError();
-    setFlash(`Resultat aktualisiert: ${participantName} · ${numericValue.toFixed(1)} kg`);
+    setFlash(`Resultat aktualisiert: ${participantName} · ${formatGenderLabel(cleanGender)} · ${numericValue.toFixed(1)} kg`);
     render();
   } catch (error) {
     setError(`Resultat konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`);
@@ -1200,9 +1294,14 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     return false;
   }
 
-  const { firstName, lastName, participantName } = getParticipantNameParts();
+  const { firstName, lastName, gender, participantName } = getParticipantNameParts();
   if (!firstName || !lastName) {
     setError("Bitte Vorname und Name eingeben.");
+    render();
+    return false;
+  }
+  if (!gender || normalizeGender(gender) === "unknown") {
+    setError("Bitte Mann oder Frau auswählen.");
     render();
     return false;
   }
@@ -1241,6 +1340,7 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
         firstName,
         lastName,
         participantName,
+        gender,
         group.direction,
         nextResults,
       );
@@ -1251,6 +1351,7 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
         firstName,
         lastName,
         participantName,
+        gender,
         value: group.finalValue,
         unit: "kg",
         forceMode: group.direction,
@@ -1293,7 +1394,7 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
         value: group.finalValue,
         leaderboardValue,
         direction: group.direction,
-        placement: getResultPlacement(leaderboardValue, group.direction),
+        placement: getResultPlacement(leaderboardValue, group.direction, gender),
       });
     }
 
@@ -1307,6 +1408,7 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
     state.lastCompletedResult = {
       eventId: state.event.id,
       participantName: savedName,
+      gender,
       directionResults,
     };
 
@@ -3566,6 +3668,7 @@ function template(page) {
                     <div class="field-grid participant-fields">
                       <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.draftFirstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
                       <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.draftLastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
+                      <div class="field"><label>Kategorie</label><select id="participantGenderSelect"><option value="">Auswählen</option><option value="male" ${state.liveEntry.draftGender === "male" ? "selected" : ""}>Mann</option><option value="female" ${state.liveEntry.draftGender === "female" ? "selected" : ""}>Frau</option></select></div>
                       <div class="field participant-activate-field"><label>Freigabe</label><button class="button primary participant-activate-button" id="activateParticipantButton" type="button">Teilnehmer aktivieren</button></div>
                     </div>
                     ${lastCompletedResultMarkup()}
@@ -3592,7 +3695,7 @@ function template(page) {
           ` : ""}
           ${page === "display" ? `
             <div class="grid two">
-              <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 10 · ${state.event.challengeType} · Letztes Resultat live</p>${isDailyChallengeType() ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}<div class="grid">${leaderboardSections(10).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="leaderboard-table display-board">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
+              <div class="card"><div class="eyebrow">Display-Modus</div><h1 class="display-title">${state.event.name}</h1><p class="muted" style="font-size:20px;">Top 3 pro Kategorie · ${state.event.challengeType} · Letztes Resultat live</p>${isDailyChallengeType() ? `<div class="mini-stats" style="margin-bottom:18px;">${dailyWinnerCardsMarkup()}</div>` : ""}<div class="grid">${leaderboardSections(3).map((section) => `<div><h4 style="margin:0 0 10px;">${section.title}</h4><table class="leaderboard-table display-board">${leaderboardTable(section.items, section.items.length)}</table></div>`).join("")}</div></div>
               <div class="grid"><div class="card"><div class="card-header"><div><h3>Letztes Resultat</h3><p>Optimiert für TV, Beamer und Grossbildschirm.</p></div></div><div style="font-size:44px; font-weight:800; letter-spacing:-0.04em;">${last ? `${last.participantName || last.name} · ${Number(last.value).toFixed(1)} kg` : "Noch kein Resultat"}</div></div><div class="card"><div class="card-header"><div><h3>Teilnehmer live</h3><p>QR-Code permanent sichtbar.</p></div></div><div class="metric-list"><div class="metric-line"><span>Teilnehmerzahl</span><strong>${getParticipantCountLabel()}</strong></div><div class="metric-line"><span>Öffentliche URL</span><strong><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">${publicUrl}</a></strong></div></div><div class="qr-block" style="margin-top:18px;"><a class="qr" href="${publicUrl}" target="_blank" rel="noopener noreferrer"><img src="${qrImage(publicUrl)}" alt="QR-Code zur Eventseite" /></a><div><strong>Live verfolgen</strong><p class="muted">Leaderboard, Statistiken und PDF-Export ohne Login.</p></div></div></div></div>
             </div>
           ` : ""}
@@ -4002,6 +4105,7 @@ function bindLiveActions() {
   root.querySelector("#participantFirstNameInput")?.addEventListener("change", syncParticipantInputs);
   root.querySelector("#participantLastNameInput")?.addEventListener("input", syncParticipantInputs);
   root.querySelector("#participantLastNameInput")?.addEventListener("change", syncParticipantInputs);
+  root.querySelector("#participantGenderSelect")?.addEventListener("change", syncParticipantInputs);
   root.querySelector("#activateParticipantButton")?.addEventListener("click", activateParticipantFromInputs);
   root.querySelector("#participantFirstNameInput")?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
@@ -4025,9 +4129,21 @@ function bindLiveActions() {
       return;
     }
     if (!state.connected) return;
+    state.guidedLiveStep = "warmup";
+    clearError();
+    render();
+  });
+  root.querySelector("#guidedWarmupYes")?.addEventListener("click", () => {
     state.guidedLiveStep = "name";
     clearError();
     render();
+  });
+  root.querySelector("#guidedWarmupNo")?.addEventListener("click", returnGuidedLiveToStart);
+  root.querySelectorAll('input[name="participantGender"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      state.liveEntry.draftGender = input.checked ? input.value : state.liveEntry.draftGender;
+      updateParticipantActivationButton();
+    });
   });
   root.querySelector("#guidedConnectPanel")?.addEventListener("click", async () => {
     if (!isLiveOnline() || state.connecting || state.connected) return;
@@ -4057,8 +4173,9 @@ function bindResultEditorActions() {
       const resultId = button.dataset.updateResult;
       const firstName = root.querySelector(`[data-result-first-name="${resultId}"]`)?.value || "";
       const lastName = root.querySelector(`[data-result-last-name="${resultId}"]`)?.value || "";
+      const gender = root.querySelector(`[data-result-gender="${resultId}"]`)?.value || "";
       const value = root.querySelector(`[data-result-value="${resultId}"]`)?.value || "";
-      await updateResultEntry(resultId, firstName, lastName, value);
+      await updateResultEntry(resultId, firstName, lastName, gender, value);
     });
   });
 

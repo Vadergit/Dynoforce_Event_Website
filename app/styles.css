@@ -3004,3 +3004,88 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
     margin-top: 26px;
   }
 }
+
+
+/* Warm-up gate and gender categories */
+.guided-warmup-actions {
+  width: min(100%, 470px);
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.guided-warmup-actions .button {
+  min-height: 56px;
+  font-weight: 800;
+}
+
+.guided-gender-field {
+  display: grid;
+  gap: 8px;
+}
+
+.guided-gender-field > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.guided-gender-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.guided-gender-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.guided-gender-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.guided-gender-option span {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  font-weight: 800;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.guided-gender-option input:checked + span {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.guided-gender-option input:focus-visible + span {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.guided-leaderboard-column {
+  overflow-y: auto !important;
+}
+
+.guided-leaderboard-column .guided-ranking-section + .guided-ranking-section {
+  margin-top: 8px;
+}
+
+.guided-leaderboard-column .guided-ranking-list li {
+  min-height: 34px;
+}
+
+@media (max-width: 620px) {
+  .guided-warmup-actions,
+  .guided-gender-options {
+    grid-template-columns: 1fr;
+  }
+}
