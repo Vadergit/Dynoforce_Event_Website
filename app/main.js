@@ -515,7 +515,7 @@ function guidedDailyLeadersMarkup() {
                   <ol class="guided-ranking-list">
                     ${leader.participantName ? `
                       <li>
-                        <span class="guided-rank-number rank-1">1</span>
+                        <span class="guided-rank-number rank-1">${medalForRank(0)}</span>
                         <strong>${escapeHtml(leader.participantName)}</strong>
                         <span>${Number(leader.value).toFixed(1)} kg</span>
                       </li>
@@ -999,7 +999,7 @@ function guidedLeaderboardMarkup() {
             <ol class="guided-ranking-list">
               ${section.items.length ? section.items.map((entry, index) => `
                 <li>
-                  <span class="guided-rank-number rank-${index + 1}">${index + 1}</span>
+                  <span class="guided-rank-number rank-${index + 1}">${medalForRank(index)}</span>
                   <strong>${escapeHtml(entry.participantName || entry.name || "Teilnehmer")}</strong>
                   <span>${Number(entry.value || 0).toFixed(1)} kg</span>
                 </li>
