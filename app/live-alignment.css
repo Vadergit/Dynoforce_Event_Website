@@ -117,6 +117,15 @@
   text-align: center;
 }
 
+/* Medaillen und Pokal ohne zusaetzlichen runden Farbhintergrund darstellen. */
+.guided-rank-number,
+.guided-rank-number.rank-1,
+.guided-rank-number.rank-2,
+.guided-rank-number.rank-3 {
+  background: transparent;
+  border-radius: 0;
+}
+
 @media (max-width: 700px) {
   .guided-screen {
     padding-top: 12px;
