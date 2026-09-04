@@ -1,7 +1,8 @@
-/* Live-Seite: QR-Code auf dem Tablet nur anzeigen, nicht als Link bedienen. */
-.guided-qr-block > a:first-of-type,
-.live-qr-card a.qr {
+/* Live-Seite: QR-Code und zugehörige Links auf dem Tablet nur anzeigen, nicht bedienen. */
+.guided-qr-block > a,
+.live-qr-card a {
   pointer-events: none;
   cursor: default;
   -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
 }
