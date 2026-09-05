@@ -25,6 +25,8 @@ import {
 import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import QRCode from "qrcode";
 import { auth, db, storage } from "./firebase.js";
+import { bindEventGames, cleanupEventGames, eventGamesPageMarkup, updateEventGamesForce } from "./event-games.js";
+import "./event-games.css";
 
 const BLE = {
   serviceUuid: "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
@@ -200,12 +202,13 @@ const pageMeta = {
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
   live: ["Live-Messseite", "Zentrale Arbeitsseite für den Organisator mit Gerät, Teilnehmer, Messwert und Top 10."],
+  games: ["DynoForce Games", "Flappy Birds, Pong und Squirrel Rush als Einzelspieler mit einem DynoGrip."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
 };
 
 const adminNavPages = ["dashboard"];
-const focusedEventPages = ["live", "public", "display"];
+const focusedEventPages = ["live", "games", "public", "display"];
 
 const APP_BASE = (import.meta.env.BASE_URL || "/")
   .replace(/^\.\//, "/")
@@ -1119,6 +1122,11 @@ function guidedStageMarkup() {
       <h2>Wie stark bist du?</h2>
       <p>Teste deine ${mode === "Ziehen" ? "Zugkraft" : mode === "Drücken" ? "Druckkraft" : "Zug- oder Druckkraft"}. ${attemptLabel}, der beste zählt.</p>
       <button class="button primary guided-primary-action" id="guidedPrimaryAction" type="button" ${!writable || !online || !state.connected || state.connecting ? "disabled" : ""}>${primaryLabel}</button>
+      <button class="guided-games-entry" data-page="games" type="button" aria-label="DynoForce Spiele öffnen">
+        <span class="guided-games-entry-icon">🎮</span>
+        <span class="guided-games-entry-copy"><strong>Spiele</strong><small>Flappy Birds · Pong · Squirrel Rush</small></span>
+        <span class="guided-games-entry-arrow">→</span>
+      </button>
       <div class="guided-safety-box"><strong>! &nbsp; Sicher testen</strong><span>Überschätze dich nicht und gib unaufgewärmt keine maximale Kraft. Bei Schmerzen sofort stoppen.</span></div>
       ${guidedDailyLeadersMarkup()}
     </div>
@@ -1778,7 +1786,7 @@ function getRouteInfo() {
   }
 
   const page = pageMeta[segments[0]] ? segments[0] : "dashboard";
-  const routedEventPage = ["setup", "branding", "live"].includes(page);
+  const routedEventPage = ["setup", "branding", "live", "games"].includes(page);
   return { page, eventId: routedEventPage ? (segments[1] || fallbackEventId) : fallbackEventId };
 }
 
@@ -3089,6 +3097,10 @@ function qrImage(url) {
 }
 
 function updateLiveMeasurementDom() {
+  if (state.currentPage === "games") {
+    updateEventGamesForce({ force: getDisplayForceValue(), signedForce: state.signedForce, connected: state.connected });
+    return;
+  }
   if (state.currentPage !== "live") return;
 
   const setText = (id, value) => {
@@ -3706,7 +3718,7 @@ function template(page) {
   const average = averageValue();
   const last = state.results[state.results.length - 1];
   const isFocusedPage = focusedEventPages.includes(page);
-  const lockedPage = !state.user && ["dashboard", "setup", "branding", "live"].includes(page);
+  const lockedPage = !state.user && ["dashboard", "setup", "branding", "live", "games"].includes(page);
   const navItems = state.user
     ? adminNavPages.map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")
     : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button>`;
@@ -3840,6 +3852,7 @@ function template(page) {
               ${brandingLivePreview()}
             </div>
           ` : ""}
+          ${!lockedPage && page === "games" ? eventGamesPageMarkup({ connected: state.connected, currentForce: getDisplayForceValue() }) : ""}
           ${!lockedPage && page === "live" ? (USE_GUIDED_LIVE_UI ? guidedLivePageMarkup(publicUrl) : `
             <div class="grid live live-compact">
               <div class="grid live-primary-column">
@@ -3929,7 +3942,7 @@ function bindGeneralUi() {
         if (!discardChanges) return;
         resetBrandingDraft();
       }
-      const targetEventId = ["setup", "branding", "live", "public", "display"].includes(page)
+      const targetEventId = ["setup", "branding", "live", "games", "public", "display"].includes(page)
         ? (state.event.id || getActiveEventId())
         : state.event.id;
       syncUrl(page, targetEventId);
@@ -4414,6 +4427,7 @@ function bindPublicActions() {
 function render() {
   hydrateResultsFromCache();
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
+  if (state.currentPage !== "games") cleanupEventGames();
   root.innerHTML = template(state.currentPage);
   bindGeneralUi();
 
@@ -4421,6 +4435,7 @@ function render() {
   if (state.user && state.currentPage === "setup") bindSetupActions();
   if (state.user && state.currentPage === "branding") bindBrandingActions();
   if (state.user && state.currentPage === "live") bindLiveActions();
+  if (state.user && state.currentPage === "games") bindEventGames(root, { connected: state.connected, currentForce: getDisplayForceValue(), signedForce: state.signedForce });
   if (state.currentPage === "public") bindPublicActions();
 }
 
