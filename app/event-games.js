@@ -105,7 +105,7 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "710px" };
+  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "820px" };
   if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "820px" };
   return { width: 900, height: 500, maxWidth: "820px" };
 }
@@ -219,7 +219,7 @@ function mountActiveGame() {
 
         <div class="event-game-canvas-column">
           <div class="event-game-canvas-wrap" style="max-width:${spec.maxWidth}">
-            <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" style="aspect-ratio:${spec.width} / ${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
+            <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
             <div class="event-game-overlay ${runtime.connected ? "show-settings" : "is-connect-prompt"}" id="eventGameOverlay" ${runtime.connected ? "" : `role="button" tabindex="0" aria-label="DynoGrip verbinden"`}>
               <div class="event-game-overlay-message">
                 <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
