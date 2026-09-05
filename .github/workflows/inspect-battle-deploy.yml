@@ -10,52 +10,36 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Extract deployed battle game source
+      - name: Trace Battle route and embedded games
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p /tmp/battle
           cd /tmp/battle
-          curl -L --fail --silent --show-error https://dynoforce.web.app/battle -o battle.html
           curl -L --fail --silent --show-error https://dynoforce.web.app/assets/index-vxyjGoE9.js -o battle.min.js
-          curl -L --fail --silent --show-error https://dynoforce.web.app/assets/index-CLh0Mr_F.css -o battle.css
-
           npx --yes prettier@3.6.2 battle.min.js --parser babel > battle.pretty.js
-
-          echo '=== GAME MARKER LINES ==='
-          grep -niE 'Flappy|Pong|Squirrel|flappy|pong|squirrel' battle.pretty.js | head -100 || true
-
           python3 - <<'PY'
           from pathlib import Path
           import re
-          text = Path('battle.pretty.js').read_text(errors='ignore')
-          lines = text.splitlines()
-          markers = []
-          for i,line in enumerate(lines):
-              if re.search(r'Flappy|Pong|Squirrel|flappy|pong|squirrel', line):
-                  markers.append(i)
-          chosen=[]
-          for i in markers:
-              if not chosen or i-chosen[-1] > 80:
-                  chosen.append(i)
-          print('MARKERS', [i+1 for i in chosen[:20]])
-          for n,i in enumerate(chosen[:20],1):
-              print(f'\n===== CONTEXT {n} lines {max(1,i-90)+1}-{min(len(lines),i+180)+1} =====')
-              for j in range(max(0,i-90), min(len(lines),i+180)):
-                  print(f'{j+1:06d}: {lines[j]}')
-          print('\n===== ASSET PATHS IN JS =====')
-          assets=sorted(set(re.findall(r'["\']([^"\']+\.(?:png|svg|webp|jpg|jpeg|gif))["\']', text, re.I)))
-          for a in assets:
-              print(a)
-          PY
-
-          echo '=== BATTLE CSS MATCHES ==='
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          css=Path('battle.css').read_text(errors='ignore')
-          for term in ['battle','flappy','pong','squirrel']:
-              print('\nTERM',term)
-              for m in list(re.finditer(term, css, re.I))[:20]:
-                  print(css[max(0,m.start()-500):m.start()+1200])
+          lines=Path('battle.pretty.js').read_text(errors='ignore').splitlines()
+          patterns=[
+            r'/battle', r'Two Grips', r'One Winner', r'Winner', r'Kraft-Preset',
+            r'DynoGrip 1', r'DynoGrip 2', r'player1', r'player2', r'Player 1', r'Player 2',
+            r'iframe', r'srcDoc', r'gameUrl', r'game.*html', r'dynoflight', r'helixdrop'
+          ]
+          seen=[]
+          for pat in patterns:
+            hits=[i for i,l in enumerate(lines) if re.search(pat,l,re.I)]
+            print(f'\n### PATTERN {pat} HITS {[i+1 for i in hits[:30]]}')
+            for i in hits[:8]:
+              if any(abs(i-x)<40 for x in seen): continue
+              seen.append(i)
+              print(f'\n===== {pat} @ {i+1} =====')
+              for j in range(max(0,i-70),min(len(lines),i+160)):
+                print(f'{j+1:06d}: {lines[j]}')
+          print('\n### URL-LIKE STRINGS NEAR GAME/BATTLE')
+          text='\n'.join(lines)
+          for m in re.finditer(r'["\']([^"\']*(?:battle|game|flappy|pong|dynoflight)[^"\']*)["\']',text,re.I):
+            s=m.group(1)
+            if len(s)<300: print(s)
           PY
