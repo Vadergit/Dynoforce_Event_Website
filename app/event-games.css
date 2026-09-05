@@ -75,17 +75,27 @@
   gap: 10px;
 }
 
-.event-games-topline {
-  min-height: 48px;
+.focused-event-header.is-games {
   display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.focused-games-title {
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 850;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+}
+
+.focused-event-header.is-games .focused-event-actions {
+  justify-self: end;
+}
+
+.event-games-navigation {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(420px, 720px) minmax(130px, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.045);
 }
 
 .event-games-back {
@@ -95,21 +105,14 @@
   white-space: nowrap;
 }
 
-.event-games-intro {
-  text-align: center;
-  line-height: 1.05;
-}
-
-.event-games-intro h2 {
-  margin: 0;
-  font-size: clamp(20px, 2vw, 27px);
-  letter-spacing: -0.045em;
+.event-games-navigation::after {
+  content: "";
 }
 
 /* Compact Battle-style game switcher instead of three dashboard cards. */
 .event-games-selector {
-  width: min(100%, 720px);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 3px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -299,7 +302,7 @@
 
 .event-game-play-layout {
   display: grid;
-  grid-template-columns: minmax(190px, .78fr) minmax(400px, 1.42fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(170px, .62fr) minmax(480px, 1.65fr) minmax(205px, .78fr);
   gap: 10px;
   padding: 10px;
   align-items: stretch;
@@ -322,12 +325,6 @@
 .event-game-side-card .eyebrow {
   margin-bottom: 7px;
   font-size: 10px;
-}
-
-.event-game-guide h4 {
-  margin: 0 0 16px;
-  font-size: 21px;
-  letter-spacing: -0.025em;
 }
 
 .event-game-guide ol {
@@ -562,12 +559,20 @@
     gap: 10px;
   }
 
-  .event-games-topline {
+  .focused-games-title {
+    display: none;
+  }
+
+  .focused-event-header.is-games {
+    display: flex;
+  }
+
+  .event-games-navigation {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .event-games-intro {
-    text-align: right;
+  .event-games-navigation::after {
+    display: none;
   }
 
   .event-game-play-layout {
@@ -595,16 +600,9 @@
     width: 100%;
   }
 
-  .event-games-topline {
-    grid-template-columns: auto minmax(0, 1fr);
+  .event-games-navigation {
+    grid-template-columns: 1fr;
     gap: 8px;
-    padding: 8px;
-  }
-
-  .event-games-intro {
-    grid-column: 2;
-    grid-row: 1;
-    text-align: center;
   }
 
   .event-games-back {
@@ -614,6 +612,8 @@
   }
 
   .event-games-selector {
+    grid-column: 1;
+    grid-row: 2;
     width: 100%;
   }
 

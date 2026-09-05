@@ -110,9 +110,9 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "460px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "520px" };
-  return { width: 900, height: 500, maxWidth: "700px" };
+  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "540px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "600px" };
+  return { width: 900, height: 500, maxWidth: "800px" };
 }
 
 export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {}) {
@@ -121,24 +121,20 @@ export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {
   const active = runtime.activeGame && GAME_CONFIG[runtime.activeGame] ? runtime.activeGame : "";
   return `
     <section class="event-games-page" aria-label="DynoForce Spiele">
-      <div class="event-games-topline">
+      <div class="event-games-navigation">
         <button class="button event-games-back" data-page="live" type="button">← Zur Challenge</button>
-        <div class="event-games-intro">
-          <h2>DynoForce Games</h2>
+        <div class="event-games-selector" role="list" aria-label="Spiel auswählen">
+          ${Object.values(GAME_CONFIG).map((game) => `
+            <button class="event-game-card ${active === game.id ? "is-selected" : ""}" data-event-game="${game.id}" type="button" role="listitem">
+              <span class="event-game-card-icon">${game.icon}</span>
+              <span class="event-game-card-copy">
+                <strong>${escaped(game.title)}</strong>
+                <small>${escaped(game.subtitle)}</small>
+              </span>
+              <span class="event-game-card-arrow">→</span>
+            </button>
+          `).join("")}
         </div>
-      </div>
-
-      <div class="event-games-selector" role="list" aria-label="Spiel auswählen">
-        ${Object.values(GAME_CONFIG).map((game) => `
-          <button class="event-game-card ${active === game.id ? "is-selected" : ""}" data-event-game="${game.id}" type="button" role="listitem">
-            <span class="event-game-card-icon">${game.icon}</span>
-            <span class="event-game-card-copy">
-              <strong>${escaped(game.title)}</strong>
-              <small>${escaped(game.subtitle)}</small>
-            </span>
-            <span class="event-game-card-arrow">→</span>
-          </button>
-        `).join("")}
       </div>
 
       <div class="event-games-arena" id="eventGamesArena">
@@ -230,7 +226,6 @@ function mountActiveGame() {
       <div class="event-game-play-layout">
         <aside class="event-game-side-card event-game-guide" aria-label="Spielanleitung">
           <div class="eyebrow">So spielst du</div>
-          <h4>${escaped(config.title)}</h4>
           <ol>
             ${config.instructions.map((instruction) => `<li>${escaped(instruction)}</li>`).join("")}
           </ol>

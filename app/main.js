@@ -3490,7 +3490,7 @@ function focusedEventHeaderMarkup(page) {
     `
     : `<button class="button" id="openLoginModalInline">Anmelden</button>`;
   return `
-    <div class="focused-event-header">
+    <div class="focused-event-header ${page === "games" ? "is-games" : ""}">
       <div class="brand compact">
         <img class="brand-mark" src="/dynoforce-icon.png" alt="DynoForce Logo" />
         <div>
@@ -3498,6 +3498,7 @@ function focusedEventHeaderMarkup(page) {
           <p>${escapeHtml([state.event.organiser, state.event.challengeType, state.event.scoringMode].filter(Boolean).join(" · "))}</p>
         </div>
       </div>
+      ${page === "games" ? `<div class="focused-games-title">DynoForce Games</div>` : ""}
       ${actionsMarkup}
     </div>
   `;
