@@ -53,6 +53,7 @@ const runtime = {
   score: 0,
   best: { flappy: 0, pong: 0, squirrel: 0 },
   readySince: 0,
+  requiresRelease: false,
   raf: 0,
   lastFrame: 0,
   game: null,
@@ -107,8 +108,8 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "620px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "700px" };
+  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "670px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "760px" };
   return { width: 900, height: 500, maxWidth: "1000px" };
 }
 
@@ -177,6 +178,7 @@ export function cleanupEventGames({ keepSelection = true } = {}) {
   runtime.game = null;
   runtime.phase = keepSelection && runtime.activeGame ? "ready" : "menu";
   runtime.readySince = 0;
+  runtime.requiresRelease = false;
   if (!keepSelection) runtime.activeGame = "";
 }
 
@@ -186,6 +188,7 @@ function selectGame(gameId) {
   runtime.phase = "ready";
   runtime.score = 0;
   runtime.readySince = 0;
+  runtime.requiresRelease = false;
 
   runtime.root?.querySelectorAll("[data-event-game]").forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.eventGame === gameId);
@@ -202,6 +205,7 @@ function mountActiveGame() {
   runtime.phase = "ready";
   runtime.score = 0;
   runtime.readySince = 0;
+  runtime.requiresRelease = false;
   runtime.game = createGameState(runtime.activeGame);
   const spec = canvasSpec(runtime.activeGame);
 
@@ -256,14 +260,12 @@ function mountActiveGame() {
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="event-game-footer">
-        <div class="event-game-status"><span class="dot ${runtime.connected ? "" : "off"}" id="eventGameStatusDot"></span><strong id="eventGameStatusText">${runtime.connected ? "Warte auf Startbereich" : "DynoGrip nicht verbunden"}</strong></div>
-        <div class="event-game-footer-actions">
-          <button class="button subtle" id="eventGameReset" type="button">Neu starten</button>
-          <button class="button" id="eventGameChoose" type="button">Anderes Spiel</button>
-        </div>
+        <aside class="event-game-result" id="eventGameResult" aria-live="polite" hidden>
+          <div class="eyebrow">Letzte Runde</div>
+          <strong id="eventGameResultValue">0 Punkte</strong>
+          <span id="eventGameResultBest">Bestwert: 0</span>
+        </aside>
       </div>
     </div>
   `;
@@ -287,20 +289,6 @@ function mountActiveGame() {
     event.preventDefault();
     connectFromGame();
   });
-  arena.querySelector("#eventGameReset")?.addEventListener("click", resetCurrentGame);
-  arena.querySelector("#eventGameChoose")?.addEventListener("click", () => {
-    stopLoop();
-    runtime.activeGame = "";
-    runtime.phase = "menu";
-    runtime.root?.querySelectorAll("[data-event-game]").forEach((button) => button.classList.remove("is-selected"));
-    arena.innerHTML = `
-      <div class="event-games-empty-state">
-        <div class="event-games-empty-icon">🎮</div>
-        <h3>Wähle ein Spiel</h3>
-        <p>Flappy Battle, Force Pong oder Squirrel Rush.</p>
-      </div>`;
-  });
-
   updateForceUi();
   startLoop();
 }
@@ -310,14 +298,15 @@ function resetCurrentGame() {
   runtime.phase = "ready";
   runtime.score = 0;
   runtime.readySince = 0;
+  runtime.requiresRelease = runtime.connected && runtime.force >= 2;
   runtime.game = createGameState(runtime.activeGame);
   setScore(0);
+  showGameResult(false);
   setOverlay(
     runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden",
     runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Hier tippen, um den DynoGrip zu verbinden.",
     true,
   );
-  setStatus(runtime.connected ? "Warte auf Startbereich" : "DynoGrip nicht verbunden", runtime.connected);
 }
 
 function createGameState(gameId) {
@@ -359,10 +348,18 @@ function frame(now) {
 function processStartGate(now) {
   if (!runtime.connected) {
     runtime.readySince = 0;
-    if (runtime.phase !== "gameover") {
+    if (runtime.phase !== "gameover") runtime.phase = "ready";
+    setOverlay("DynoGrip verbinden", "Hier tippen, um den DynoGrip zu verbinden.", true);
+    return;
+  }
+  if (runtime.requiresRelease) {
+    runtime.readySince = 0;
+    if (runtime.force < 2) {
+      runtime.requiresRelease = false;
       runtime.phase = "ready";
-      setOverlay("DynoGrip verbinden", "Hier tippen, um den DynoGrip zu verbinden.", true);
-      setStatus("DynoGrip nicht verbunden", false);
+      setOverlay("Bereit zum Start", "Bring deine Kraft erneut in den grünen Bereich.", true);
+    } else {
+      setOverlay("Bereit für die nächste Runde", "Löse den DynoGrip kurz, bis die Kraft unter 2 kg fällt.", true);
     }
     return;
   }
@@ -373,7 +370,6 @@ function processStartGate(now) {
   if (!inReadyZone) {
     runtime.readySince = 0;
     setOverlay("Bereit zum Start", `Bring deine Kraft auf etwa ${Math.round(runtime.preset * 0.5)} kg in den grünen Bereich. Danach startet das Spiel automatisch.`, true);
-    setStatus("Warte auf Startbereich", true);
     return;
   }
 
@@ -381,7 +377,6 @@ function processStartGate(now) {
   const remaining = Math.max(0, READY_HOLD_MS - (now - runtime.readySince));
   if (remaining > 0) {
     setOverlay("Startbereit", "Halten …", true);
-    setStatus("Startbereich erreicht", true);
     return;
   }
   beginGame();
@@ -391,10 +386,11 @@ function beginGame() {
   runtime.phase = "playing";
   runtime.score = 0;
   runtime.readySince = 0;
+  runtime.requiresRelease = false;
   runtime.game = createGameState(runtime.activeGame);
   setScore(0);
+  showGameResult(false);
   setOverlay("", "", false);
-  setStatus("Spiel läuft", true);
   const startSound = BATTLE_SOUNDS.start[Math.floor(Math.random() * BATTLE_SOUNDS.start.length)];
   playSound(startSound, 0.25, 500, "start");
 }
@@ -402,11 +398,28 @@ function beginGame() {
 function gameOver(message) {
   if (runtime.phase === "gameover") return;
   runtime.phase = "gameover";
+  runtime.readySince = 0;
+  runtime.requiresRelease = true;
   runtime.best[runtime.activeGame] = Math.max(runtime.best[runtime.activeGame] || 0, runtime.score);
   const best = runtime.root?.querySelector("#eventGameBest");
   if (best) best.textContent = String(runtime.best[runtime.activeGame]);
-  setOverlay("Game Over", `${message}${runtime.activeGame === "pong" ? "" : ` · ${runtime.score} ${runtime.score === 1 ? "Punkt" : "Punkte"}`}`, true);
-  setStatus("Neu starten für den nächsten Versuch", true);
+  showGameResult(true);
+  setOverlay("Nächste Runde", `${message}. Löse den DynoGrip kurz unter 2 kg.`, true);
+}
+
+function showGameResult(visible) {
+  const result = runtime.root?.querySelector("#eventGameResult");
+  const value = runtime.root?.querySelector("#eventGameResultValue");
+  const best = runtime.root?.querySelector("#eventGameResultBest");
+  if (!result) return;
+  result.hidden = !visible;
+  if (!visible) return;
+  if (runtime.activeGame === "pong" && runtime.game) {
+    value.textContent = `${runtime.game.playerScore || 0} : ${runtime.game.cpuScore || 0}`;
+  } else {
+    value.textContent = `${runtime.score} ${runtime.score === 1 ? "Punkt" : "Punkte"}`;
+  }
+  best.textContent = `Bestwert: ${runtime.best[runtime.activeGame] || 0}`;
 }
 
 function setScore(value) {
@@ -427,10 +440,10 @@ function setOverlay(title, text, visible) {
   if (titleNode) titleNode.textContent = title;
   if (textNode) textNode.textContent = text;
   overlay?.classList.toggle("is-hidden", !visible);
-  overlay?.classList.toggle("show-settings", visible && runtime.connected && runtime.phase === "ready");
-  overlay?.classList.toggle("is-connect-prompt", visible && !runtime.connected && runtime.phase === "ready");
+  overlay?.classList.toggle("show-settings", visible && runtime.connected && (runtime.phase === "ready" || runtime.phase === "gameover"));
+  overlay?.classList.toggle("is-connect-prompt", visible && !runtime.connected);
   if (overlay) {
-    const connectPrompt = visible && !runtime.connected && runtime.phase === "ready";
+    const connectPrompt = visible && !runtime.connected;
     if (connectPrompt) {
       overlay.setAttribute("role", "button");
       overlay.setAttribute("tabindex", "0");
@@ -441,13 +454,6 @@ function setOverlay(title, text, visible) {
       overlay.removeAttribute("aria-label");
     }
   }
-}
-
-function setStatus(text, connectedStyle) {
-  const node = runtime.root?.querySelector("#eventGameStatusText");
-  const dot = runtime.root?.querySelector("#eventGameStatusDot");
-  if (node) node.textContent = text;
-  dot?.classList.toggle("off", !connectedStyle);
 }
 
 function updateForceUi() {
