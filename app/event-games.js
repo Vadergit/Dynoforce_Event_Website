@@ -11,7 +11,7 @@ const GAME_CONFIG = {
     title: "Force Pong",
     icon: "🏓",
     subtitle: "Spiele mit deiner Kraft gegen den Computer.",
-    instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Triff den Ball und verteidige deine Seite."],
+    instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Verpasst du den Ball, ist die Runde vorbei."],
   },
   squirrel: {
     id: "squirrel",
@@ -105,9 +105,9 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "820px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "820px" };
-  return { width: 900, height: 500, maxWidth: "820px" };
+  if (gameId === "flappy") return { width: 400, height: 400, pixelScale: 2, maxWidth: "820px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, pixelScale: 2, maxWidth: "820px" };
+  return { width: 900, height: 500, pixelScale: 1, maxWidth: "820px" };
 }
 
 export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {}) {
@@ -219,7 +219,7 @@ function mountActiveGame() {
 
         <div class="event-game-canvas-column">
           <div class="event-game-canvas-wrap" style="max-width:${spec.maxWidth}">
-            <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
+            <canvas id="eventGameCanvas" width="${spec.width * spec.pixelScale}" height="${spec.height * spec.pixelScale}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
             <div class="event-game-overlay ${runtime.connected ? "show-settings" : "is-connect-prompt"}" id="eventGameOverlay" ${runtime.connected ? "" : `role="button" tabindex="0" aria-label="DynoGrip verbinden"`}>
               <div class="event-game-overlay-message">
                 <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
@@ -256,6 +256,7 @@ function mountActiveGame() {
 
   runtime.canvas = arena.querySelector("#eventGameCanvas");
   runtime.ctx = runtime.canvas?.getContext("2d") || null;
+  runtime.ctx?.setTransform(spec.pixelScale, 0, 0, spec.pixelScale, 0, 0);
 
   arena.querySelectorAll("[data-game-preset]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -736,11 +737,11 @@ function drawFlappy(ctx) {
 }
 
 function createPongState() {
-  return { ball: { x: 450, y: 250, vx: (Math.random() > 0.5 ? 1 : -1) * 686, vy: (Math.random() - 0.5) * 422, r: 11 }, playerY: 250, cpuY: 250, playerScore: 0, cpuScore: 0, win: 5 };
+  return { ball: { x: 450, y: 250, vx: (Math.random() > 0.5 ? 1 : -1) * 686, vy: (Math.random() - 0.5) * 422, r: 11 }, playerY: 250, cpuY: 250, playerScore: 0, cpuScore: 0 };
 }
 
 function getPongField() {
-  return { x: 18, y: 18, w: 864, h: 464, paddleW: 18, paddleH: 120, sideInset: 30 };
+  return { x: 18, y: 18, w: 864, h: 464, paddleW: 18, paddleH: 88, sideInset: 30 };
 }
 
 function scorePong(direction) {
@@ -753,10 +754,7 @@ function scorePong(direction) {
   game.ball.vy = (Math.random() - 0.5) * 422;
   runtime.score = game.playerScore;
   setScore(runtime.score);
-  if (game.playerScore >= game.win || game.cpuScore >= game.win) {
-    if (game.playerScore >= game.win) gameOver(`Du gewinnst ${game.playerScore}:${game.cpuScore}`);
-    else gameOver(`Computer gewinnt ${game.cpuScore}:${game.playerScore}`);
-  }
+  if (game.cpuScore >= 1) gameOver("Ball verpasst");
 }
 
 function updatePong(dt) {
