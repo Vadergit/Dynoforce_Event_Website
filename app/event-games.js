@@ -4,7 +4,6 @@ const GAME_CONFIG = {
     title: "Flappy Battle",
     icon: "🐦",
     subtitle: "Steuere den Vogel mit deiner Kraft.",
-    help: "Finde mit mehr oder weniger Kraft den Weg durch die Hindernisse.",
     instructions: ["Mehr Kraft lässt den Vogel steigen.", "Weniger Kraft lässt ihn sinken.", "Weiche den Hindernissen aus."],
   },
   pong: {
@@ -12,7 +11,6 @@ const GAME_CONFIG = {
     title: "Force Pong",
     icon: "🏓",
     subtitle: "Spiele mit deiner Kraft gegen den Computer.",
-    help: "Bewege deinen Schläger mit mehr oder weniger Kraft.",
     instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Triff den Ball und verteidige deine Seite."],
   },
   squirrel: {
@@ -20,7 +18,6 @@ const GAME_CONFIG = {
     title: "Squirrel Rush",
     icon: "🐿️",
     subtitle: "Springe mit dem Eichhörnchen nach oben.",
-    help: "Gib im richtigen Moment Kraft und lande sicher auf der nächsten Plattform.",
     instructions: ["Kurz lösen und dann Kraft geben.", "Mehr Kraft sorgt für einen höheren Sprung.", "Ziele auf die nächste Plattform."],
   },
 };
@@ -108,9 +105,9 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "670px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "760px" };
-  return { width: 900, height: 500, maxWidth: "1000px" };
+  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "710px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "820px" };
+  return { width: 900, height: 500, maxWidth: "820px" };
 }
 
 export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {}) {
@@ -211,19 +208,6 @@ function mountActiveGame() {
 
   arena.innerHTML = `
     <div class="event-game-shell ${runtime.activeGame === "pong" ? "is-pong" : ""}">
-      <div class="event-game-toolbar">
-        <div>
-          <div class="eyebrow">${config.icon} ${escaped(config.title)}</div>
-          <h3>${escaped(config.title)}</h3>
-          <p>${escaped(config.help)}</p>
-        </div>
-        <div class="event-game-scorebox">
-          <span>${runtime.activeGame === "pong" ? "Spielstand" : "Punkte"}</span>
-          <strong id="eventGameScore">${runtime.activeGame === "pong" ? "0 : 0" : "0"}</strong>
-          <small>${runtime.activeGame === "pong" ? "Du : CPU" : `Best: <span id="eventGameBest">${runtime.best[runtime.activeGame] || 0}</span>`}</small>
-        </div>
-      </div>
-
       <div class="event-game-play-layout">
         <aside class="event-game-side-card event-game-guide" aria-label="Spielanleitung">
           <div class="eyebrow">So spielst du</div>
@@ -261,10 +245,10 @@ function mountActiveGame() {
           </div>
         </div>
 
-        <aside class="event-game-result" id="eventGameResult" aria-live="polite" hidden>
-          <div class="eyebrow">Letzte Runde</div>
-          <strong id="eventGameResultValue">0 Punkte</strong>
-          <span id="eventGameResultBest">Bestwert: 0</span>
+        <aside class="event-game-result" id="eventGameResult" aria-live="polite">
+          <div class="eyebrow" id="eventGameResultLabel">${runtime.activeGame === "pong" ? "Spielstand" : "Punkte"}</div>
+          <strong id="eventGameResultValue">${runtime.activeGame === "pong" ? "0 : 0" : "0 Punkte"}</strong>
+          <span id="eventGameResultBest">Bestwert: ${runtime.best[runtime.activeGame] || 0}</span>
         </aside>
       </div>
     </div>
@@ -301,7 +285,6 @@ function resetCurrentGame() {
   runtime.requiresRelease = runtime.connected && runtime.force >= 2;
   runtime.game = createGameState(runtime.activeGame);
   setScore(0);
-  showGameResult(false);
   setOverlay(
     runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden",
     runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Hier tippen, um den DynoGrip zu verbinden.",
@@ -389,7 +372,6 @@ function beginGame() {
   runtime.requiresRelease = false;
   runtime.game = createGameState(runtime.activeGame);
   setScore(0);
-  showGameResult(false);
   setOverlay("", "", false);
   const startSound = BATTLE_SOUNDS.start[Math.floor(Math.random() * BATTLE_SOUNDS.start.length)];
   playSound(startSound, 0.25, 500, "start");
@@ -401,19 +383,16 @@ function gameOver(message) {
   runtime.readySince = 0;
   runtime.requiresRelease = true;
   runtime.best[runtime.activeGame] = Math.max(runtime.best[runtime.activeGame] || 0, runtime.score);
-  const best = runtime.root?.querySelector("#eventGameBest");
-  if (best) best.textContent = String(runtime.best[runtime.activeGame]);
-  showGameResult(true);
+  updateGameResult("finished");
   setOverlay("Nächste Runde", `${message}. Löse den DynoGrip kurz unter 2 kg.`, true);
 }
 
-function showGameResult(visible) {
-  const result = runtime.root?.querySelector("#eventGameResult");
+function updateGameResult(mode = "current") {
+  const label = runtime.root?.querySelector("#eventGameResultLabel");
   const value = runtime.root?.querySelector("#eventGameResultValue");
   const best = runtime.root?.querySelector("#eventGameResultBest");
-  if (!result) return;
-  result.hidden = !visible;
-  if (!visible) return;
+  if (!label || !value || !best) return;
+  label.textContent = mode === "finished" ? "Letzte Runde" : runtime.activeGame === "pong" ? "Spielstand" : "Punkte";
   if (runtime.activeGame === "pong" && runtime.game) {
     value.textContent = `${runtime.game.playerScore || 0} : ${runtime.game.cpuScore || 0}`;
   } else {
@@ -424,13 +403,7 @@ function showGameResult(visible) {
 
 function setScore(value) {
   runtime.score = Math.max(0, Math.floor(value));
-  const node = runtime.root?.querySelector("#eventGameScore");
-  if (!node) return;
-  if (runtime.activeGame === "pong" && runtime.game) {
-    node.textContent = `${runtime.game.playerScore || 0} : ${runtime.game.cpuScore || 0}`;
-  } else {
-    node.textContent = String(runtime.score);
-  }
+  if (runtime.phase !== "gameover") updateGameResult("current");
 }
 
 function setOverlay(title, text, visible) {
