@@ -5,7 +5,6 @@ const GAME_CONFIG = {
     icon: "🐦",
     subtitle: "Steuere den Vogel mit deiner Kraft.",
     help: "Finde mit mehr oder weniger Kraft den Weg durch die Hindernisse.",
-    goal: "Fliege durch möglichst viele Lücken.",
     instructions: ["Mehr Kraft lässt den Vogel steigen.", "Weniger Kraft lässt ihn sinken.", "Weiche den Hindernissen aus."],
   },
   pong: {
@@ -14,7 +13,6 @@ const GAME_CONFIG = {
     icon: "🏓",
     subtitle: "Spiele mit deiner Kraft gegen den Computer.",
     help: "Bewege deinen Schläger mit mehr oder weniger Kraft.",
-    goal: "Erreiche vor dem Computer fünf Punkte.",
     instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Triff den Ball und verteidige deine Seite."],
   },
   squirrel: {
@@ -23,7 +21,6 @@ const GAME_CONFIG = {
     icon: "🐿️",
     subtitle: "Springe mit dem Eichhörnchen nach oben.",
     help: "Gib im richtigen Moment Kraft und lande sicher auf der nächsten Plattform.",
-    goal: "Sammle möglichst viele Punkte, ohne herunterzufallen.",
     instructions: ["Kurz lösen und dann Kraft geben.", "Mehr Kraft sorgt für einen höheren Sprung.", "Ziele auf die nächste Plattform."],
   },
 };
@@ -235,16 +232,12 @@ function mountActiveGame() {
         <div class="event-game-canvas-column">
           <div class="event-game-canvas-wrap" style="max-width:${spec.maxWidth}">
             <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" style="aspect-ratio:${spec.width} / ${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
-            <div class="event-game-overlay show-settings" id="eventGameOverlay">
+            <div class="event-game-overlay ${runtime.connected ? "show-settings" : "is-connect-prompt"}" id="eventGameOverlay" ${runtime.connected ? "" : `role="button" tabindex="0" aria-label="DynoGrip verbinden"`}>
               <div class="event-game-overlay-message">
                 <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
-                <span id="eventGameOverlayText">${runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Verbinde den DynoGrip oben rechts, um zu spielen."}</span>
+                <span id="eventGameOverlayText">${runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Hier tippen, um den DynoGrip zu verbinden."}</span>
               </div>
               <div class="event-game-overlay-settings" aria-label="Spieleinstellungen">
-                <div class="event-game-goal">
-                  <div class="eyebrow">Dein Ziel</div>
-                  <strong>${escaped(config.goal)}</strong>
-                </div>
                 <div class="event-game-live-force">
                   <span>Aktuelle Kraft</span>
                   <strong><span id="eventGameArenaForce">${runtime.force.toFixed(1)}</span> kg</strong>
@@ -285,6 +278,15 @@ function mountActiveGame() {
       resetCurrentGame();
     });
   });
+  const connectFromGame = () => {
+    if (!runtime.connected) runtime.root?.querySelector("#connectToggle")?.click();
+  };
+  arena.querySelector("#eventGameOverlay")?.addEventListener("click", connectFromGame);
+  arena.querySelector("#eventGameOverlay")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    connectFromGame();
+  });
   arena.querySelector("#eventGameReset")?.addEventListener("click", resetCurrentGame);
   arena.querySelector("#eventGameChoose")?.addEventListener("click", () => {
     stopLoop();
@@ -312,7 +314,7 @@ function resetCurrentGame() {
   setScore(0);
   setOverlay(
     runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden",
-    runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Verbinde den DynoGrip oben rechts, um zu spielen.",
+    runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Hier tippen, um den DynoGrip zu verbinden.",
     true,
   );
   setStatus(runtime.connected ? "Warte auf Startbereich" : "DynoGrip nicht verbunden", runtime.connected);
@@ -359,7 +361,7 @@ function processStartGate(now) {
     runtime.readySince = 0;
     if (runtime.phase !== "gameover") {
       runtime.phase = "ready";
-      setOverlay("DynoGrip verbinden", "Verbinde den DynoGrip oben rechts, um zu spielen.", true);
+      setOverlay("DynoGrip verbinden", "Hier tippen, um den DynoGrip zu verbinden.", true);
       setStatus("DynoGrip nicht verbunden", false);
     }
     return;
@@ -425,7 +427,20 @@ function setOverlay(title, text, visible) {
   if (titleNode) titleNode.textContent = title;
   if (textNode) textNode.textContent = text;
   overlay?.classList.toggle("is-hidden", !visible);
-  overlay?.classList.toggle("show-settings", visible && runtime.phase === "ready");
+  overlay?.classList.toggle("show-settings", visible && runtime.connected && runtime.phase === "ready");
+  overlay?.classList.toggle("is-connect-prompt", visible && !runtime.connected && runtime.phase === "ready");
+  if (overlay) {
+    const connectPrompt = visible && !runtime.connected && runtime.phase === "ready";
+    if (connectPrompt) {
+      overlay.setAttribute("role", "button");
+      overlay.setAttribute("tabindex", "0");
+      overlay.setAttribute("aria-label", "DynoGrip verbinden");
+    } else {
+      overlay.removeAttribute("role");
+      overlay.removeAttribute("tabindex");
+      overlay.removeAttribute("aria-label");
+    }
+  }
 }
 
 function setStatus(text, connectedStyle) {

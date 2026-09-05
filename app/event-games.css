@@ -302,13 +302,14 @@
 
 .event-game-play-layout {
   display: grid;
-  grid-template-columns: minmax(185px, .48fr) minmax(560px, 2.2fr);
+  grid-template-columns: minmax(185px, 1fr) minmax(0, 1000px) minmax(185px, 1fr);
   gap: 10px;
   padding: 10px;
   align-items: stretch;
 }
 
 .event-game-canvas-column {
+  grid-column: 2;
   min-width: 0;
   display: grid;
   place-items: center;
@@ -370,17 +371,6 @@
   color: #fff;
   font-size: 11px;
   font-weight: 850;
-}
-
-.event-game-goal {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.event-game-goal strong {
-  display: block;
-  font-size: 15px;
-  line-height: 1.35;
 }
 
 .event-game-presets,
@@ -496,8 +486,8 @@
 }
 
 .event-game-overlay.show-settings {
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 40%);
-  gap: 12px;
+  align-content: center;
+  gap: 14px;
 }
 
 .event-game-overlay-message {
@@ -508,9 +498,8 @@
 
 .event-game-overlay-settings {
   display: none;
-  width: 100%;
-  align-self: stretch;
-  padding: 14px;
+  width: min(100%, 360px);
+  padding: 15px;
   border: 1px solid rgba(31, 79, 70, 0.16);
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.9);
@@ -523,6 +512,19 @@
 
 .event-game-overlay.show-settings .event-game-overlay-settings {
   display: flex;
+}
+
+.event-game-overlay.is-connect-prompt {
+  cursor: pointer;
+}
+
+.event-game-overlay.is-connect-prompt:hover {
+  background: rgba(239, 246, 243, 0.92);
+}
+
+.event-game-overlay.is-connect-prompt:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: -5px;
 }
 
 .event-game-overlay.is-hidden {
@@ -697,10 +699,6 @@
     align-self: auto;
     padding: 10px;
     gap: 8px;
-  }
-
-  .event-game-overlay-settings .event-game-goal {
-    display: none;
   }
 
   .event-game-overlay.show-settings .event-game-overlay-message strong {
