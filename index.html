@@ -15,25 +15,12 @@
 <body>
   <div id="app"></div>
   <script type="module" src="/app/main.js"></script>
-  <script type="module" src="/app/squirrel-soundtrack.js"></script>
   <script>
     (() => {
       const app = document.getElementById("app");
       let activeGamesPage = null;
 
-      const updateGamesTeaserCopy = () => {
-        const teaser = app.querySelector(".guided-games-entry");
-        if (!teaser) return;
-
-        const title = teaser.querySelector(".guided-games-entry-copy strong");
-        const subtitle = teaser.querySelector(".guided-games-entry-copy small");
-        if (title) title.textContent = "Spiele ausprobieren";
-        if (subtitle) subtitle.textContent = "Flappy Birds · Pong · Squirrel Rush";
-      };
-
       const openDefaultSinglePlayerGame = () => {
-        updateGamesTeaserCopy();
-
         const gamesPage = app.querySelector(".event-games-page");
         if (!gamesPage) {
           activeGamesPage = null;
