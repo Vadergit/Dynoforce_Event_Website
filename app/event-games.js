@@ -124,14 +124,7 @@ export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {
       <div class="event-games-topline">
         <button class="button event-games-back" data-page="live" type="button">← Zur Challenge</button>
         <div class="event-games-intro">
-          <div class="eyebrow">Einzelspieler</div>
           <h2>DynoForce Games</h2>
-          <p>Wähle ein Spiel und steuere es mit deiner Kraft.</p>
-        </div>
-        <div class="event-games-force-card ${connected ? "is-connected" : "is-disconnected"}">
-          <span class="event-games-force-label">Aktuelle Kraft</span>
-          <strong><span id="eventGamesForceValue">${Number(currentForce || 0).toFixed(1)}</span> kg</strong>
-          <small id="eventGamesConnectionText">${connected ? "DynoGrip verbunden" : "DynoGrip nicht verbunden"}</small>
         </div>
       </div>
 
@@ -272,6 +265,7 @@ function mountActiveGame() {
               ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
             </div>
           </div>
+          <p class="event-game-auto-start">Das Spiel startet automatisch, sobald du mit deiner Kraft den grünen Bereich erreichst.</p>
         </aside>
       </div>
 
@@ -380,7 +374,7 @@ function processStartGate(now) {
   const inReadyZone = ratio >= READY_MIN && ratio <= READY_MAX;
   if (!inReadyZone) {
     runtime.readySince = 0;
-    setOverlay("Bereit zum Start", `Bring deine Kraft auf etwa ${Math.round(runtime.preset * 0.5)} kg in den grünen Bereich.`, true);
+    setOverlay("Bereit zum Start", `Bring deine Kraft auf etwa ${Math.round(runtime.preset * 0.5)} kg in den grünen Bereich. Danach startet das Spiel automatisch.`, true);
     setStatus("Warte auf Startbereich", true);
     return;
   }
@@ -448,18 +442,10 @@ function updateForceUi() {
   const root = runtime.root;
   if (!root) return;
   const forceText = runtime.force.toFixed(1);
-  const headerValue = root.querySelector("#eventGamesForceValue");
   const arenaValue = root.querySelector("#eventGameArenaForce");
-  const connection = root.querySelector("#eventGamesConnectionText");
   const fill = root.querySelector("#eventGameForceFill");
-  if (headerValue) headerValue.textContent = forceText;
   if (arenaValue) arenaValue.textContent = forceText;
-  if (connection) connection.textContent = runtime.connected ? "DynoGrip verbunden" : "DynoGrip nicht verbunden";
   if (fill) fill.style.width = `${clamp(forceRatio() * 100, 0, 100)}%`;
-
-  const forceCard = root.querySelector(".event-games-force-card");
-  forceCard?.classList.toggle("is-connected", runtime.connected);
-  forceCard?.classList.toggle("is-disconnected", !runtime.connected);
 }
 
 const FLAPPY = {
