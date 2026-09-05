@@ -15,5 +15,35 @@
 <body>
   <div id="app"></div>
   <script type="module" src="/app/main.js"></script>
+  <script>
+    (() => {
+      const app = document.getElementById("app");
+      let activeGamesPage = null;
+
+      const openDefaultSinglePlayerGame = () => {
+        const gamesPage = app.querySelector(".event-games-page");
+        if (!gamesPage) {
+          activeGamesPage = null;
+          return;
+        }
+        if (gamesPage === activeGamesPage) return;
+        activeGamesPage = gamesPage;
+
+        const selectedGame = gamesPage.querySelector(".event-game-card.is-selected");
+        const defaultGame = gamesPage.querySelector('[data-event-game="flappy"]');
+        if (!selectedGame && defaultGame) {
+          queueMicrotask(() => {
+            if (document.contains(defaultGame)) defaultGame.click();
+          });
+        }
+      };
+
+      new MutationObserver(openDefaultSinglePlayerGame).observe(app, {
+        childList: true,
+        subtree: true,
+      });
+      openDefaultSinglePlayerGame();
+    })();
+  </script>
 </body>
 </html>
