@@ -68,7 +68,7 @@
  * one central arena, compact game switcher, prominent force feedback.
  */
 .event-games-page {
-  width: min(100%, 1320px);
+  width: 100%;
   margin: 0 auto;
   display: grid;
   align-content: start;

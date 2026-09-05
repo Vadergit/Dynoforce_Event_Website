@@ -738,9 +738,12 @@ function drawFlappy(ctx) {
 
 const PONG_WIDTH = 900;
 const PONG_HEIGHT = 765;
+const PONG_X_SPEED = 480.2;
+const PONG_Y_SPEED = 434;
+const PONG_HIT_IMPULSE = 3.36;
 
 function createPongState() {
-  return { ball: { x: PONG_WIDTH / 2, y: PONG_HEIGHT / 2, vx: (Math.random() > 0.5 ? 1 : -1) * 686, vy: (Math.random() - 0.5) * 620, r: 11 }, playerY: PONG_HEIGHT / 2, cpuY: PONG_HEIGHT / 2, playerScore: 0, cpuScore: 0 };
+  return { ball: { x: PONG_WIDTH / 2, y: PONG_HEIGHT / 2, vx: (Math.random() > 0.5 ? 1 : -1) * PONG_X_SPEED, vy: (Math.random() - 0.5) * PONG_Y_SPEED, r: 11 }, playerY: PONG_HEIGHT / 2, cpuY: PONG_HEIGHT / 2, playerScore: 0, cpuScore: 0 };
 }
 
 function getPongField() {
@@ -753,8 +756,8 @@ function scorePong(direction) {
   const field = getPongField();
   game.ball.x = field.x + field.w / 2;
   game.ball.y = field.y + field.h / 2;
-  game.ball.vx = direction * 686;
-  game.ball.vy = (Math.random() - 0.5) * 620;
+  game.ball.vx = direction * PONG_X_SPEED;
+  game.ball.vy = (Math.random() - 0.5) * PONG_Y_SPEED;
   runtime.score = game.playerScore;
   setScore(runtime.score);
   if (game.cpuScore >= 1) gameOver("Ball verpasst");
@@ -780,13 +783,13 @@ function updatePong(dt) {
   if (ball.vx < 0 && ball.x - ball.r < leftX + field.paddleW && ball.x > leftX && Math.abs(ball.y - game.playerY) < field.paddleH / 2) {
     ball.x = leftX + field.paddleW + ball.r;
     ball.vx = Math.abs(ball.vx) * 1.10;
-    ball.vy += (ball.y - game.playerY) * 4.8;
+    ball.vy += (ball.y - game.playerY) * PONG_HIT_IMPULSE;
     beep(630, 0.03);
   }
   if (ball.vx > 0 && ball.x + ball.r > rightX && ball.x < rightX + field.paddleW && Math.abs(ball.y - game.cpuY) < field.paddleH / 2) {
     ball.x = rightX - ball.r;
     ball.vx = -Math.abs(ball.vx) * 1.10;
-    ball.vy += (ball.y - game.cpuY) * 4.8;
+    ball.vy += (ball.y - game.cpuY) * PONG_HIT_IMPULSE;
     beep(630, 0.03);
   }
   if (ball.x + ball.r < field.x) { game.cpuScore++; scorePong(-1); }
