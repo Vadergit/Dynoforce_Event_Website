@@ -1,0 +1,52 @@
+name: Inspect battle deployment
+
+on:
+  push:
+    branches: ["fix/battle-games-single-player"]
+    paths:
+      - ".github/workflows/inspect-battle-deploy.yml"
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch battle deployment
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/battle
+          cd /tmp/battle
+          curl -L --fail --silent --show-error https://dynoforce.web.app/battle -o battle.html
+          echo '=== HTML HEAD ==='
+          sed -n '1,160p' battle.html
+          echo '=== ASSET LINKS ==='
+          grep -oE '(src|href)="[^"]+"' battle.html || true
+
+          python3 - <<'PY'
+          import re, urllib.parse, urllib.request, pathlib
+          html=pathlib.Path('battle.html').read_text(errors='ignore')
+          urls=[]
+          for u in re.findall(r'(?:src|href)="([^"]+)"', html):
+              if u.startswith(('data:','#','mailto:','tel:')): continue
+              full=urllib.parse.urljoin('https://dynoforce.web.app/battle', u)
+              if full.startswith('https://dynoforce.web.app/'):
+                  urls.append(full)
+          for i,u in enumerate(dict.fromkeys(urls)):
+              try:
+                  data=urllib.request.urlopen(u, timeout=30).read()
+                  name=urllib.parse.urlparse(u).path.rsplit('/',1)[-1] or f'asset-{i}'
+                  p=pathlib.Path(f'asset-{i:02d}-{name}')
+                  p.write_bytes(data)
+                  print(f'FETCHED {u} -> {p} {len(data)} bytes')
+              except Exception as e:
+                  print('ERROR',u,e)
+          PY
+
+          echo '=== FILES ==='
+          ls -lah
+          echo '=== STRING MATCHES ==='
+          grep -aoniE 'Flappy|Pong|Squirrel|Two Grips|One Winner|battle|Player ?1|Player ?2|10 kg|20 kg|30 kg|40 kg' asset-* battle.html | head -300 || true
+          echo '=== SOURCE MAP REFERENCES ==='
+          grep -aohE 'sourceMappingURL=[^[:space:]]+' asset-* | head -50 || true
+          echo '=== JS/CSS FILE IDENTIFICATION ==='
+          file asset-* || true
