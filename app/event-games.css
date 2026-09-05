@@ -69,20 +69,19 @@
  */
 .event-games-page {
   width: min(100%, 1320px);
-  min-height: calc(100vh - 150px);
   margin: 0 auto;
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 10px;
 }
 
 .event-games-topline {
-  min-height: 76px;
+  min-height: 66px;
   display: grid;
   grid-template-columns: minmax(145px, 0.75fr) minmax(280px, 1.7fr) minmax(190px, 0.9fr);
   align-items: center;
   gap: 16px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
@@ -107,7 +106,7 @@
 
 .event-games-intro h2 {
   margin: 0;
-  font-size: clamp(24px, 2.7vw, 36px);
+  font-size: clamp(22px, 2.4vw, 32px);
   letter-spacing: -0.045em;
 }
 
@@ -167,7 +166,7 @@
 .event-games-selector {
   width: min(100%, 720px);
   margin: 0 auto;
-  padding: 4px;
+  padding: 3px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
@@ -178,8 +177,8 @@
 
 .event-game-card {
   min-width: 0;
-  min-height: 48px;
-  padding: 7px 11px;
+  min-height: 42px;
+  padding: 5px 10px;
   border: 1px solid transparent;
   border-radius: 11px;
   background: transparent;
@@ -245,7 +244,7 @@
 }
 
 .event-games-empty-state {
-  min-height: min(60vh, 590px);
+  min-height: min(46vh, 430px);
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--surface);
@@ -295,8 +294,8 @@
 
 /* Header stays compact so the game remains the visual centre. */
 .event-game-toolbar {
-  min-height: 64px;
-  padding: 9px 15px;
+  min-height: 56px;
+  padding: 7px 13px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
@@ -310,7 +309,7 @@
 
 .event-game-toolbar h3 {
   margin: 0;
-  font-size: 23px;
+  font-size: 21px;
   letter-spacing: -0.035em;
 }
 
@@ -354,14 +353,88 @@
   font-weight: 750;
 }
 
-.event-game-controls-row {
-  padding: 8px 15px;
+.event-game-play-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, .75fr);
-  gap: 18px;
-  align-items: center;
+  grid-template-columns: minmax(190px, .78fr) minmax(400px, 1.42fr) minmax(220px, 1fr);
+  gap: 10px;
+  padding: 10px;
+  align-items: stretch;
+}
+
+.event-game-canvas-column {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+}
+
+.event-game-side-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
   background: #f8f7f3;
+}
+
+.event-game-side-card .eyebrow {
+  margin-bottom: 7px;
+  font-size: 10px;
+}
+
+.event-game-guide h4 {
+  margin: 0 0 16px;
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.event-game-guide ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 14px;
+  counter-reset: game-step;
+}
+
+.event-game-guide li {
+  counter-increment: game-step;
+  display: grid;
+  grid-template-columns: 27px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.event-game-guide li::before {
+  content: counter(game-step);
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.event-game-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.event-game-goal {
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.event-game-goal strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .event-game-presets,
@@ -380,14 +453,14 @@
 }
 
 .event-game-presets > div {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
-  flex-wrap: nowrap;
 }
 
 .event-game-preset {
   min-height: 32px;
-  min-width: 67px;
+  min-width: 0;
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -409,7 +482,7 @@
 }
 
 .event-game-live-force strong {
-  font-size: 19px;
+  font-size: 30px;
   letter-spacing: -0.03em;
 }
 
@@ -443,13 +516,13 @@
 /* The game itself is the dominant element, exactly one arena in the centre. */
 .event-game-canvas-wrap {
   position: relative;
-  width: min(calc(100% - 20px), 1120px);
-  margin: 10px auto;
+  width: 100%;
+  margin: 0 auto;
   padding: 0;
 }
 
 .event-game-shell.is-pong .event-game-canvas-wrap {
-  width: min(calc(100% - 20px), 1000px);
+  width: 100%;
 }
 
 #eventGameCanvas {
@@ -500,8 +573,8 @@
 }
 
 .event-game-footer {
-  min-height: 52px;
-  padding: 7px 15px;
+  min-height: 46px;
+  padding: 6px 12px;
   border-top: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -547,9 +620,23 @@
     justify-self: stretch;
   }
 
-  .event-game-controls-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
+  .event-game-play-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .event-game-canvas-column {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .event-game-guide {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .event-game-settings {
+    grid-column: 2;
+    grid-row: 2;
   }
 }
 
@@ -622,8 +709,24 @@
     font-size: 27px;
   }
 
-  .event-game-controls-row {
-    padding: 7px 10px;
+  .event-game-play-layout {
+    grid-template-columns: 1fr;
+    padding: 6px;
+  }
+
+  .event-game-canvas-column {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .event-game-guide {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .event-game-settings {
+    grid-column: 1;
+    grid-row: 3;
   }
 
   .event-game-presets > div {
@@ -638,8 +741,8 @@
 
   .event-game-canvas-wrap,
   .event-game-shell.is-pong .event-game-canvas-wrap {
-    width: calc(100% - 12px);
-    margin: 6px auto;
+    width: 100%;
+    margin: 0 auto;
   }
 
   .event-game-footer {

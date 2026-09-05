@@ -1,5 +1,5 @@
 .guided-force-column .guided-games-entry {
-  width: min(calc(100% - 20px), 280px);
+  width: 100%;
   min-height: 62px;
   margin: 14px auto;
   justify-self: center;
@@ -8,7 +8,7 @@
 
 @media (max-width: 700px) {
   .guided-force-column .guided-games-entry {
-    width: min(calc(100% - 12px), 320px);
+    width: 100%;
     margin: 12px auto;
   }
 }

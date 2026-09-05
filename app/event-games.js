@@ -3,22 +3,28 @@ const GAME_CONFIG = {
     id: "flappy",
     title: "Flappy Battle",
     icon: "🐦",
-    subtitle: "Direkte Kraftsteuerung durch das originale Battle-Level.",
-    help: "50 % Kraft entspricht ungefähr der Mitte des Spielfelds. Mehr Kraft = höher, weniger Kraft = tiefer.",
+    subtitle: "Steuere den Vogel mit deiner Kraft.",
+    help: "Finde mit mehr oder weniger Kraft den Weg durch die Hindernisse.",
+    goal: "Fliege durch möglichst viele Lücken.",
+    instructions: ["Mehr Kraft lässt den Vogel steigen.", "Weniger Kraft lässt ihn sinken.", "Weiche den Hindernissen aus."],
   },
   pong: {
     id: "pong",
     title: "Force Pong",
     icon: "🏓",
-    subtitle: "Das originale Battle-Pong – im Einzelspieler gegen den Computer.",
-    help: "Deine Kraft steuert das linke Paddle. Der Computer spielt rechts. Wer zuerst 5 Punkte erreicht, gewinnt.",
+    subtitle: "Spiele mit deiner Kraft gegen den Computer.",
+    help: "Bewege deinen Schläger mit mehr oder weniger Kraft.",
+    goal: "Erreiche vor dem Computer fünf Punkte.",
+    instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Triff den Ball und verteidige deine Seite."],
   },
   squirrel: {
     id: "squirrel",
     title: "Squirrel Rush",
     icon: "🐿️",
-    subtitle: "Die originale Kraftsteuerung mit Waldplattformen.",
-    help: "Loslassen zum Scharfstellen, Kraft geben zum Springen und in der Luft nochmals nachdrücken für zusätzlichen Auftrieb.",
+    subtitle: "Springe mit dem Eichhörnchen nach oben.",
+    help: "Gib im richtigen Moment Kraft und lande sicher auf der nächsten Plattform.",
+    goal: "Sammle möglichst viele Punkte, ohne herunterzufallen.",
+    instructions: ["Kurz lösen und dann Kraft geben.", "Mehr Kraft sorgt für einen höheren Sprung.", "Ziele auf die nächste Plattform."],
   },
 };
 
@@ -104,9 +110,9 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "640px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "720px" };
-  return { width: 900, height: 500, maxWidth: "1000px" };
+  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "460px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "520px" };
+  return { width: 900, height: 500, maxWidth: "700px" };
 }
 
 export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {}) {
@@ -120,7 +126,7 @@ export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {
         <div class="event-games-intro">
           <div class="eyebrow">Einzelspieler</div>
           <h2>DynoForce Games</h2>
-          <p>Die drei Games aus DynoForce Battle – für einen DynoGrip.</p>
+          <p>Wähle ein Spiel und steuere es mit deiner Kraft.</p>
         </div>
         <div class="event-games-force-card ${connected ? "is-connected" : "is-disconnected"}">
           <span class="event-games-force-label">Aktuelle Kraft</span>
@@ -147,7 +153,7 @@ export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {
           <div class="event-games-empty-state">
             <div class="event-games-empty-icon">🎮</div>
             <h3>Wähle ein Spiel</h3>
-            <p>Flappy Battle, Force Pong oder Squirrel Rush – genau die drei Spiele aus DynoForce Battle.</p>
+            <p>Flappy Battle, Force Pong oder Squirrel Rush.</p>
           </div>
         `}
       </div>
@@ -228,29 +234,45 @@ function mountActiveGame() {
         </div>
       </div>
 
-      <div class="event-game-controls-row">
-        <div class="event-game-presets" aria-label="Kraft-Preset">
-          <span>Kraft-Preset</span>
-          <div>
-            ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
-          </div>
-        </div>
-        <div class="event-game-live-force">
-          <span>DynoGrip</span>
-          <strong><span id="eventGameArenaForce">${runtime.force.toFixed(1)}</span> kg</strong>
-          <div class="event-game-force-track" aria-hidden="true">
-            <span class="event-game-force-ready-zone"></span>
-            <span class="event-game-force-fill" id="eventGameForceFill"></span>
-          </div>
-        </div>
-      </div>
+      <div class="event-game-play-layout">
+        <aside class="event-game-side-card event-game-guide" aria-label="Spielanleitung">
+          <div class="eyebrow">So spielst du</div>
+          <h4>${escaped(config.title)}</h4>
+          <ol>
+            ${config.instructions.map((instruction) => `<li>${escaped(instruction)}</li>`).join("")}
+          </ol>
+        </aside>
 
-      <div class="event-game-canvas-wrap" style="max-width:${spec.maxWidth}">
-        <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" style="aspect-ratio:${spec.width} / ${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
-        <div class="event-game-overlay" id="eventGameOverlay">
-          <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
-          <span id="eventGameOverlayText">${runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Verbinde den DynoGrip oben rechts, um zu spielen."}</span>
+        <div class="event-game-canvas-column">
+          <div class="event-game-canvas-wrap" style="max-width:${spec.maxWidth}">
+            <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" style="aspect-ratio:${spec.width} / ${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
+            <div class="event-game-overlay" id="eventGameOverlay">
+              <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
+              <span id="eventGameOverlayText">${runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Verbinde den DynoGrip oben rechts, um zu spielen."}</span>
+            </div>
+          </div>
         </div>
+
+        <aside class="event-game-side-card event-game-settings" aria-label="Spieleinstellungen">
+          <div class="event-game-goal">
+            <div class="eyebrow">Dein Ziel</div>
+            <strong>${escaped(config.goal)}</strong>
+          </div>
+          <div class="event-game-live-force">
+            <span>Aktuelle Kraft</span>
+            <strong><span id="eventGameArenaForce">${runtime.force.toFixed(1)}</span> kg</strong>
+            <div class="event-game-force-track" aria-hidden="true">
+              <span class="event-game-force-ready-zone"></span>
+              <span class="event-game-force-fill" id="eventGameForceFill"></span>
+            </div>
+          </div>
+          <div class="event-game-presets" aria-label="Kraft auswählen">
+            <span>Passende Stärke wählen</span>
+            <div>
+              ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
+            </div>
+          </div>
+        </aside>
       </div>
 
       <div class="event-game-footer">
@@ -283,7 +305,7 @@ function mountActiveGame() {
       <div class="event-games-empty-state">
         <div class="event-games-empty-icon">🎮</div>
         <h3>Wähle ein Spiel</h3>
-        <p>Flappy Battle, Force Pong oder Squirrel Rush – genau die drei Spiele aus DynoForce Battle.</p>
+        <p>Flappy Battle, Force Pong oder Squirrel Rush.</p>
       </div>`;
   });
 
