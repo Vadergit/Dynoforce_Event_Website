@@ -105,9 +105,9 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, pixelScale: 2, maxWidth: "820px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, pixelScale: 2, maxWidth: "820px" };
-  return { width: 900, height: 500, pixelScale: 1, maxWidth: "820px" };
+  if (gameId === "flappy") return { width: 470, height: 400, pixelScale: 2, contextScaleX: 470 / 400, maxWidth: "820px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, pixelScale: 2, contextScaleX: 1, maxWidth: "820px" };
+  return { width: 900, height: 765, pixelScale: 1, contextScaleX: 1, maxWidth: "820px" };
 }
 
 export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {}) {
@@ -256,7 +256,7 @@ function mountActiveGame() {
 
   runtime.canvas = arena.querySelector("#eventGameCanvas");
   runtime.ctx = runtime.canvas?.getContext("2d") || null;
-  runtime.ctx?.setTransform(spec.pixelScale, 0, 0, spec.pixelScale, 0, 0);
+  runtime.ctx?.setTransform(spec.pixelScale * spec.contextScaleX, 0, 0, spec.pixelScale, 0, 0);
 
   arena.querySelectorAll("[data-game-preset]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -736,12 +736,15 @@ function drawFlappy(ctx) {
   drawFlappyBird(ctx, game.bird, interpolation);
 }
 
+const PONG_WIDTH = 900;
+const PONG_HEIGHT = 765;
+
 function createPongState() {
-  return { ball: { x: 450, y: 250, vx: (Math.random() > 0.5 ? 1 : -1) * 686, vy: (Math.random() - 0.5) * 422, r: 11 }, playerY: 250, cpuY: 250, playerScore: 0, cpuScore: 0 };
+  return { ball: { x: PONG_WIDTH / 2, y: PONG_HEIGHT / 2, vx: (Math.random() > 0.5 ? 1 : -1) * 686, vy: (Math.random() - 0.5) * 620, r: 11 }, playerY: PONG_HEIGHT / 2, cpuY: PONG_HEIGHT / 2, playerScore: 0, cpuScore: 0 };
 }
 
 function getPongField() {
-  return { x: 18, y: 18, w: 864, h: 464, paddleW: 18, paddleH: 88, sideInset: 30 };
+  return { x: 18, y: 18, w: PONG_WIDTH - 36, h: PONG_HEIGHT - 36, paddleW: 18, paddleH: 88, sideInset: 30 };
 }
 
 function scorePong(direction) {
@@ -751,7 +754,7 @@ function scorePong(direction) {
   game.ball.x = field.x + field.w / 2;
   game.ball.y = field.y + field.h / 2;
   game.ball.vx = direction * 686;
-  game.ball.vy = (Math.random() - 0.5) * 422;
+  game.ball.vy = (Math.random() - 0.5) * 620;
   runtime.score = game.playerScore;
   setScore(runtime.score);
   if (game.cpuScore >= 1) gameOver("Ball verpasst");
@@ -765,7 +768,7 @@ function updatePong(dt) {
   const targetPlayer = top + (bottom - top) * (1 - clamp(forceRatio(), 0, 1));
   game.playerY += (targetPlayer - game.playerY) * Math.min(1, dt * 10);
   const cpuTarget = clamp(game.ball.y + game.ball.vy * 0.035, top + field.paddleH / 2, bottom - field.paddleH / 2);
-  const cpuMaxStep = (315 + Math.min(150, Math.abs(game.ball.vx) * 0.12)) * dt;
+  const cpuMaxStep = (430 + Math.min(180, Math.abs(game.ball.vx) * 0.12)) * dt;
   game.cpuY += clamp(cpuTarget - game.cpuY, -cpuMaxStep, cpuMaxStep);
   const ball = game.ball;
   ball.x += ball.vx * dt;
@@ -793,9 +796,9 @@ function updatePong(dt) {
 function drawPong(ctx) {
   const game = runtime.game;
   const field = getPongField();
-  ctx.clearRect(0, 0, 900, 500);
+  ctx.clearRect(0, 0, PONG_WIDTH, PONG_HEIGHT);
   ctx.fillStyle = "#081018";
-  ctx.fillRect(0, 0, 900, 500);
+  ctx.fillRect(0, 0, PONG_WIDTH, PONG_HEIGHT);
   ctx.save();
   ctx.lineWidth = 9;
   ctx.strokeStyle = "#ffffff";
