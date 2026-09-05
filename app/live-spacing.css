@@ -22,6 +22,14 @@
   padding-bottom: 16px;
 }
 
+/* Games-Einstieg links statt zentriert platzieren. */
+.guided-games-entry {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  justify-self: start;
+  align-self: start;
+}
+
 @media (max-width: 960px) {
   .guided-live-layout {
     height: auto;
