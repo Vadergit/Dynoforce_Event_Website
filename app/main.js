@@ -205,6 +205,7 @@ const pageMeta = {
   games: ["DynoForce Games", "Flappy Birds, Pong und Squirrel Rush als Einzelspieler mit einem DynoGrip."],
   public: ["Öffentliche Eventseite", "Live Leaderboard, Statistik, QR-Code und Druckansicht für Teilnehmer und Zuschauer."],
   display: ["Display-Modus", "Optimiert für Beamer, TV und Grossbildschirm mit permanent sichtbarem QR-Code."],
+  privacy: ["Datenschutz", "Kurze Informationen zur Verwendung der Daten bei DynoForce Events."],
 };
 
 const adminNavPages = ["dashboard"];
@@ -1074,6 +1075,7 @@ function guidedStageMarkup() {
     `;
   }
   if (step === "name") {
+    const privacyUrl = getPrivacyUrl();
     return `
       <div class="guided-screen guided-name-screen">
         <div class="eyebrow">Teilnehmer erfassen</div>
@@ -1092,6 +1094,16 @@ function guidedStageMarkup() {
           <button class="button primary" id="activateParticipantButton" type="button" ${!online || !state.connected || !writable ? "disabled" : ""}>Bestätigen und starten</button>
         </div>
         <button class="button subtle guided-secondary-action" id="guidedBackToStart" type="button">Zurück</button>
+        <div class="guided-privacy-notice">
+          <div class="guided-privacy-copy">
+            <strong>Hinweis zum Datenschutz</strong>
+            <span>Name, Kategorie und Resultat werden für dieses Event gespeichert und in der öffentlichen Rangliste angezeigt.</span>
+            <a href="${privacyUrl}" target="_blank" rel="noopener noreferrer">Datenschutzhinweise öffnen</a>
+          </div>
+          <a class="guided-privacy-qr" href="${privacyUrl}" target="_blank" rel="noopener noreferrer" aria-label="Datenschutzhinweise öffnen">
+            <img src="${qrImage(privacyUrl)}" alt="QR-Code zu den Datenschutzhinweisen" />
+          </a>
+        </div>
       </div>
     `;
   }
@@ -1785,6 +1797,10 @@ function getRouteInfo() {
     return { page: "public", eventId: segments[1] || fallbackEventId };
   }
 
+  if (segments[0] === "privacy") {
+    return { page: "privacy", eventId: segments[1] || fallbackEventId };
+  }
+
   const page = pageMeta[segments[0]] ? segments[0] : "dashboard";
   const routedEventPage = ["setup", "branding", "live", "games"].includes(page);
   return { page, eventId: routedEventPage ? (segments[1] || fallbackEventId) : fallbackEventId };
@@ -1796,6 +1812,10 @@ function getPublicUrl() {
 
 function getDisplayUrl() {
   return `${PUBLIC_ORIGIN.replace(/\.+$/, "")}${APP_BASE}/#/display/${encodeURIComponent(state.event.id)}`;
+}
+
+function getPrivacyUrl() {
+  return `${PUBLIC_ORIGIN.replace(/\.+$/, "")}${APP_BASE}/#/privacy/${encodeURIComponent(state.event.id)}`;
 }
 
 function syncUrl(page, eventId = state.event.id) {
@@ -3096,6 +3116,62 @@ function qrImage(url) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function privacyPageMarkup() {
+  const organiser = escapeHtml(state.event.organiser || "Veranstalter des Events");
+  const organiserEmail = String(state.event.organiserEmail || "").trim();
+  const contactMarkup = organiserEmail
+    ? `<a href="mailto:${encodeURIComponent(organiserEmail)}">${escapeHtml(organiserEmail)}</a>`
+    : "Bitte wende dich vor Ort an den Veranstalter.";
+
+  return `
+    <main class="privacy-page">
+      <article class="privacy-card">
+        <header class="privacy-header">
+          <img src="/dynoforce-icon.png" alt="DynoForce Logo" />
+          <div>
+            <div class="eyebrow">DynoForce Event</div>
+            <h1>Datenschutzhinweise</h1>
+            <p>${escapeHtml(getEventDisplayName())}</p>
+          </div>
+        </header>
+
+        <p class="privacy-intro">Diese kurze Information erklärt, welche Daten bei der Teilnahme an diesem Event verwendet werden.</p>
+
+        <section>
+          <h2>Welche Daten werden erfasst?</h2>
+          <p>Erfasst werden dein Vorname, dein Nachname, die gewählte Kategorie, dein gemessenes Resultat sowie die Zuordnung zu diesem Event.</p>
+        </section>
+
+        <section>
+          <h2>Wofür werden die Daten verwendet?</h2>
+          <p>Die Daten werden benötigt, um die Challenge durchzuführen, dein bestes Resultat zu bestimmen und die Rangliste sowie die Event-Statistik anzuzeigen.</p>
+        </section>
+
+        <section>
+          <h2>Was ist öffentlich sichtbar?</h2>
+          <p>Dein Name, deine Kategorie und dein bestes Resultat erscheinen auf der öffentlichen Eventseite. Diese Seite kann über den Event-QR-Code ohne Anmeldung geöffnet werden.</p>
+        </section>
+
+        <section>
+          <h2>Speicherung</h2>
+          <p>Die Eventdaten werden online gespeichert, damit Rangliste und Resultate auf den Eventseiten verfügbar sind. Sie bleiben gespeichert, bis der Veranstalter sie korrigiert oder löscht.</p>
+        </section>
+
+        <section class="privacy-contact">
+          <h2>Fragen, Korrektur oder Löschung</h2>
+          <p>Wende dich dafür an den verantwortlichen Veranstalter:</p>
+          <p><strong>${organiser}</strong><br />${contactMarkup}</p>
+        </section>
+
+        <footer class="privacy-actions">
+          <a class="button primary" href="${getPublicUrl()}">Zur Eventseite</a>
+          <a class="button" href="https://dynoforce.ch" target="_blank" rel="noopener noreferrer">Mehr über DynoForce</a>
+        </footer>
+      </article>
+    </main>
+  `;
+}
+
 function updateLiveMeasurementDom() {
   if (state.currentPage === "games") {
     updateEventGamesForce({ force: getDisplayForceValue(), signedForce: state.signedForce, connected: state.connected });
@@ -3725,7 +3801,7 @@ function template(page) {
     : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button>`;
   const [dashboardTitle, dashboardText] = getDashboardMeta();
 
-  if (["public", "display"].includes(page) && (!state.eventLoaded || !state.eventBrandingReady)) {
+  if (["public", "display", "privacy"].includes(page) && (!state.eventLoaded || !state.eventBrandingReady)) {
     return `
       <main class="event-loading-screen" aria-live="polite" aria-busy="true">
         <div class="event-loading-indicator" aria-hidden="true"></div>
@@ -3733,6 +3809,8 @@ function template(page) {
       </main>
     `;
   }
+
+  if (page === "privacy") return privacyPageMarkup();
 
   return `
     <div class="app-shell ${isFocusedPage ? "focus-shell" : ""} ${["public", "display"].includes(page) ? "public-event-shell" : ""}">
@@ -4455,7 +4533,7 @@ async function routeAndLoad() {
   const route = getRouteInfo();
   state.currentPage = route.page;
 
-  if (route.page === "public" || route.page === "display") {
+  if (["public", "display", "privacy"].includes(route.page)) {
     safeUnsub("publicEvents");
     await subscribeToEvent(route.eventId);
     render();

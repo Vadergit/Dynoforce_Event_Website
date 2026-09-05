@@ -241,7 +241,7 @@
 
 .event-game-play-layout {
   display: grid;
-  grid-template-columns: minmax(185px, 210px) minmax(0, 820px) minmax(185px, 210px);
+  grid-template-columns: minmax(210px, 1fr) minmax(0, 820px) minmax(210px, 1fr);
   justify-content: center;
   gap: 10px;
   padding: 10px;
@@ -270,7 +270,7 @@
 
 .event-game-guide {
   width: min(100%, 210px);
-  justify-self: end;
+  justify-self: center;
 }
 
 .event-game-guide ol {
@@ -321,7 +321,7 @@
 .event-game-result {
   grid-column: 3;
   width: min(100%, 210px);
-  justify-self: start;
+  justify-self: center;
   align-self: start;
   margin-top: 12px;
   padding: 16px;
