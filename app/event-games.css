@@ -302,7 +302,7 @@
 
 .event-game-play-layout {
   display: grid;
-  grid-template-columns: minmax(170px, .62fr) minmax(480px, 1.65fr) minmax(205px, .78fr);
+  grid-template-columns: minmax(185px, .48fr) minmax(560px, 2.2fr);
   gap: 10px;
   padding: 10px;
   align-items: stretch;
@@ -336,6 +336,17 @@
   counter-reset: game-step;
 }
 
+.event-game-guide-start {
+  margin: 0 0 18px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: var(--primary-soft);
+  color: #294f45;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .event-game-guide li {
   counter-increment: game-step;
   display: grid;
@@ -359,23 +370,6 @@
   color: #fff;
   font-size: 11px;
   font-weight: 850;
-}
-
-.event-game-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.event-game-auto-start {
-  margin: auto 0 0;
-  padding: 11px 12px;
-  border-radius: 11px;
-  background: var(--primary-soft);
-  color: #294f45;
-  font-size: 12px;
-  font-weight: 750;
-  line-height: 1.35;
 }
 
 .event-game-goal {
@@ -493,14 +487,42 @@
   inset: 0;
   border-radius: 15px;
   display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 7px;
-  padding: 22px;
+  place-items: center;
+  padding: 14px;
   background: rgba(247, 248, 245, 0.82);
   backdrop-filter: blur(4px);
   text-align: center;
   transition: opacity 140ms ease;
+}
+
+.event-game-overlay.show-settings {
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 40%);
+  gap: 12px;
+}
+
+.event-game-overlay-message {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.event-game-overlay-settings {
+  display: none;
+  width: 100%;
+  align-self: stretch;
+  padding: 14px;
+  border: 1px solid rgba(31, 79, 70, 0.16);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.9);
+  text-align: left;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.06);
+}
+
+.event-game-overlay.show-settings .event-game-overlay-settings {
+  display: flex;
 }
 
 .event-game-overlay.is-hidden {
@@ -508,12 +530,12 @@
   pointer-events: none;
 }
 
-.event-game-overlay strong {
+.event-game-overlay-message > strong {
   font-size: clamp(25px, 4vw, 42px);
   letter-spacing: -0.045em;
 }
 
-.event-game-overlay span {
+.event-game-overlay-message > span {
   max-width: 650px;
   padding: 7px 12px;
   border-radius: 10px;
@@ -576,23 +598,19 @@
   }
 
   .event-game-play-layout {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(160px, .45fr) minmax(430px, 1.8fr);
   }
 
   .event-game-canvas-column {
-    grid-column: 1 / -1;
+    grid-column: 2;
     grid-row: 1;
   }
 
   .event-game-guide {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
   }
 
-  .event-game-settings {
-    grid-column: 2;
-    grid-row: 2;
-  }
 }
 
 @media (max-width: 700px) {
@@ -668,9 +686,30 @@
     grid-row: 2;
   }
 
-  .event-game-settings {
-    grid-column: 1;
-    grid-row: 3;
+  .event-game-overlay.show-settings {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .event-game-overlay-settings {
+    align-self: auto;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .event-game-overlay-settings .event-game-goal {
+    display: none;
+  }
+
+  .event-game-overlay.show-settings .event-game-overlay-message strong {
+    font-size: 24px;
+  }
+
+  .event-game-overlay.show-settings .event-game-overlay-message span {
+    padding: 5px 8px;
+    font-size: 11px;
   }
 
   .event-game-presets > div {

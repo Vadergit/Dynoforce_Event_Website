@@ -31,7 +31,7 @@ const GAME_CONFIG = {
 const PRESETS = [10, 20, 30, 40];
 const READY_MIN = 0.42;
 const READY_MAX = 0.58;
-const READY_HOLD_MS = 320;
+const READY_HOLD_MS = 180;
 const ASSET_ROOT = "https://dynoforce.web.app/1v1-assets/";
 const SOUND_ROOT = `${ASSET_ROOT}sounds/`;
 const BATTLE_SOUNDS = {
@@ -110,9 +110,9 @@ function beep(frequency = 630, duration = 0.03) {
 }
 
 function canvasSpec(gameId) {
-  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "540px" };
-  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "600px" };
-  return { width: 900, height: 500, maxWidth: "800px" };
+  if (gameId === "flappy") return { width: 400, height: 400, maxWidth: "620px" };
+  if (gameId === "squirrel") return { width: 400, height: 340, maxWidth: "700px" };
+  return { width: 900, height: 500, maxWidth: "1000px" };
 }
 
 export function eventGamesPageMarkup({ connected = false, currentForce = 0 } = {}) {
@@ -226,6 +226,7 @@ function mountActiveGame() {
       <div class="event-game-play-layout">
         <aside class="event-game-side-card event-game-guide" aria-label="Spielanleitung">
           <div class="eyebrow">So spielst du</div>
+          <p class="event-game-guide-start">Das Spiel startet automatisch, sobald du mit deiner Kraft den grünen Bereich erreichst.</p>
           <ol>
             ${config.instructions.map((instruction) => `<li>${escaped(instruction)}</li>`).join("")}
           </ol>
@@ -234,34 +235,34 @@ function mountActiveGame() {
         <div class="event-game-canvas-column">
           <div class="event-game-canvas-wrap" style="max-width:${spec.maxWidth}">
             <canvas id="eventGameCanvas" width="${spec.width}" height="${spec.height}" style="aspect-ratio:${spec.width} / ${spec.height}" aria-label="${escaped(config.title)} Spielfeld"></canvas>
-            <div class="event-game-overlay" id="eventGameOverlay">
-              <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
-              <span id="eventGameOverlayText">${runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Verbinde den DynoGrip oben rechts, um zu spielen."}</span>
+            <div class="event-game-overlay show-settings" id="eventGameOverlay">
+              <div class="event-game-overlay-message">
+                <strong id="eventGameOverlayTitle">${runtime.connected ? "Bereit zum Start" : "DynoGrip verbinden"}</strong>
+                <span id="eventGameOverlayText">${runtime.connected ? "Bring deine Kraft in den grünen Bereich. Das Spiel startet automatisch." : "Verbinde den DynoGrip oben rechts, um zu spielen."}</span>
+              </div>
+              <div class="event-game-overlay-settings" aria-label="Spieleinstellungen">
+                <div class="event-game-goal">
+                  <div class="eyebrow">Dein Ziel</div>
+                  <strong>${escaped(config.goal)}</strong>
+                </div>
+                <div class="event-game-live-force">
+                  <span>Aktuelle Kraft</span>
+                  <strong><span id="eventGameArenaForce">${runtime.force.toFixed(1)}</span> kg</strong>
+                  <div class="event-game-force-track" aria-hidden="true">
+                    <span class="event-game-force-ready-zone"></span>
+                    <span class="event-game-force-fill" id="eventGameForceFill"></span>
+                  </div>
+                </div>
+                <div class="event-game-presets" aria-label="Kraft auswählen">
+                  <span>Passende Stärke wählen</span>
+                  <div>
+                    ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        <aside class="event-game-side-card event-game-settings" aria-label="Spieleinstellungen">
-          <div class="event-game-goal">
-            <div class="eyebrow">Dein Ziel</div>
-            <strong>${escaped(config.goal)}</strong>
-          </div>
-          <div class="event-game-live-force">
-            <span>Aktuelle Kraft</span>
-            <strong><span id="eventGameArenaForce">${runtime.force.toFixed(1)}</span> kg</strong>
-            <div class="event-game-force-track" aria-hidden="true">
-              <span class="event-game-force-ready-zone"></span>
-              <span class="event-game-force-fill" id="eventGameForceFill"></span>
-            </div>
-          </div>
-          <div class="event-game-presets" aria-label="Kraft auswählen">
-            <span>Passende Stärke wählen</span>
-            <div>
-              ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
-            </div>
-          </div>
-          <p class="event-game-auto-start">Das Spiel startet automatisch, sobald du mit deiner Kraft den grünen Bereich erreichst.</p>
-        </aside>
       </div>
 
       <div class="event-game-footer">
@@ -424,6 +425,7 @@ function setOverlay(title, text, visible) {
   if (titleNode) titleNode.textContent = title;
   if (textNode) textNode.textContent = text;
   overlay?.classList.toggle("is-hidden", !visible);
+  overlay?.classList.toggle("show-settings", visible && runtime.phase === "ready");
 }
 
 function setStatus(text, connectedStyle) {
