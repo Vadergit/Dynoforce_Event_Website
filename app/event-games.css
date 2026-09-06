@@ -109,39 +109,37 @@
   content: "";
 }
 
-/* Compact Battle-style game switcher instead of three dashboard cards. */
+/* Keep the game choices visually separate instead of merging them into one bar. */
 .event-games-selector {
   width: 100%;
   margin: 0;
-  padding: 3px;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  background: #f3f2ed;
+  gap: 10px;
 }
 
 .event-game-card {
   min-width: 0;
   min-height: 42px;
   padding: 5px 10px;
-  border: 1px solid transparent;
-  border-radius: 11px;
-  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
   color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   text-align: center;
-  box-shadow: none;
+  box-shadow: 0 5px 14px rgba(23, 23, 23, 0.045);
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
 .event-game-card:hover {
-  transform: none;
-  background: rgba(255,255,255,.7);
+  transform: translateY(-1px);
+  border-color: rgba(31, 79, 70, 0.35);
+  background: #fff;
   color: var(--text);
 }
 
@@ -241,7 +239,7 @@
 
 .event-game-play-layout {
   display: grid;
-  grid-template-columns: minmax(210px, 1fr) minmax(0, 820px) minmax(210px, 1fr);
+  grid-template-columns: minmax(250px, 1fr) minmax(0, 820px) minmax(210px, 1fr);
   justify-content: center;
   gap: 10px;
   padding: 10px;
@@ -269,7 +267,7 @@
 }
 
 .event-game-guide {
-  width: min(100%, 210px);
+  width: min(100%, 250px);
   justify-self: center;
 }
 
