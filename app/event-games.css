@@ -354,7 +354,7 @@
 
 .event-game-app-promo {
   width: 100%;
-  padding: 16px 14px;
+  padding: 14px 10px 10px;
   border: 1px solid var(--line);
   border-radius: 15px;
   background: #f8f7f3;
@@ -379,25 +379,23 @@
   line-height: 1.4;
 }
 
-.event-game-app-qr,
-.event-game-app-qr img {
-  display: block;
-  width: 132px;
-  height: 132px;
-}
-
 .event-game-app-qr {
   margin-top: 2px;
-  padding: 5px;
-  border-radius: 10px;
+  width: min(178px, 100%);
+  aspect-ratio: 1;
+  padding: 2px;
+  border-radius: 7px;
   background: #fff;
+  display: block;
   pointer-events: none;
   user-select: none;
 }
 
 .event-game-app-qr img {
-  width: 122px;
-  height: 122px;
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .event-game-presets,
