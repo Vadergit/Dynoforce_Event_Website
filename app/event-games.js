@@ -243,6 +243,13 @@ function mountActiveGame() {
           <ol>
             ${config.instructions.map((instruction) => `<li>${escaped(instruction)}</li>`).join("")}
           </ol>
+          <div class="event-game-app-promo" aria-label="DynoForce App entdecken">
+            <strong>READY FOR MORE?</strong>
+            <p>Entdecke mehr Games, Produkte und das volle DynoForce Erlebnis in der App.</p>
+            <div class="event-game-app-qr">
+              <img src="${qrImage(APP_PROMO_URL)}" alt="QR-Code zur DynoForce App-Seite" />
+            </div>
+          </div>
         </aside>
 
         <div class="event-game-canvas-column">
@@ -278,13 +285,6 @@ function mountActiveGame() {
             <div class="eyebrow" id="eventGameResultLabel">Punkte</div>
             <strong id="eventGameResultValue">0 Punkte</strong>
             <span id="eventGameResultBest">Bestwert: ${runtime.best[runtime.activeGame] || 0}</span>
-          </aside>
-          <aside class="event-game-app-promo" aria-label="DynoForce App entdecken">
-            <strong>READY FOR MORE?</strong>
-            <p>Entdecke mehr Games, Produkte und das volle DynoForce Erlebnis in der App.</p>
-            <div class="event-game-app-qr">
-              <img src="${qrImage(APP_PROMO_URL)}" alt="QR-Code zur DynoForce App-Seite" />
-            </div>
           </aside>
         </div>
       </div>

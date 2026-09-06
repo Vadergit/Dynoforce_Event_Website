@@ -354,10 +354,12 @@
 
 .event-game-app-promo {
   width: 100%;
-  padding: 14px 10px 10px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  background: #f8f7f3;
+  margin-top: 22px;
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   display: grid;
   justify-items: center;
   gap: 8px;
@@ -381,7 +383,7 @@
 
 .event-game-app-qr {
   margin-top: 2px;
-  width: min(178px, 100%);
+  width: min(218px, 100%);
   aspect-ratio: 1;
   padding: 2px;
   border-radius: 7px;
