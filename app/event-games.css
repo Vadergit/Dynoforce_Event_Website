@@ -3,20 +3,21 @@
   min-height: 62px;
   margin: 16px auto 14px;
   padding: 10px 14px;
-  border: 1px solid rgba(31, 79, 70, 0.22);
+  border: 1px solid var(--primary);
   border-radius: 16px;
-  background: linear-gradient(180deg, #f8fbfa 0%, #eef5f2 100%);
-  color: var(--text);
+  background: var(--primary);
+  color: #fff;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 24px;
   align-items: center;
   gap: 10px;
   text-align: left;
-  box-shadow: 0 8px 22px rgba(31, 79, 70, 0.05);
+  box-shadow: 0 8px 22px rgba(31, 79, 70, 0.18);
 }
 
 .guided-games-entry:hover {
-  border-color: rgba(31, 79, 70, 0.42);
+  border-color: var(--primary);
+  filter: brightness(1.06);
   transform: translateY(-1px);
 }
 
@@ -43,7 +44,7 @@
 }
 
 .guided-games-entry-copy small {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 11px;
   font-weight: 650;
   white-space: nowrap;
@@ -52,7 +53,7 @@
 }
 
 .guided-games-entry-arrow {
-  color: var(--primary);
+  color: #fff;
   font-size: 21px;
   font-weight: 800;
   text-align: right;

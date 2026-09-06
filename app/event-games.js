@@ -20,7 +20,7 @@ const GAME_CONFIG = {
     title: "Squirrel Rush",
     icon: "🐿️",
     subtitle: "Springe mit dem Eichhörnchen nach oben.",
-    instructions: ["Kurz lösen und dann Kraft geben.", "Mehr Kraft sorgt für einen höheren Sprung.", "Ziele auf die nächste Plattform."],
+    instructions: ["Nach dem Start zuerst vollständig loslassen.", "Kraft geben, um zur nächsten Plattform zu springen.", "Nach jedem Sprung wieder vollständig loslassen."],
   },
 };
 
