@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+
 const GAME_CONFIG = {
   flappy: {
     id: "flappy",
@@ -26,6 +28,7 @@ const PRESETS = [10, 20, 30, 40];
 const READY_MIN = 0.42;
 const READY_MAX = 0.58;
 const READY_HOLD_MS = 180;
+const APP_PROMO_URL = "https://dynoforce.ch/app.html";
 const ASSET_ROOT = "https://dynoforce.web.app/1v1-assets/";
 const SOUND_ROOT = `${ASSET_ROOT}sounds/`;
 const BATTLE_SOUNDS = {
@@ -76,6 +79,31 @@ function escaped(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function qrImage(url) {
+  const qr = QRCode.create(url, { errorCorrectionLevel: "M" });
+  const moduleCount = qr.modules.size;
+  const margin = 4;
+  const imageSize = moduleCount + (margin * 2);
+  let path = "";
+
+  for (let row = 0; row < moduleCount; row += 1) {
+    let runStart = -1;
+    for (let column = 0; column <= moduleCount; column += 1) {
+      const isDark = column < moduleCount && qr.modules.get(row, column);
+      if (isDark && runStart < 0) {
+        runStart = column;
+      } else if (!isDark && runStart >= 0) {
+        const runLength = column - runStart;
+        path += `M${runStart + margin} ${row + margin}h${runLength}v1h-${runLength}z`;
+        runStart = -1;
+      }
+    }
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${imageSize} ${imageSize}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function playSound(file, volume = 0.25, cooldown = 120, key = file) {
@@ -245,11 +273,20 @@ function mountActiveGame() {
           </div>
         </div>
 
-        <aside class="event-game-result" id="eventGameResult" aria-live="polite">
-          <div class="eyebrow" id="eventGameResultLabel">Punkte</div>
-          <strong id="eventGameResultValue">0 Punkte</strong>
-          <span id="eventGameResultBest">Bestwert: ${runtime.best[runtime.activeGame] || 0}</span>
-        </aside>
+        <div class="event-game-side-rail">
+          <aside class="event-game-result" id="eventGameResult" aria-live="polite">
+            <div class="eyebrow" id="eventGameResultLabel">Punkte</div>
+            <strong id="eventGameResultValue">0 Punkte</strong>
+            <span id="eventGameResultBest">Bestwert: ${runtime.best[runtime.activeGame] || 0}</span>
+          </aside>
+          <aside class="event-game-app-promo" aria-label="DynoForce App entdecken">
+            <strong>READY FOR MORE?</strong>
+            <p>Entdecke mehr Games, Produkte und das volle DynoForce Erlebnis in der App.</p>
+            <div class="event-game-app-qr">
+              <img src="${qrImage(APP_PROMO_URL)}" alt="QR-Code zur DynoForce App-Seite" />
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   `;
