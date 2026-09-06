@@ -2773,13 +2773,6 @@ html.mobile-layout .public-event-shell .brand-sponsor-footer-frame {
   line-height: 1.35;
 }
 
-.guided-privacy-copy a {
-  width: fit-content;
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 800;
-}
-
 .guided-privacy-qr {
   display: block;
   border-radius: 9px;

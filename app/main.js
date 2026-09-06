@@ -1098,11 +1098,10 @@ function guidedStageMarkup() {
           <div class="guided-privacy-copy">
             <strong>Hinweis zum Datenschutz</strong>
             <span>Name, Kategorie und Resultat werden für dieses Event gespeichert und in der öffentlichen Rangliste angezeigt.</span>
-            <a href="${privacyUrl}" target="_blank" rel="noopener noreferrer">Datenschutzhinweise öffnen</a>
           </div>
-          <a class="guided-privacy-qr" href="${privacyUrl}" target="_blank" rel="noopener noreferrer" aria-label="Datenschutzhinweise öffnen">
+          <div class="guided-privacy-qr" aria-label="QR-Code zu den Datenschutzhinweisen">
             <img src="${qrImage(privacyUrl)}" alt="QR-Code zu den Datenschutzhinweisen" />
-          </a>
+          </div>
         </div>
       </div>
     `;

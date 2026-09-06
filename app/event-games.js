@@ -11,7 +11,7 @@ const GAME_CONFIG = {
     title: "Force Pong",
     icon: "🏓",
     subtitle: "Spiele mit deiner Kraft gegen den Computer.",
-    instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Verpasst du den Ball, ist die Runde vorbei."],
+    instructions: ["Mehr Kraft bewegt den Schläger nach oben.", "Weniger Kraft bewegt ihn nach unten.", "Jeder Rückschlag gibt einen Punkt. Verpasst du den Ball, ist die Runde vorbei."],
   },
   squirrel: {
     id: "squirrel",
@@ -246,8 +246,8 @@ function mountActiveGame() {
         </div>
 
         <aside class="event-game-result" id="eventGameResult" aria-live="polite">
-          <div class="eyebrow" id="eventGameResultLabel">${runtime.activeGame === "pong" ? "Spielstand" : "Punkte"}</div>
-          <strong id="eventGameResultValue">${runtime.activeGame === "pong" ? "0 : 0" : "0 Punkte"}</strong>
+          <div class="eyebrow" id="eventGameResultLabel">Punkte</div>
+          <strong id="eventGameResultValue">0 Punkte</strong>
           <span id="eventGameResultBest">Bestwert: ${runtime.best[runtime.activeGame] || 0}</span>
         </aside>
       </div>
@@ -384,27 +384,23 @@ function gameOver(message) {
   runtime.readySince = 0;
   runtime.requiresRelease = true;
   runtime.best[runtime.activeGame] = Math.max(runtime.best[runtime.activeGame] || 0, runtime.score);
-  updateGameResult("finished");
+  updateGameResult();
   setOverlay("Nächste Runde", `${message}. Löse den DynoGrip kurz unter 2 kg.`, true);
 }
 
-function updateGameResult(mode = "current") {
+function updateGameResult() {
   const label = runtime.root?.querySelector("#eventGameResultLabel");
   const value = runtime.root?.querySelector("#eventGameResultValue");
   const best = runtime.root?.querySelector("#eventGameResultBest");
   if (!label || !value || !best) return;
-  label.textContent = mode === "finished" ? "Letzte Runde" : runtime.activeGame === "pong" ? "Spielstand" : "Punkte";
-  if (runtime.activeGame === "pong" && runtime.game) {
-    value.textContent = `${runtime.game.playerScore || 0} : ${runtime.game.cpuScore || 0}`;
-  } else {
-    value.textContent = `${runtime.score} ${runtime.score === 1 ? "Punkt" : "Punkte"}`;
-  }
+  label.textContent = "Punkte";
+  value.textContent = `${runtime.score} ${runtime.score === 1 ? "Punkt" : "Punkte"}`;
   best.textContent = `Bestwert: ${runtime.best[runtime.activeGame] || 0}`;
 }
 
 function setScore(value) {
   runtime.score = Math.max(0, Math.floor(value));
-  if (runtime.phase !== "gameover") updateGameResult("current");
+  if (runtime.phase !== "gameover") updateGameResult();
 }
 
 function setOverlay(title, text, visible) {
@@ -741,16 +737,23 @@ const PONG_HEIGHT = 765;
 const PONG_X_SPEED = 480.2;
 const PONG_Y_SPEED = 434;
 const PONG_HIT_IMPULSE = 3.36;
+const PONG_MAX_SPEED_FACTOR = 1.5;
 
 function createPongState() {
-  return { ball: { x: PONG_WIDTH / 2, y: PONG_HEIGHT / 2, vx: (Math.random() > 0.5 ? 1 : -1) * PONG_X_SPEED, vy: (Math.random() - 0.5) * PONG_Y_SPEED, r: 11 }, playerY: PONG_HEIGHT / 2, cpuY: PONG_HEIGHT / 2, playerScore: 0, cpuScore: 0 };
+  const vx = (Math.random() > 0.5 ? 1 : -1) * PONG_X_SPEED;
+  const vy = (Math.random() - 0.5) * PONG_Y_SPEED;
+  return {
+    ball: { x: PONG_WIDTH / 2, y: PONG_HEIGHT / 2, vx, vy, r: 11, maxSpeed: Math.hypot(vx, vy) * PONG_MAX_SPEED_FACTOR },
+    playerY: PONG_HEIGHT / 2,
+    cpuY: PONG_HEIGHT / 2,
+  };
 }
 
 function getPongField() {
   return { x: 18, y: 18, w: PONG_WIDTH - 36, h: PONG_HEIGHT - 36, paddleW: 18, paddleH: 88, sideInset: 30 };
 }
 
-function scorePong(direction) {
+function resetPongBall(direction) {
   beep(900, 0.06);
   const game = runtime.game;
   const field = getPongField();
@@ -758,9 +761,15 @@ function scorePong(direction) {
   game.ball.y = field.y + field.h / 2;
   game.ball.vx = direction * PONG_X_SPEED;
   game.ball.vy = (Math.random() - 0.5) * PONG_Y_SPEED;
-  runtime.score = game.playerScore;
-  setScore(runtime.score);
-  if (game.cpuScore >= 1) gameOver("Ball verpasst");
+  game.ball.maxSpeed = Math.hypot(game.ball.vx, game.ball.vy) * PONG_MAX_SPEED_FACTOR;
+}
+
+function limitPongBallSpeed(ball) {
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed <= ball.maxSpeed) return;
+  const scale = ball.maxSpeed / speed;
+  ball.vx *= scale;
+  ball.vy *= scale;
 }
 
 function updatePong(dt) {
@@ -784,16 +793,19 @@ function updatePong(dt) {
     ball.x = leftX + field.paddleW + ball.r;
     ball.vx = Math.abs(ball.vx) * 1.10;
     ball.vy += (ball.y - game.playerY) * PONG_HIT_IMPULSE;
+    limitPongBallSpeed(ball);
+    setScore(runtime.score + 1);
     beep(630, 0.03);
   }
   if (ball.vx > 0 && ball.x + ball.r > rightX && ball.x < rightX + field.paddleW && Math.abs(ball.y - game.cpuY) < field.paddleH / 2) {
     ball.x = rightX - ball.r;
     ball.vx = -Math.abs(ball.vx) * 1.10;
     ball.vy += (ball.y - game.cpuY) * PONG_HIT_IMPULSE;
+    limitPongBallSpeed(ball);
     beep(630, 0.03);
   }
-  if (ball.x + ball.r < field.x) { game.cpuScore++; scorePong(-1); }
-  else if (ball.x - ball.r > field.x + field.w) { game.playerScore++; scorePong(1); }
+  if (ball.x + ball.r < field.x) gameOver("Ball verpasst");
+  else if (ball.x - ball.r > field.x + field.w) resetPongBall(-1);
 }
 
 function drawPong(ctx) {
@@ -819,11 +831,6 @@ function drawPong(ctx) {
     ctx.lineTo(field.x + field.w / 2, y + 14);
     ctx.stroke();
   }
-  ctx.fillStyle = "rgba(255,255,255,0.14)";
-  ctx.font = `1000 ${Math.max(82, Math.min(150, field.h * 0.24))}px Inter, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`${game.playerScore} : ${game.cpuScore}`, field.x + field.w / 2, field.y + field.h / 2);
   const leftX = field.x + field.sideInset;
   const rightX = field.x + field.w - field.sideInset - field.paddleW;
   ctx.fillStyle = "#4bcfff";
