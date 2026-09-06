@@ -24,7 +24,7 @@ const GAME_CONFIG = {
   },
 };
 
-const PRESETS = [10, 20, 30, 40];
+const PRESETS = [5, 10, 20, 30];
 const READY_MIN = 0.42;
 const READY_MAX = 0.58;
 const READY_HOLD_MS = 180;
@@ -45,7 +45,7 @@ const BATTLE_SOUNDS = {
 const runtime = {
   root: null,
   activeGame: "",
-  preset: 20,
+  preset: 10,
   force: 0,
   signedForce: 0,
   connected: false,
@@ -270,7 +270,7 @@ function mountActiveGame() {
                   </div>
                 </div>
                 <div class="event-game-presets" aria-label="Kraft auswählen">
-                  <span>Passende Stärke wählen</span>
+                  <span>MAX. BENÖTIGTE KRAFT</span>
                   <div>
                     ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
                   </div>
@@ -297,7 +297,7 @@ function mountActiveGame() {
 
   arena.querySelectorAll("[data-game-preset]").forEach((button) => {
     button.addEventListener("click", () => {
-      runtime.preset = Number(button.dataset.gamePreset || 20);
+      runtime.preset = Number(button.dataset.gamePreset || 10);
       arena.querySelectorAll("[data-game-preset]").forEach((item) => item.classList.toggle("is-selected", item === button));
       resetCurrentGame();
     });
@@ -378,7 +378,7 @@ function processStartGate(now) {
     if (runtime.force < 2) {
       runtime.requiresRelease = false;
       runtime.phase = "ready";
-      setOverlay("Bereit zum Start", "Bring deine Kraft erneut in den grünen Bereich.", true);
+      setOverlay("Bereit zum Start", "Bring deine Kraft in den grünen Bereich. Danach startet das Spiel automatisch.", true);
     } else {
       setOverlay("Bereit für die nächste Runde", "Löse den DynoGrip kurz, bis die Kraft unter 2 kg fällt.", true);
     }
@@ -390,7 +390,7 @@ function processStartGate(now) {
   const inReadyZone = ratio >= READY_MIN && ratio <= READY_MAX;
   if (!inReadyZone) {
     runtime.readySince = 0;
-    setOverlay("Bereit zum Start", `Bring deine Kraft auf etwa ${Math.round(runtime.preset * 0.5)} kg in den grünen Bereich. Danach startet das Spiel automatisch.`, true);
+    setOverlay("Bereit zum Start", "Bring deine Kraft in den grünen Bereich. Danach startet das Spiel automatisch.", true);
     return;
   }
 
