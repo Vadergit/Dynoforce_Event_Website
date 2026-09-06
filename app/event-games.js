@@ -270,7 +270,7 @@ function mountActiveGame() {
                   </div>
                 </div>
                 <div class="event-game-presets" aria-label="Kraft auswählen">
-                  <span>MAX. BENÖTIGTE KRAFT</span>
+                  <span>MAX. BENÖTIGTE KRAFT IM SPIEL</span>
                   <div>
                     ${PRESETS.map((value) => `<button class="event-game-preset ${runtime.preset === value ? "is-selected" : ""}" data-game-preset="${value}" type="button">${value} kg</button>`).join("")}
                   </div>
