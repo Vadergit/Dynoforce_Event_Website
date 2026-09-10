@@ -27,9 +27,7 @@ function squirrelIsRunning() {
   const page = document.querySelector(".event-games-page");
   if (!page) return false;
   if (!page.querySelector('[data-event-game="squirrel"].is-selected')) return false;
-  const status = page.querySelector("#eventGameStatusText")?.textContent?.trim();
-  const overlayHidden = page.querySelector("#eventGameOverlay")?.classList.contains("is-hidden");
-  return status === "Spiel läuft" && overlayHidden;
+  return page.querySelector("#eventGameOverlay")?.classList.contains("is-hidden") === true;
 }
 
 function stopSoundtrack() {
