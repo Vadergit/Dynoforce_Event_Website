@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "prepare:event-ui": "node scripts/prepare-event-ui-v2.mjs",
+    "dev": "npm run prepare:event-ui && vite",
+    "build": "npm run prepare:event-ui && vite build",
     "preview": "vite preview",
     "provision:venues": "node scripts/provision-venue-accounts.mjs"
   },
