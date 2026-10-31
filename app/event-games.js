@@ -195,6 +195,12 @@ export function updateEventGamesForce({ force = 0, signedForce = 0, connected = 
   updateForceUi();
 }
 
+export function resumeEventGames() {
+  if (!runtime.root || !runtime.canvas || !runtime.ctx || !runtime.activeGame) return;
+  updateForceUi();
+  startLoop();
+}
+
 export function cleanupEventGames({ keepSelection = true } = {}) {
   stopLoop();
   runtime.root = null;

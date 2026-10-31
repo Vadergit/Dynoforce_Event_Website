@@ -25,7 +25,7 @@ import {
 import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import QRCode from "qrcode";
 import { auth, db, storage } from "./firebase.js";
-import { bindEventGames, cleanupEventGames, eventGamesPageMarkup, updateEventGamesForce } from "./event-games.js";
+import { bindEventGames, cleanupEventGames, eventGamesPageMarkup, resumeEventGames, updateEventGamesForce } from "./event-games.js";
 import "./event-games.css";
 
 const BLE = {
@@ -164,6 +164,9 @@ const state = {
     autoReconnectEnabled: true,
     autoReconnectInFlight: false,
     reconnectAttempted: false,
+    lastPacketAt: 0,
+    resumeTimer: null,
+    resumeInFlight: false,
   },
   event: {
     id: "",
@@ -1889,6 +1892,9 @@ function parseStatePacket(dataView) {
 }
 
 function disconnectCleanup() {
+  if (state.ble.resumeTimer) window.clearTimeout(state.ble.resumeTimer);
+  state.ble.resumeTimer = null;
+  state.ble.lastPacketAt = 0;
   state.connected = false;
   state.connecting = false;
   state.signal = "Nicht verbunden";
@@ -1959,6 +1965,7 @@ function onBluetoothDisconnected() {
 function onStateCharacteristicChanged(event) {
   const packet = parseStatePacket(event.target.value);
   if (!packet) return;
+  state.ble.lastPacketAt = performance.now();
   const signedForce = -packet.force;
   const absForce = Math.abs(signedForce);
   const direction = directionFromSignedForce(signedForce);
@@ -2011,8 +2018,8 @@ async function openBleConnection(device, { silent = false } = {}) {
   state.ble.stateCharacteristic = stateCharacteristic;
   state.ble.commandCharacteristic = commandCharacteristic;
   state.ble.infoCharacteristic = infoCharacteristic;
-  await stateCharacteristic.startNotifications();
   stateCharacteristic.addEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
+  await stateCharacteristic.startNotifications();
   try {
     state.deviceInfo = parseDeviceInfo(await infoCharacteristic.readValue());
   } catch {}
@@ -2093,7 +2100,53 @@ async function attemptAutoReconnect() {
 
 function resumeAutoReconnect() {
   if (document.visibilityState === "hidden" || !state.user) return;
-  void attemptAutoReconnect();
+  if (!state.connected) {
+    void attemptAutoReconnect();
+    return;
+  }
+
+  // Rebuild the live view after browser suspension without losing name inputs.
+  if (state.currentPage === "live") {
+    syncParticipantDraftFromInputs();
+    render();
+  } else if (state.currentPage === "games") {
+    resumeEventGames();
+  }
+  updateLiveMeasurementDom();
+
+  if (state.ble.resumeTimer) window.clearTimeout(state.ble.resumeTimer);
+  const resumedAt = performance.now();
+  state.ble.resumeTimer = window.setTimeout(() => {
+    state.ble.resumeTimer = null;
+    if (document.visibilityState === "hidden" || !state.connected) return;
+    if (!state.ble.device?.gatt?.connected || state.ble.lastPacketAt <= resumedAt) {
+      void recoverBleNotifications();
+    }
+  }, 1500);
+}
+
+async function recoverBleNotifications() {
+  if (state.ble.resumeInFlight || !state.ble.autoReconnectEnabled) return;
+  const characteristic = state.ble.stateCharacteristic;
+  const device = state.ble.device;
+  if (!characteristic || !device) return;
+  state.ble.resumeInFlight = true;
+  try {
+    if (!device.gatt?.connected) throw new Error("Bluetooth connection suspended");
+    await characteristic.stopNotifications();
+    if (state.ble.stateCharacteristic !== characteristic || !state.ble.autoReconnectEnabled) return;
+    await characteristic.startNotifications();
+    updateLiveMeasurementDom();
+  } catch (error) {
+    if (state.ble.stateCharacteristic !== characteristic || !state.ble.autoReconnectEnabled) return;
+    console.warn("Bluetooth-Empfang wird nach Standby wiederhergestellt", error);
+    device.gatt?.disconnect();
+    disconnectCleanup();
+    render();
+    void attemptAutoReconnect();
+  } finally {
+    state.ble.resumeInFlight = false;
+  }
 }
 
 async function disconnectDevice() {
@@ -4607,6 +4660,7 @@ try {
 
 window.addEventListener("popstate", routeAndLoad);
 window.addEventListener("focus", resumeAutoReconnect);
+window.addEventListener("pageshow", resumeAutoReconnect);
 window.addEventListener("online", () => {
   resumeAutoReconnect();
   if (state.currentPage === "live") render();
