@@ -167,6 +167,7 @@ const state = {
     lastPacketAt: 0,
     resumeTimer: null,
     resumeInFlight: false,
+    lastResumeAt: 0,
   },
   event: {
     id: "",
@@ -2099,9 +2100,9 @@ async function attemptAutoReconnect() {
 }
 
 function resumeAutoReconnect() {
-  if (document.visibilityState === "hidden" || !state.user) return;
+  if (document.visibilityState === "hidden") return;
   if (!state.connected) {
-    void attemptAutoReconnect();
+    if (state.user) void attemptAutoReconnect();
     return;
   }
 
@@ -2115,27 +2116,34 @@ function resumeAutoReconnect() {
   updateLiveMeasurementDom();
 
   if (state.ble.resumeTimer) window.clearTimeout(state.ble.resumeTimer);
-  const resumedAt = performance.now();
   state.ble.resumeTimer = window.setTimeout(() => {
     state.ble.resumeTimer = null;
     if (document.visibilityState === "hidden" || !state.connected) return;
-    if (!state.ble.device?.gatt?.connected || state.ble.lastPacketAt <= resumedAt) {
-      void recoverBleNotifications();
-    }
-  }, 1500);
+    // Status packets alone do not prove the force stream survived suspension.
+    void recoverBleNotifications();
+  }, 250);
 }
 
 async function recoverBleNotifications() {
   if (state.ble.resumeInFlight || !state.ble.autoReconnectEnabled) return;
+  if (state.ble.lastResumeAt && Date.now() - state.ble.lastResumeAt < 1000) return;
   const characteristic = state.ble.stateCharacteristic;
   const device = state.ble.device;
   if (!characteristic || !device) return;
   state.ble.resumeInFlight = true;
+  state.ble.lastResumeAt = Date.now();
   try {
     if (!device.gatt?.connected) throw new Error("Bluetooth connection suspended");
     await characteristic.stopNotifications();
     if (state.ble.stateCharacteristic !== characteristic || !state.ble.autoReconnectEnabled) return;
+    characteristic.removeEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
+    characteristic.addEventListener("characteristicvaluechanged", onStateCharacteristicChanged);
     await characteristic.startNotifications();
+    if (state.ble.stateCharacteristic !== characteristic || !state.ble.autoReconnectEnabled) return;
+    if (state.currentPage === "live") {
+      syncParticipantDraftFromInputs();
+      render();
+    }
     updateLiveMeasurementDom();
   } catch (error) {
     if (state.ble.stateCharacteristic !== characteristic || !state.ble.autoReconnectEnabled) return;
@@ -4671,7 +4679,13 @@ window.addEventListener("offline", () => {
 document.addEventListener("visibilitychange", resumeAutoReconnect);
 await routeAndLoad();
 
+let lastMeasurementHeartbeatAt = Date.now();
 setInterval(() => {
+  const now = Date.now();
+  const resumedAfterPause = now - lastMeasurementHeartbeatAt > 4000;
+  lastMeasurementHeartbeatAt = now;
+  if (document.visibilityState === "hidden") return;
+  if (resumedAfterPause && state.connected) resumeAutoReconnect();
   if (!state.connected || !isActiveEventStatus(state.event.status)) return;
   state.elapsedSeconds = (state.elapsedSeconds + 1) % 60;
   updateLiveMeasurementDom();
