@@ -27,6 +27,7 @@ import QRCode from "qrcode";
 import { auth, db, storage } from "./firebase.js";
 import { bindEventGames, cleanupEventGames, eventGamesPageMarkup, resumeEventGames, updateEventGamesForce } from "./event-games.js";
 import "./event-games.css";
+import {renderDynoTouch,cleanupDynoTouch} from './dynotouch/index.jsx';
 
 const BLE = {
   serviceUuid: "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
@@ -202,6 +203,7 @@ const state = {
 const root = document.getElementById("app");
 
 const pageMeta = {
+  dynotouch: ["DynoTouch", "QR-Runs, öffentliche Ranglisten und Event-Verwaltung."],
   dashboard: ["Dashboard", "Alle eigenen Events auf einen Blick mit Status, Teilnehmerzahl und Schnellzugriff."],
   setup: ["Event Setup", "Eventname, Challenge, Wertung und Ablauf in wenigen Schritten konfigurieren."],
   branding: ["Branding", "Hallenlogo, Sponsor Banner und Primärfarbe professionell integrieren."],
@@ -212,7 +214,7 @@ const pageMeta = {
   privacy: ["Datenschutz", "Kurze Informationen zur Verwendung der Daten bei DynoForce Events."],
 };
 
-const adminNavPages = ["dashboard"];
+const adminNavPages = ["dashboard", "dynotouch"];
 const focusedEventPages = ["live", "games", "public", "display"];
 
 const APP_BASE = (import.meta.env.BASE_URL || "/")
@@ -1790,6 +1792,7 @@ function applyBrandingPresetData(data = {}) {
 function getRouteInfo() {
   const hash = window.location.hash.replace(/^#/, "");
   const segments = hash.split("/").filter(Boolean);
+  if(segments[0]==='dynotouch')return {page:'dynotouch',eventId:''};
   const fallbackEventId = getActiveEventId() || state.event.id;
 
   if (segments[0] === "display") {
@@ -3858,7 +3861,7 @@ function template(page) {
   const lockedPage = !state.user && ["dashboard", "setup", "branding", "live", "games"].includes(page);
   const navItems = state.user
     ? adminNavPages.map((key) => `<button data-page="${key}" class="${page === key ? "active" : ""}">${pageMeta[key][0]}</button>`).join("")
-    : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button>`;
+    : `<button data-page="dashboard" class="${page === "dashboard" ? "active" : ""}">Startseite</button><button data-page="dynotouch">DynoTouch</button>`;
   const [dashboardTitle, dashboardText] = getDashboardMeta();
 
   if (["public", "display", "privacy"].includes(page) && (!state.eventLoaded || !state.eventBrandingReady)) {
@@ -4564,6 +4567,8 @@ function bindPublicActions() {
 }
 
 function render() {
+  if(state.currentPage==='dynotouch'){cleanupEventGames();renderDynoTouch(root,state.user);return;}
+  cleanupDynoTouch();
   hydrateResultsFromCache();
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
   if (state.currentPage !== "games") cleanupEventGames();
@@ -4592,6 +4597,7 @@ window.addEventListener("beforeunload", (event) => {
 async function routeAndLoad() {
   const route = getRouteInfo();
   state.currentPage = route.page;
+  if(route.page==='dynotouch'){render();return;}
 
   if (["public", "display", "privacy"].includes(route.page)) {
     safeUnsub("publicEvents");
@@ -4667,6 +4673,7 @@ try {
 }
 
 window.addEventListener("popstate", routeAndLoad);
+window.addEventListener("hashchange", routeAndLoad);
 window.addEventListener("focus", resumeAutoReconnect);
 window.addEventListener("pageshow", resumeAutoReconnect);
 window.addEventListener("online", () => {

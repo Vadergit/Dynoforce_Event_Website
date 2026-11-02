@@ -100,3 +100,8 @@ Für jede vorbereitete Halle gibt es einen separaten Firebase-Zugang und eine ei
 Passwörter werden absichtlich nicht im Repository gespeichert. Konten und Vorlagen lassen sich idempotent mit `npm run provision:venues` einrichten oder aktualisieren. Das Skript erwartet die Passwörter ausschliesslich zur Laufzeit in `DYNOFORCE_VENUE_PASSWORDS`, beispielsweise als JSON-Objekt mit den sechs Benutzernamen als Schlüssel.
 
 Die veröffentlichten Bilddateien liegen unter `public/branding/`. Private Schlüssel, Service-Account-Dateien und Passwörter dürfen nicht committed werden.
+
+## DynoTouch extension
+
+Public DynoTouch leaderboards are available under `#/dynotouch`. Existing
+DynoGrip events remain unchanged. See [DynoTouch setup and architecture](docs/DYNOTOUCH.md).
