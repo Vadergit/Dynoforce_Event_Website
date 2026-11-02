@@ -22,3 +22,9 @@ test('public claim sends nickname and consent, not editable scores',()=>{
   assert.match(client,/data.expired/);
   assert.match(client,/\/dynoforce-icon.png/);
 });
+test('claim copy permits repeated runs and describes personal bests',()=>{
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/Ergebnis speichern/);assert.match(client,/Spiele so oft du möchtest/);
+  assert.match(client,/nur dein bestes Ergebnis zählt/);
+  assert.doesNotMatch(client,/Einmalig eintragen|Korrekturen sind danach nur durch den Veranstalter möglich/);
+});
