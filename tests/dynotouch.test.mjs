@@ -137,8 +137,8 @@ test('live name checks do not debounce: no per-keystroke HTTP calls',()=>{
   assert.doesNotMatch(client,/setTimeout\(/);
   assert.match(client,/Ja, das bin ich/);
   assert.match(client,/Nein, anderer Name/);
-  assert.match(client,/saveParticipantProfile\(window\.localStorage,eventId,cleanName,category\)/);
-  assert.match(client,/readParticipantProfile\(window\.localStorage,eventId\)/);
+  assert.match(client,/saveParticipantProfile\(claimStorage\(\),eventId,cleanName,category\)/);
+  assert.match(client,/readParticipantProfile\(claimStorage\(\),eventId\)/);
   assert.match(client,/allowExistingName/);
 });
 
@@ -182,4 +182,12 @@ test('a successful claim can prefill the last participant on exactly the same de
   assert.equal(nameCheckState({name:'Dario',category:'male',profile,known:matches,loading:false,allowReuse:false}),'blocked');
   assert.equal(nameCheckState({name:'Other',category:'male',profile,known:new Set(['male|other']),loading:false}),'duplicate');
   assert.equal(saveParticipantProfile({setItem:()=>{throw Error('Denied')}},'event','Other','male'),false);
+});
+
+test('the optimized claim response can provide names without extra requests',()=>{
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/Array\.isArray\(data\.nameIndex\)\?data\.nameIndex:null/);
+  assert.match(client,/if\(providedNames\)\{/);
+  assert.match(client,/setKnown\(knownNames\(providedNames\)\)/);
+  assert.match(client,/setChecking\(false\)/);
 });
