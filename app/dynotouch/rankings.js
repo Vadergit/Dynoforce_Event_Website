@@ -31,6 +31,7 @@ export function eventGroupKey(event) {
   if(event?.eventGroupId || event?.groupId)return 'group:'+String(event.eventGroupId||event.groupId);
   // Two challenges with the same event title and calendar dates belong together.
   return 'event:'+String(event?.name||'').trim().toLocaleLowerCase('de-CH')
+    .replace(/(?:\s*[-|·:]\s*|\s*\(\s*)(?:single|multi)\s*target\s*\)?$/i,'').trim()
     +'|'+localDay(event?.starts)+'|'+localDay(event?.ends);
 }
 
