@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {CATEGORIES,categoryOf,eventGroupKey,groupEvents,groupRankings} from '../app/dynotouch/rankings.js';
+import {CATEGORIES,categoryOf,eventGroupKey,groupEvents,groupRankings,demoTemplateId} from '../app/dynotouch/rankings.js';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('DynoTouch retains isolated routing and a dashboard return link',()=>{
@@ -83,4 +83,15 @@ test('boards with identical rules combine while different rules remain separate'
   const event={rules:{mode:'single',mask:31,targetMs:5000}};
   assert.equal(groupRankings([{event:{...event,id:'a'},entries:[]},{event:{...event,id:'b'},entries:[]}]).length,1);
   assert.equal(groupRankings([{event:{...event,id:'a'},entries:[]},{event:{...event,id:'b',rules:{...event.rules,targetMs:3000}},entries:[]}]).length,2);
+});
+
+test('DynoTouch demo defaults to Kraftreaktor without changing regular event branding',()=>{
+  assert.equal(demoTemplateId({name:'DynoTouch Demo Event'}),'kraftreaktor-lenzburg-aarau');
+  assert.equal(demoTemplateId({id:'demo-single-target',name:'Example'}),'kraftreaktor-lenzburg-aarau');
+  assert.equal(demoTemplateId({name:'Kraftreaktor Challenge'}),'');
+  assert.equal(demoTemplateId({name:'Demo Event',brandingTemplate:'mito-zuerich'}),'');
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/demoTemplateId\(event\)/);
+  assert.match(client,/supplied,\.\.\.presetBranding\(preset\)/);
+  assert.match(client,/header:'header-banner-2400x600.jpg'/);
 });

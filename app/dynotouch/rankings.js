@@ -87,3 +87,11 @@ export function groupRankings(challenges) {
     }))
   }));
 }
+
+// The public demo uses the existing Kraftreaktor template until its metadata
+// can be persisted by the separate DynoTouch event API.
+export function demoTemplateId(event) {
+  if(event?.brandingTemplate)return '';
+  const identifier=String(event?.name||'')+' '+String(event?.id||'');
+  return /demo/i.test(identifier)?'kraftreaktor-lenzburg-aarau':'';
+}
