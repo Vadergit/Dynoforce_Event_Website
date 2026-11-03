@@ -187,6 +187,117 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
     <button className="primary" disabled={busy} onClick={save}>{busy?'Speichert …':'Event-Design speichern'}</button>
   </section>;
 }
+
+function ClaimForm({data,id}:{data:Any;id:string}){
+  const eventId=String(data.eventId||'');
+  // Only a display preference is kept locally. Consent, tokens and scores are never stored.
+  const [profile,setProfile]=useState<Any|null>(()=>readParticipantProfile(window.localStorage,eventId));
+  const [name,setName]=useState(()=>profile?.name||'');
+  const [category,setCategory]=useState(()=>profile?.category||'');
+  const [consent,setConsent]=useState(false);
+  const [known,setKnown]=useState<Set<string>|null>(null);
+  const [checking,setChecking]=useState(true);
+  const [lookupError,setLookupError]=useState('');
+  const [allowReuse,setAllowReuse]=useState(true);
+  const [confirmedFor,setConfirmedFor]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+
+  useEffect(()=>{
+    let alive=true;
+    setKnown(null);setChecking(true);setLookupError('');
+    // Fetch once in the background while the participant types, not on every keystroke.
+    // Reuse the selected event's first page and fetch all pages so even rank 101+ is checked.
+    (async()=>{
+      const [detail,listing]=await Promise.all([
+        api('events/'+encodeURIComponent(eventId)),
+        api('events').catch(()=>null)
+      ]);
+      const selected=detail?.event;
+      if(!selected)throw Error('Event konnte nicht geladen werden.');
+      const all=Array.isArray(listing)?listing:[];
+      const matching=all.filter((other:Any)=>competitionKey(other)===competitionKey(selected));
+      const members=matching.some((event:Any)=>String(event.id)===eventId)?matching:[selected,...matching];
+      const batches=await Promise.all(members.map((event:Any)=>
+        fetchAllEntries(event,String(event.id)===eventId&&Array.isArray(detail.entries)?detail.entries:undefined)));
+      if(!alive)return;
+      setKnown(knownNames(batches.flat()));
+      setAllowReuse(selected.allowExistingName!==false);
+    })().catch(e=>{
+      if(!alive)return;
+      // Never claim a name is available if the check failed.
+      setKnown(new Set());
+      setLookupError((e as Error).message);
+    }).finally(()=>{if(alive)setChecking(false);});
+    return()=>{alive=false;};
+  },[eventId]);
+
+  const status=nameCheckState({name,category,known,profile,loading:checking,error:!!lookupError,allowReuse});
+  const lookupKey=category+'|'+normalizeParticipantName(name);
+  const confirmed=confirmedFor===lookupKey;
+  const ready=status==='available'||status==='returning'||
+    ((status==='duplicate'||status==='unverified')&&confirmed);
+  const discipline=String(data.eventName||'').toLowerCase().includes('multi')?'Multi Target':null;
+
+  async function save(e:React.FormEvent<HTMLFormElement>){
+    e.preventDefault();
+    if(busy||!consent||!ready)return;
+    setBusy(true);setError('');
+    try{
+      const cleanName=name.trim().replace(/\s+/g,' ');
+      // All runs are immutable. The existing leaderboard groups identical names
+      // *within the same discipline and category* to show only the best result.
+      const result=await api('claim/'+encodeURIComponent(id),'POST',{name:cleanName,consent,category});
+      saveParticipantProfile(window.localStorage,eventId,cleanName,category);
+      setProfile({eventId,name:cleanName,category});
+      window.location.hash='/dynotouch/e/'+encodeURIComponent(result.eventId||eventId);
+    }catch(err){setError((err as Error).message);}
+    finally{setBusy(false);}
+  }
+
+  return <section className="claim card">
+    <div className="eyebrow">{data.eventName}</div><h1 className="compact">Dein Ergebnis</h1>
+    <div className="result"><strong>{data.score}</strong><span>PUNKTE · {seconds(data.durationMs)}</span></div>
+    {data.claimed?<div className="notice">Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.</div>
+      :data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>
+      :<form onSubmit={save}>
+        {profile&&<div className="dt-returning-hint">Angaben vom letzten Versuch auf diesem Natel übernommen. Für eine andere Person kannst du den Namen ändern.</div>}
+        <label htmlFor="player">Dein Anzeigename</label>
+        <input id="player" value={name} onChange={e=>setName(e.target.value)} maxLength={32} minLength={2} autoComplete="nickname" placeholder="z. B. Alex" required/>
+        <fieldset className="dt-category"><legend>Kategorie auswählen (Pflichtfeld)</legend>
+          {CATEGORIES.map(c=><label key={c.key}><input type="radio" name="category" value={c.key} checked={category===c.key} onChange={()=>setCategory(c.key)} required/>{c.label}</label>)}
+        </fieldset>
+        <div className="dt-name-check" role="status" aria-live="polite">
+          {status==='checking'&&<span className="dt-name-neutral">Namen werden geladen – die Prüfung reagiert anschliessend sofort beim Tippen.</span>}
+          {status==='available'&&<span className="dt-name-success">✓ Name verfügbar</span>}
+          {status==='returning'&&<span className="dt-name-success">✓ Dein bisheriger Name ist auf diesem Natel gespeichert. Keine erneute Bestätigung nötig.</span>}
+          {status==='blocked'&&<span className="dt-name-warning">Dieser Name ist in dieser Disziplin und Kategorie bereits belegt. Der Veranstalter hat die Wiederverwendung deaktiviert. Bitte einen anderen Namen wählen.</span>}
+          {status==='duplicate'&&<div className="dt-name-conflict">
+            <strong>Dieser Name ist bereits vorhanden!</strong>
+            <p>In derselben Disziplin und Kategorie gibt es bereits ein Ergebnis mit diesem Namen. Bist du dieselbe Person?</p>
+            {confirmed?<div className="dt-name-success">✓ Bestätigt. Der neue Versuch wird mit diesem Namen gewertet; der bessere Wert zählt.</div>
+              :<div className="dt-name-actions">
+                <button type="button" onClick={()=>setConfirmedFor(lookupKey)}>Ja, das bin ich</button>
+                <button type="button" onClick={()=>{setName('');document.getElementById('player')?.focus();}}>Nein, anderer Name</button>
+              </div>}
+          </div>}
+          {status==='unverified'&&<div className="dt-name-conflict">
+            <strong>Namensprüfung gerade nicht verfügbar</strong>
+            <p>Die Rangliste konnte nicht geladen werden. Bitte prüfe selbst, ob du deinen bisherigen Namen verwenden möchtest.</p>
+            {confirmed?<div className="dt-name-warning">Du hast das Speichern ohne Namensprüfung bestätigt.</div>
+              :<button type="button" onClick={()=>setConfirmedFor(lookupKey)}>Trotzdem mit diesem Namen fortfahren</button>}
+          </div>}
+        </div>
+        <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/>
+          <span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
+        <button disabled={busy||!consent||!ready} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
+        <p className="small">Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.</p>
+        {error&&<div className="notice error" role="alert">{error}</div>}
+      </form>}
+    <a className="text-link" href={'#/dynotouch/e/'+encodeURIComponent(eventId)}>Zur Rangliste →</a>
+  </section>;
+}
+
 export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'event'|'claim'|'admin'|'manage';id?:string;signedIn?:boolean}){
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),
     [name,setName]=useState(''),
@@ -223,20 +334,7 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
       </a>)}</div>
       {data&&homeEvents.length===0&&<div className="card empty"><h2>Noch keine DynoTouch Events</h2><p>Events werden im DynoTouch-Webportal erstellt und anschliessend hier angezeigt.</p></div>}
     </>}
-    {kind==='claim'&&data&&<section className="claim card"><div className="eyebrow">{data.eventName}</div><h1 className="compact">Dein Ergebnis</h1><div className="result"><strong>{data.score}</strong><span>PUNKTE · {seconds(data.durationMs)}</span></div>
-      {data.claimed?<div className="notice">Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.</div>:data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>:<form onSubmit={e=>{e.preventDefault();action(async()=>{
-          const result=await api('claim/'+encodeURIComponent(id),'POST',{name,consent,category});
-          window.location.hash='/dynotouch/e/'+result.eventId;
-      });}}>
-        <label htmlFor="player">Dein Anzeigename</label><input id="player" value={name} onChange={e=>setName(e.target.value)} maxLength={32} minLength={2} autoComplete="nickname" placeholder="z. B. Alex" required/>
-        <fieldset className="dt-category"><legend>Kategorie auswählen (Pflichtfeld)</legend>
-          {CATEGORIES.map(c=><label key={c.key}><input type="radio" name="category" value={c.key} checked={category===c.key} onChange={()=>setCategory(c.key)} required/>{c.label}</label>)}
-        </fieldset>
-        <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/><span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
-        <button disabled={busy||!consent||!category} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
-        <p className="small">Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.</p>
-      </form>}<a className="text-link" href={'#/dynotouch/e/'+data.eventId}>Zur Rangliste →</a>
-    </section>}
+    {kind==='claim'&&data&&<ClaimForm key={id} data={data} id={id}/>}
     {kind==='event'&&data&&<><EventHero event={event}/>
       <div className="grid two public-summary-grid dt-summary">
         <div className="card compact-public-card event-info-card"><div className="card-header"><div><h3>{event.name}</h3><p>{date(event.starts)} – {date(event.ends)}</p></div></div>
