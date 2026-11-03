@@ -99,6 +99,18 @@
 }
 
 
+/* Deliberate consent: the complete label is a generous touch target. */
+.dt-shell .dt-consent{margin:22px 0 18px;border:1.5px solid #a9c2b3;border-radius:14px;background:#f0f5ef;transition:background .15s,border-color .15s}
+.dt-shell .dt-consent label{display:flex;align-items:flex-start;gap:14px;margin:0;padding:16px;min-height:44px;cursor:pointer;font-size:15px;line-height:1.5;font-weight:600}
+.dt-shell .dt-consent input{width:28px;height:28px;min-width:28px;padding:0;margin:2px 0 0;accent-color:var(--primary);cursor:pointer;flex-shrink:0}
+.dt-shell .dt-consent-hint{display:block;margin-top:10px;font-size:12px;line-height:1.5;color:#526454;font-weight:400}
+.dt-shell .dt-consent:focus-within{outline:3px solid #95b4a1;outline-offset:3px}
+.dt-shell .dt-consent.is-checked{background:#e8f1e8;border-color:#547c61}
+.dt-shell .dt-consent.has-error{border-color:#b35239;background:#fff5ef}
+.dt-shell .dt-consent.has-error .dt-consent-hint{color:#963b25;font-size:13px;font-weight:700}
+.dt-shell .dt-back,.dt-shell .dt-nav a.dt-back{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:46px;min-width:112px;padding:11px 16px;border:1px solid #bdd0c3;border-radius:11px;background:#e8f0ec;color:#244e40;font-size:14px;font-weight:800;line-height:1.25;white-space:nowrap}
+.dt-shell .dt-back:hover{background:#dbe9df;border-color:#8da995}
+.dt-shell .dt-back span{font-size:21px;line-height:1}
 /* Claim name availability is computed synchronously from the prefetched list. */
 .dt-shell .dt-returning-hint{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 13px;margin:0 0 14px;border-radius:10px;background:#f1f6e7;color:#40512d;font-size:12px}
 .dt-shell .dt-returning-hint button{padding:7px 10px;border-radius:7px;font-size:11px;flex-shrink:0}

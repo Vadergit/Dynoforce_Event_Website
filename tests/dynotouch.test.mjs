@@ -29,7 +29,8 @@ test('claim requires one of the three competition categories',()=>{
   const client=read('app/dynotouch/event-client.tsx');
   assert.match(client,/'claim\/'.*'POST',\{name:cleanName,consent,category,confirmExistingName\}/);
   assert.match(client,/type="radio" name="category"/);
-  assert.match(client,/!consent\|\|!ready/);
+  assert.match(client,/if\(!consent\)\{explainConsent\(\);return;\}/);
+  assert.match(client,/if\(!ready\)/);
   assert.match(client,/data.claimed/);
   assert.match(client,/data.expired/);
   assert.match(client,/Ergebnis speichern/);
@@ -38,6 +39,18 @@ test('claim requires one of the three competition categories',()=>{
   assert.doesNotMatch(client,/Einmalig eintragen|Korrekturen sind danach nur durch den Veranstalter möglich/);
   assert.doesNotMatch(client,/Ohne Kategorie speichern|legacyClaimAvailable/);
   assert.match(client,/Kategorie korrigieren/);
+});
+
+test('public consent is explicit, fully clickable and explains a missing check inline',()=>{
+  const client=read('app/dynotouch/event-client.tsx'),css=read('app/dynotouch/dynotouch.css');
+  assert.match(client,/\[consent,setConsent\]=useState\(false\)/);
+  assert.match(client,/label htmlFor="public-consent"/);
+  assert.match(client,/aria-invalid=\{consentError\}/);
+  assert.match(client,/id="consent-error" role="alert"/);
+  assert.match(client,/Ich bin einverstanden, dass mein Anzeigename und mein Ergebnis öffentlich in der Rangliste angezeigt werden\./);
+  assert.match(client,/e.preventDefault\(\);explainConsent\(\)/);
+  assert.match(css,/\.dt-consent input\{width:28px;height:28px/);
+  assert.match(css,/min-height:46px/);
 });
 
 test('single and multi target share an event when name and day match',()=>{
