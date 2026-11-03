@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {CATEGORIES,categoryOf,eventGroupKey,groupEvents,groupRankings,demoTemplateId,medalForRank} from '../app/dynotouch/rankings.js';
-import {normalizeParticipantName,competitionKey,knownNames,nameCheckState,readParticipantProfile,saveParticipantProfile} from '../app/dynotouch/claim-names.js';
+import {normalizeParticipantName,competitionKey,knownNames,nameCheckState,readParticipantProfile,saveParticipantProfile,clearParticipantProfile} from '../app/dynotouch/claim-names.js';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('DynoTouch retains isolated routing and a dashboard return link',()=>{
@@ -169,7 +169,8 @@ test('a successful claim can prefill the last participant on exactly the same de
   const map=new Map();
   const storage={
     getItem:key=>map.get(key)||null,
-    setItem:(key,value)=>map.set(key,value)
+    setItem:(key,value)=>map.set(key,value),
+    removeItem:key=>map.delete(key)
   };
   assert.equal(readParticipantProfile(storage,'event-single'),null);
   assert.equal(saveParticipantProfile(storage,'event-single','Dario','male'),true);
@@ -182,6 +183,9 @@ test('a successful claim can prefill the last participant on exactly the same de
   assert.equal(nameCheckState({name:'Dario',category:'male',profile,known:matches,loading:false,allowReuse:false}),'blocked');
   assert.equal(nameCheckState({name:'Other',category:'male',profile,known:new Set(['male|other']),loading:false}),'duplicate');
   assert.equal(saveParticipantProfile({setItem:()=>{throw Error('Denied')}},'event','Other','male'),false);
+  assert.equal(clearParticipantProfile(storage,'event-single'),true);
+  assert.equal(readParticipantProfile(storage,'event-single'),null);
+  assert.match(read('app/dynotouch/event-client.tsx'),/Anderer Teilnehmer/);
 });
 
 test('the optimized claim response can provide names without extra requests',()=>{
