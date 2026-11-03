@@ -3,7 +3,7 @@ import {auth,db,storage} from '../firebase.js';
 import {collection,getDocs,query,where} from 'firebase/firestore';
 import {getDownloadURL,ref,uploadBytes} from 'firebase/storage';
 import {CATEGORIES,categoryOf,groupEvents,groupRankings,modeOf,eventGroupKey,demoTemplateId,medalForRank} from './rankings.js';
-import {competitionKey,knownNames,normalizeParticipantName,nameCheckState,readParticipantProfile,saveParticipantProfile} from './claim-names.js';
+import {competitionKey,knownNames,normalizeParticipantName,nameCheckState,readParticipantProfile,saveParticipantProfile,clearParticipantProfile} from './claim-names.js';
 
 const EVENT_API=import.meta.env.VITE_DYNOTOUCH_API_URL||'https://dynoforce-events.dario-neuenschwander.chatgpt.site';
 let moderatorSession='';
@@ -202,6 +202,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
   const [checking,setChecking]=useState(!providedNames);
   const [lookupError,setLookupError]=useState('');
   const [allowReuse,setAllowReuse]=useState(true);
+  const [discipline,setDiscipline]=useState('dieser Disziplin');
   const [confirmedFor,setConfirmedFor]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -226,6 +227,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
       ]);
       const selected=detail?.event;
       if(!selected)throw Error('Event konnte nicht geladen werden.');
+      if(alive)setDiscipline(modeOf(selected)==='multi'?'Multi Target':'Single Target');
       const all=Array.isArray(listing)?listing:[];
       const matching=all.filter((other:Any)=>competitionKey(other)===competitionKey(selected));
       const members=matching.some((event:Any)=>String(event.id)===eventId)?matching:[selected,...matching];
@@ -271,7 +273,10 @@ function ClaimForm({data,id}:{data:Any;id:string}){
     {data.claimed?<div className="notice">Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.</div>
       :data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>
       :<form onSubmit={save}>
-        {profile&&<div className="dt-returning-hint">Angaben vom letzten Versuch auf diesem Natel übernommen. Für eine andere Person kannst du den Namen ändern.</div>}
+        {profile&&<div className="dt-returning-hint"><span>Angaben vom letzten Versuch auf diesem Natel übernommen.</span><button type="button" onClick={()=>{
+          clearParticipantProfile(claimStorage(),eventId);setProfile(null);setName('');setCategory('');setConfirmedFor('');
+          document.getElementById('player')?.focus();
+        }}>Anderer Teilnehmer</button></div>}
         <label htmlFor="player">Dein Anzeigename</label>
         <input id="player" value={name} onChange={e=>setName(e.target.value)} maxLength={32} minLength={2} autoComplete="nickname" placeholder="z. B. Alex" required/>
         <fieldset className="dt-category"><legend>Kategorie auswählen (Pflichtfeld)</legend>
@@ -284,7 +289,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
           {status==='blocked'&&<span className="dt-name-warning">Dieser Name ist in dieser Disziplin und Kategorie bereits belegt. Der Veranstalter hat die Wiederverwendung deaktiviert. Bitte einen anderen Namen wählen.</span>}
           {status==='duplicate'&&<div className="dt-name-conflict">
             <strong>Dieser Name ist bereits vorhanden!</strong>
-            <p>In derselben Disziplin und Kategorie gibt es bereits ein Ergebnis mit diesem Namen. Bist du dieselbe Person?</p>
+            <p>In {discipline} und dieser Kategorie gibt es bereits ein Ergebnis mit diesem Namen. Bist du dieselbe Person?</p>
             {confirmed?<div className="dt-name-success">✓ Bestätigt. Der neue Versuch wird mit diesem Namen gewertet; der bessere Wert zählt.</div>
               :<div className="dt-name-actions">
                 <button type="button" onClick={()=>setConfirmedFor(lookupKey)}>Ja, das bin ich</button>
