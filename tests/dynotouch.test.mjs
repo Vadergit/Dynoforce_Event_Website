@@ -27,7 +27,7 @@ test('organizer retains Firebase identity, existing presets, and approved upload
 
 test('claim requires one of the three competition categories',()=>{
   const client=read('app/dynotouch/event-client.tsx');
-  assert.match(client,/'claim\/'.*'POST',\{name:cleanName,consent,category\}/);
+  assert.match(client,/'claim\/'.*'POST',\{name:cleanName,consent,category,confirmExistingName\}/);
   assert.match(client,/type="radio" name="category"/);
   assert.match(client,/!consent\|\|!ready/);
   assert.match(client,/data.claimed/);
@@ -194,4 +194,19 @@ test('the optimized claim response can provide names without extra requests',()=
   assert.match(client,/if\(providedNames\)\{/);
   assert.match(client,/setKnown\(knownNames\(providedNames\)\)/);
   assert.match(client,/setChecking\(false\)/);
+});
+
+test('reuse confirmation reaches the atomic server check and stale conflicts refresh the form',()=>{
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/confirmExistingName=status==='returning'\|\|confirmed/);
+  assert.match(client,/NAME_CONFIRMATION_REQUIRED.*NAME_TAKEN/);
+  assert.match(client,/setKnown\(knownNames\(failure.data\?\.nameIndex\)\)/);
+});
+
+test('ranking and immediate name checks use identical Unicode and whitespace normalization',()=>{
+  const entries=[{name:'Älex  Müller',score:3,duration:2000},{name:'A\u0308LEX\tMU\u0308LLER',score:5,duration:1000}];
+  assert.equal(knownNames(entries.map(e=>({...e,category:'male'}))).size,1);
+  const grouped=groupRankings([{event:{rules:{mode:'single'}},entries:entries.map(e=>({...e,category:'male'}))}]);
+  assert.equal(grouped[0].sections[0].entries.length,1);
+  assert.equal(grouped[0].sections[0].entries[0].score,5);
 });
