@@ -3,6 +3,7 @@ import {auth,db,storage} from '../firebase.js';
 import {collection,getDocs,query,where} from 'firebase/firestore';
 import {getDownloadURL,ref,uploadBytes} from 'firebase/storage';
 import {CATEGORIES,categoryOf,groupEvents,groupRankings,modeOf,eventGroupKey,demoTemplateId,medalForRank} from './rankings.js';
+import {competitionKey,knownNames,normalizeParticipantName,nameCheckState,readParticipantProfile,saveParticipantProfile} from './claim-names.js';
 
 const EVENT_API=import.meta.env.VITE_DYNOTOUCH_API_URL||'https://dynoforce-events.dario-neuenschwander.chatgpt.site';
 let moderatorSession='';
@@ -50,10 +51,13 @@ function Rules({event}:{event:Any}){
   const count=Number(r.mask||0).toString(2).replace(/0/g,'').length;
   return <div className="chips"><span>{modeOf(event)==='multi'?'Multi Target':'Single Target'}</span>{r.targetMs&&<span>{r.targetMs/1000} s / Target</span>}{count>0&&<span>{count} Targets</span>}</div>;
 }
-async function fetchAllEntries(event:Any){
-  const collected:Any[]=[];
+async function fetchAllEntries(event:Any,firstPage?:Any[]){
+  const hasFirstPage=Array.isArray(firstPage);
+  const collected:Any[]=hasFirstPage?[...firstPage!]:[];
+  // The claim form can reuse the first page already returned by GET /events/:id.
+  if(hasFirstPage&&collected.length<100)return collected;
   // Full rankings are fetched for correct per-category ranks (server pages are 100 entries).
-  for(let offset=0;;offset+=100){
+  for(let offset=hasFirstPage?100:0;;offset+=100){
     const page=await api('events/'+encodeURIComponent(event.id)+'?offset='+offset);
     const entries=Array.isArray(page.entries)?page.entries:[];
     collected.push(...entries);
@@ -105,7 +109,7 @@ function Leaderboards({challenges}:{challenges:Array<{event:Any,entries:Any[]}>}
     </section>)}
   </div>;
 }
-const EMPTY_DRAFT={description:'',organiser:'',location:'',eventGroupId:'',brandingTemplate:'',branding:{...DEFAULT_BRANDING}};
+const EMPTY_DRAFT={description:'',organiser:'',location:'',eventGroupId:'',brandingTemplate:'',branding:{...DEFAULT_BRANDING},allowExistingName:true};
 function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
   const [draft,setDraft]=useState<Any>(EMPTY_DRAFT);
   const [presets,setPresets]=useState<Any[]>([]);
@@ -113,7 +117,7 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
   const [message,setMessage]=useState('');
   useEffect(()=>{
     setDraft({description:event.description||'',organiser:event.organiser||'',location:event.location||'',
-      eventGroupId:event.eventGroupId||event.groupId||'',brandingTemplate:event.brandingTemplate||'',branding:brandingFor(event)});
+      eventGroupId:event.eventGroupId||event.groupId||'',brandingTemplate:event.brandingTemplate||'',branding:brandingFor(event),allowExistingName:event.allowExistingName!==false});
     setMessage('');
   },[event.id]);
   useEffect(()=>{
@@ -150,12 +154,13 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
     setBusy(true);setMessage('');
     try{
       await api('owner/events','PATCH',{id:event.id,description:draft.description,organiser:draft.organiser,location:draft.location,
-        eventGroupId:draft.eventGroupId||null,brandingTemplate:draft.brandingTemplate,branding:draft.branding});
+        eventGroupId:draft.eventGroupId||null,brandingTemplate:draft.brandingTemplate,branding:draft.branding,allowExistingName:!!draft.allowExistingName});
       // Do not report success when the deployed backend ignores the new metadata.
       const check=await api('events/'+encodeURIComponent(event.id));
       const e=check.event||{};
       if(['description','organiser','location','brandingTemplate','eventGroupId'].some(key=>(e[key]||'')!==String(draft[key]||'').trim())
-        ||Object.keys(DEFAULT_BRANDING).some(key=>e.branding?.[key]!==draft.branding[key])){
+        ||Object.keys(DEFAULT_BRANDING).some(key=>e.branding?.[key]!==draft.branding[key])
+        ||e.allowExistingName!==!!draft.allowExistingName){
         throw Error('Der DynoTouch-API-Server unterstützt das Speichern der Event-Daten noch nicht. Backend-Erweiterung erforderlich.');
       }
       setMessage('Event-Design und Informationen gespeichert.');
@@ -176,6 +181,7 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
     </label>)}</div>
     <label className="check"><input type="checkbox" checked={!!draft.branding.showVenueLogo} onChange={e=>changeBranding('showVenueLogo',e.target.checked)}/>Hallenlogo anzeigen</label>
     <label>Primärfarbe <input type="color" value={draft.branding.primaryColor||'#1f4f46'} onChange={e=>changeBranding('primaryColor',e.target.value)}/></label>
+    <label className="check"><input type="checkbox" checked={!!draft.allowExistingName} onChange={e=>change('allowExistingName',e.target.checked)}/>Bestehende Namen nach Bestätigung erneut verwenden (bester Versuch zählt)</label>
     <div className="dt-editor-preview"><EventHero event={{...event,...draft}}/></div>
     {message&&<div className="notice" role="status">{message}</div>}
     <button className="primary" disabled={busy} onClick={save}>{busy?'Speichert …':'Event-Design speichern'}</button>
@@ -183,7 +189,7 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
 }
 export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'event'|'claim'|'admin'|'manage';id?:string;signedIn?:boolean}){
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),
-    [name,setName]=useState(''),[category,setCategory]=useState(''),[consent,setConsent]=useState(false),
+    [name,setName]=useState(''),
     [password,setPassword]=useState(''),[paired,setPaired]=useState<Any|null>(null),[activeId,setActiveId]=useState('');
   async function load(){
     try{
