@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {auth,db,storage} from '../firebase.js';
 import {collection,getDocs,query,where} from 'firebase/firestore';
 import {getDownloadURL,ref,uploadBytes} from 'firebase/storage';
-import {CATEGORIES,categoryOf,groupEvents,groupRankings,modeOf,eventGroupKey} from './rankings.js';
+import {CATEGORIES,categoryOf,groupEvents,groupRankings,modeOf,eventGroupKey,demoTemplateId} from './rankings.js';
 
 const EVENT_API=import.meta.env.VITE_DYNOTOUCH_API_URL||'https://dynoforce-events.dario-neuenschwander.chatgpt.site';
 let moderatorSession='';
@@ -23,8 +23,12 @@ function presetBranding(preset:Any):Any{
   return {...DEFAULT_BRANDING,eventLogo:url(preset.logo),venueLogo:url(preset.venue),headerBanner:url(preset.header),sponsorBanner:url(preset.sponsor),showVenueLogo:!!preset.venue};
 }
 function brandingFor(event:Any):Any{
-  const preset=STANDARD_TEMPLATES.find(p=>p.id===event?.brandingTemplate);
+  const demoTemplate=demoTemplateId(event);
+  const preset=STANDARD_TEMPLATES.find(p=>p.id===(event?.brandingTemplate||demoTemplate));
   const supplied=event?.branding&&typeof event.branding==='object'?event.branding:{};
+  // For the demo, render the Kraftreaktor assets even if the legacy backend
+  // returns generic/empty branding fields. Explicitly selected templates win.
+  if(demoTemplate&&preset)return {...DEFAULT_BRANDING,...supplied,...presetBranding(preset)};
   return {...DEFAULT_BRANDING,...(preset?presetBranding(preset):{}),...supplied};
 }
 async function api(path:string,method='GET',body?:unknown){
