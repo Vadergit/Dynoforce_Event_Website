@@ -43,7 +43,7 @@ export function groupEvents(events) {
   }
   return [...groups.values()].map(group=>({
     ...group,
-    children:group.children.sort((a,b)=>modeOf(a).localeCompare(modeOf(b))||String(a.id).localeCompare(String(b.id)))
+    children:group.children.sort((a,b)=>modeOf(b).localeCompare(modeOf(a))||String(a.id).localeCompare(String(b.id)))
   }));
 }
 
@@ -68,12 +68,21 @@ export function bestResults(entries) {
 }
 
 export function groupRankings(challenges) {
-  return (Array.isArray(challenges)?challenges:[]).map(({event,entries})=>({
-    event,
-    mode:modeOf(event),
+  // Merge duplicate boards only if their competition rules are identical.
+  const grouped=new Map();
+  for(const {event,entries} of Array.isArray(challenges)?challenges:[]) {
+    const mode=modeOf(event);
+    const rules=event?.rules||{};
+    const key=mode+'|'+String(rules.mask||'')+'|'+String(rules.targetMs||'');
+    if(!grouped.has(key))grouped.set(key,{event,mode,entries:[]});
+    grouped.get(key).entries.push(...(entries||[]));
+  }
+  return [...grouped.values()].sort((a,b)=>b.mode.localeCompare(a.mode)).map(group=>({
+    event:group.event,
+    mode:group.mode,
     sections:CATEGORIES.map(category=>({
       ...category,
-      entries:bestResults((entries||[]).filter(entry=>categoryOf(entry)===category.key))
+      entries:bestResults(group.entries.filter(entry=>categoryOf(entry)===category.key))
     }))
   }));
 }
