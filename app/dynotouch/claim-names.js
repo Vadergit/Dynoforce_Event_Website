@@ -48,6 +48,12 @@ export function saveParticipantProfile(storage,eventId,name,category) {
   }catch { return false; }
 }
 
+export function clearParticipantProfile(storage,eventId) {
+  if(!storage||!eventId)return false;
+  try {storage.removeItem(participantProfileKey(eventId));return true;}
+  catch {return false;}
+}
+
 export function nameCheckState({name,category,known,profile,loading,error=false,allowReuse=true}) {
   const clean=normalizeParticipantName(name);
   if(clean.length<2||!['male','female','youth'].includes(category))return 'empty';
