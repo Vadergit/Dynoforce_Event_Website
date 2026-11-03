@@ -53,12 +53,11 @@ function Rules({event}:{event:Any}){
 async function fetchAllEntries(event:Any){
   const collected:Any[]=[];
   // Full rankings are fetched for correct per-category ranks (server pages are 100 entries).
-  for(let offset=0;offset<10000;offset+=100){
+  for(let offset=0;;offset+=100){
     const page=await api('events/'+encodeURIComponent(event.id)+'?offset='+offset);
     const entries=Array.isArray(page.entries)?page.entries:[];
     collected.push(...entries);
     if(entries.length<100)break;
-    if(offset===9900)throw Error('Rangliste ist zu gross. Bitte API-Paginierung erweitern.');
   }
   return collected;
 }
@@ -155,8 +154,8 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
       // Do not report success when the deployed backend ignores the new metadata.
       const check=await api('events/'+encodeURIComponent(event.id));
       const e=check.event||{};
-      if(e.description!==draft.description||e.branding?.headerBanner!==draft.branding.headerBanner
-        ||(e.eventGroupId||'')!==(draft.eventGroupId||'')){
+      if(['description','organiser','location','brandingTemplate','eventGroupId'].some(key=>(e[key]||'')!==String(draft[key]||'').trim())
+        ||Object.keys(DEFAULT_BRANDING).some(key=>e.branding?.[key]!==draft.branding[key])){
         throw Error('Der DynoTouch-API-Server unterstützt das Speichern der Event-Daten noch nicht. Backend-Erweiterung erforderlich.');
       }
       setMessage('Event-Design und Informationen gespeichert.');
@@ -185,8 +184,7 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
 export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'event'|'claim'|'admin'|'manage';id?:string;signedIn?:boolean}){
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),
     [name,setName]=useState(''),[category,setCategory]=useState(''),[consent,setConsent]=useState(false),
-    [password,setPassword]=useState(''),[paired,setPaired]=useState<Any|null>(null),[activeId,setActiveId]=useState(''),
-    [legacyClaimAvailable,setLegacyClaimAvailable]=useState(false),[legacySaved,setLegacySaved]=useState(false);
+    [password,setPassword]=useState(''),[paired,setPaired]=useState<Any|null>(null),[activeId,setActiveId]=useState('');
   async function load(){
     try{
       const result=kind==='home'?await api('events'):kind==='claim'?await api('claim/'+encodeURIComponent(id))
@@ -220,19 +218,9 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
       {data&&homeEvents.length===0&&<div className="card empty"><h2>Noch keine DynoTouch Events</h2><p>Events werden im DynoTouch-Webportal erstellt und anschliessend hier angezeigt.</p></div>}
     </>}
     {kind==='claim'&&data&&<section className="claim card"><div className="eyebrow">{data.eventName}</div><h1 className="compact">Dein Ergebnis</h1><div className="result"><strong>{data.score}</strong><span>PUNKTE · {seconds(data.durationMs)}</span></div>
-      {data.claimed?<div className="notice">{legacySaved?'Ergebnis ohne Kategorie gespeichert. Der Event-Server unterstützt die Kategorien noch nicht.':'Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.'}</div>:data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>:<form onSubmit={e=>{e.preventDefault();action(async()=>{
-        try{
+      {data.claimed?<div className="notice">Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.</div>:data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>:<form onSubmit={e=>{e.preventDefault();action(async()=>{
           const result=await api('claim/'+encodeURIComponent(id),'POST',{name,consent,category});
           window.location.hash='/dynotouch/e/'+result.eventId;
-        }catch(e){
-          const status=(e as Error & {status?:number}).status;
-          if(status===400||status===422){
-            setLegacyClaimAvailable(true);
-            setError('Der Server hat die Kategorie-Eingabe abgelehnt. Die Kategorie ist noch nicht unterstützt oder ein anderes Formularfeld ist ungültig. Du kannst das Resultat alternativ ohne Kategorie eintragen.');
-            return;
-          }
-          throw e;
-        }
       });}}>
         <label htmlFor="player">Dein Anzeigename</label><input id="player" value={name} onChange={e=>setName(e.target.value)} maxLength={32} minLength={2} autoComplete="nickname" placeholder="z. B. Alex" required/>
         <fieldset className="dt-category"><legend>Kategorie auswählen (Pflichtfeld)</legend>
@@ -240,11 +228,6 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
         </fieldset>
         <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/><span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
         <button disabled={busy||!consent||!category} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
-        {legacyClaimAvailable&&<button type="button" className="dt-legacy-save" disabled={busy} onClick={()=>action(async()=>{
-          const result=await api('claim/'+encodeURIComponent(id),'POST',{name,consent});
-          setData({...data,claimed:true,eventId:result.eventId});
-          setLegacySaved(true);setLegacyClaimAvailable(false);
-        })}>Ohne Kategorie speichern (alter Server)</button>}
         <p className="small">Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.</p>
       </form>}<a className="text-link" href={'#/dynotouch/e/'+data.eventId}>Zur Rangliste →</a>
     </section>}
@@ -286,5 +269,6 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
 }
 function ModerationRow({run,busy,save}:{run:Any;busy:boolean;save:(changes:Any)=>void}){
   const [name,setName]=useState(run.name);
-  return <div className="moderation-row"><div><strong>{run.score} Punkte</strong><span className="small"> · {seconds(run.duration)}</span>{run.hidden===1&&<span className="badge">Ausgeblendet</span>}</div><div className="inline-form"><input aria-label="Anzeigename bearbeiten" maxLength={32} value={name} onChange={e=>setName(e.target.value)}/><button disabled={busy||name===run.name} onClick={()=>save({name})}>Speichern</button><button disabled={busy} onClick={()=>save({hidden:!run.hidden})}>{run.hidden?'Einblenden':'Ausblenden'}</button></div></div>;
+  const [category,setCategory]=useState(categoryOf(run));
+  return <div className="moderation-row"><div><strong>{run.score} Punkte</strong><span className="small"> · {seconds(run.duration)}</span>{run.hidden===1&&<span className="badge">Ausgeblendet</span>}</div><div className="inline-form"><input aria-label="Anzeigename bearbeiten" maxLength={32} value={name} onChange={e=>setName(e.target.value)}/><select aria-label="Kategorie korrigieren" value={category} onChange={e=>setCategory(e.target.value)}>{CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select><button disabled={busy||(name===run.name&&category===categoryOf(run))} onClick={()=>save({name,category})}>Speichern</button><button disabled={busy} onClick={()=>save({hidden:!run.hidden})}>{run.hidden?'Einblenden':'Ausblenden'}</button></div></div>;
 }

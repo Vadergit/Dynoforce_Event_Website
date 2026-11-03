@@ -35,6 +35,8 @@ test('claim requires one of the three competition categories',()=>{
   assert.match(client,/Spiele so oft du möchtest/);
   assert.match(client,/nur dein bestes Ergebnis zählt/);
   assert.doesNotMatch(client,/Einmalig eintragen|Korrekturen sind danach nur durch den Veranstalter möglich/);
+  assert.doesNotMatch(client,/Ohne Kategorie speichern|legacyClaimAvailable/);
+  assert.match(client,/Kategorie korrigieren/);
 });
 
 test('single and multi target share an event when name and day match',()=>{
@@ -52,6 +54,7 @@ test('explicit event group ID takes precedence and does not mix unrelated events
   const second={id:'two',name:'B',eventGroupId:'challenge-x',rules:{mode:'multi'}};
   const unrelated={id:'three',name:'C',groupId:'challenge-y'};
   assert.equal(groupEvents([first,second,unrelated]).length,2);
+  assert.equal(groupEvents([{...first,organiserScope:'one'},{...second,organiserScope:'two'}]).length,2);
 });
 
 test('categories are explicit; legacy runs without a category remain unknown',()=>{
@@ -83,6 +86,7 @@ test('boards with identical rules combine while different rules remain separate'
   const event={rules:{mode:'single',mask:31,targetMs:5000}};
   assert.equal(groupRankings([{event:{...event,id:'a'},entries:[]},{event:{...event,id:'b'},entries:[]}]).length,1);
   assert.equal(groupRankings([{event:{...event,id:'a'},entries:[]},{event:{...event,id:'b',rules:{...event.rules,targetMs:3000}},entries:[]}]).length,2);
+  assert.equal(groupRankings([{event:{...event,id:'a'},entries:[]},{event:{...event,id:'b',rules:{...event.rules,delayMs:1000}},entries:[]}]).length,2);
 });
 
 test('DynoTouch demo defaults to Kraftreaktor without changing regular event branding',()=>{

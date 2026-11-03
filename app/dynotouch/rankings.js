@@ -28,9 +28,10 @@ function localDay(value) {
 }
 
 export function eventGroupKey(event) {
-  if(event?.eventGroupId || event?.groupId)return 'group:'+String(event.eventGroupId||event.groupId);
+  const scope=String(event?.organiserScope||'');
+  if(event?.eventGroupId || event?.groupId)return scope+'|group:'+String(event.eventGroupId||event.groupId);
   // Two challenges with the same event title and calendar dates belong together.
-  return 'event:'+String(event?.name||'').trim().toLocaleLowerCase('de-CH')
+  return scope+'|event:'+String(event?.name||'').trim().toLocaleLowerCase('de-CH')
     .replace(/(?:\s*[-|·:]\s*|\s*\(\s*)(?:single|multi)\s*target\s*\)?$/i,'').trim()
     +'|'+localDay(event?.starts)+'|'+localDay(event?.ends);
 }
@@ -74,7 +75,7 @@ export function groupRankings(challenges) {
   for(const {event,entries} of Array.isArray(challenges)?challenges:[]) {
     const mode=modeOf(event);
     const rules=event?.rules||{};
-    const key=mode+'|'+String(rules.mask||'')+'|'+String(rules.targetMs||'');
+    const key=[mode,rules.mask,rules.targetMs,rules.delayMs,rules.challenge,rules.mpr].map(v=>String(v??'')).join('|');
     if(!grouped.has(key))grouped.set(key,{event,mode,entries:[]});
     grouped.get(key).entries.push(...(entries||[]));
   }

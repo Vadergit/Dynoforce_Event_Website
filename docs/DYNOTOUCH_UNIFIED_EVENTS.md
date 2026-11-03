@@ -1,5 +1,25 @@
 # DynoTouch – gemeinsame Events und Branding
 
+## Koordinierte Backend-Implementierung
+
+Der separate `event-leaderboard`-Workspace implementiert diesen Vertrag mit der
+additiven Migration `0002_busy_blue_shield.sql`: alte Kategorien bleiben
+`unknown`, neue Claims benötigen `male`, `female` oder `youth`. Bestwerte und
+Ränge werden je Event und Kategorie berechnet. Kategoriekorrekturen und
+Metadatenänderungen sind auditierbar; fehlende `enabled`-Felder deaktivieren kein
+Event mehr. Bild-URLs sind auf die sechs statischen Vorlagen und den eigenen
+Firebase-Storage-Pfad beschränkt. `organiserScope` verhindert versehentliches
+Zusammenführen gleich benannter Events verschiedener Veranstalter.
+
+Der Frontend-Fallback «ohne Kategorie speichern» entfällt mit diesem Rollout.
+Moderation bietet stattdessen eine protokollierte Kategoriekorrektur. Identische
+Disziplinen werden nur mit gleichen vollständigen Regeln zusammengefasst.
+
+Verifiziert: Backend-Integration, 126 vollständig paginierte Resultate,
+Kategorie-/URL-Validierung, Eigentümer-Isolation, Firebase-JWT-Prüfung sowie
+lokaler Browserpfad Dashboard → DynoTouch → Event → Kategorie-Claim → Event →
+Dashboard. Testdaten bleiben außerhalb der produktiven Ranglisten.
+
 ## Frontend (dieser Branch)
 
 - Zurück zum Haupt-Dashboard, zur DynoTouch-Übersicht und zur Verwaltung von jeder Seite aus.
