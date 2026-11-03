@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {CATEGORIES,categoryOf,eventGroupKey,groupEvents,groupRankings,demoTemplateId} from '../app/dynotouch/rankings.js';
+import {CATEGORIES,categoryOf,eventGroupKey,groupEvents,groupRankings,demoTemplateId,medalForRank} from '../app/dynotouch/rankings.js';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('DynoTouch retains isolated routing and a dashboard return link',()=>{
@@ -58,7 +58,7 @@ test('explicit event group ID takes precedence and does not mix unrelated events
 });
 
 test('categories are explicit; legacy runs without a category remain unknown',()=>{
-  assert.deepEqual(CATEGORIES.slice(0,3).map(c=>c.key),['male','female','youth']);
+  assert.deepEqual(CATEGORIES.map(c=>c.key),['male','female','youth']);
   assert.equal(categoryOf({category:'u16'}),'youth');
   assert.equal(categoryOf({gender:'female'}),'female');
   assert.equal(categoryOf({name:'Alex'}),'unknown');
@@ -98,4 +98,30 @@ test('DynoTouch demo defaults to Kraftreaktor without changing regular event bra
   assert.match(client,/demoTemplateId\(event\)/);
   assert.match(client,/supplied,\.\.\.presetBranding\(preset\)/);
   assert.match(client,/header:'header-banner-2400x600.jpg'/);
+});
+
+
+test('public DynoTouch leaderboards show the identical medals as DynoForce',()=>{
+  assert.equal(medalForRank(1),'🏆');
+  assert.equal(medalForRank(2),'🥈');
+  assert.equal(medalForRank(3),'🥉');
+  assert.equal(medalForRank(4),'4');
+  const event={id:'s',rules:{mode:'single',mask:31,targetMs:1500}};
+  const groups=groupRankings([{event,entries:[
+    {id:'a',name:'First',category:'male',score:10,duration:1000},
+    {id:'b',name:'Tied',category:'male',score:10,duration:1000},
+    {id:'c',name:'Third',category:'male',score:9,duration:500},
+    {id:'x',name:'Old result',score:50,duration:1000},
+  ]}]);
+  assert.deepEqual(groups[0].sections.map(c=>c.label),['Mann','Frau','Jugendliche unter 16']);
+  assert.deepEqual(groups[0].sections[0].entries.map(row=>medalForRank(row.rank)),['🏆','🏆','🥉']);
+  assert.ok(!groups[0].sections.some(c=>c.entries.some(row=>row.id==='x')));
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/medalForRank\(entry\.rank\)/);
+  assert.doesNotMatch(client,/section\.key!=='unknown'/);
+  assert.doesNotMatch(client,/Nicht zugeordnet/);
+  assert.match(client,/Kategorie auswählen<\/option>/);
+  const css=read('app/dynotouch/dynotouch.css');
+  assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.dt-shell \.leaderboard-table \.rank-pill\{[^}]*width:30px;height:30px/);
 });
