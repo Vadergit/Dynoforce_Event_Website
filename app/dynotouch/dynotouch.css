@@ -97,3 +97,18 @@
  .dt-shell .leaderboard-table td,.dt-shell .leaderboard-table .score,.dt-shell .leaderboard-table .mono{font-size:14px}
  .dt-shell .leaderboard-table th{font-size:11px}
 }
+
+
+/* Claim name availability is computed synchronously from the prefetched list. */
+.dt-shell .dt-returning-hint{padding:10px 13px;margin:0 0 14px;border-radius:10px;background:#f1f6e7;color:#40512d;font-size:12px}
+.dt-shell .dt-name-check{margin:12px 0 8px;font-size:13px;min-height:20px}
+.dt-shell .dt-name-neutral{color:var(--muted)}
+.dt-shell .dt-name-success{color:#2b693a;font-weight:700}
+.dt-shell .dt-name-warning{color:#9a5b16;font-weight:700}
+.dt-shell .dt-name-conflict{border:1px solid #ddba7a;border-radius:12px;padding:14px;background:#fffaf0}
+.dt-shell .dt-name-conflict strong{color:#8b5310}
+.dt-shell .dt-name-conflict p{margin:6px 0 12px;color:#765a30;font-size:13px}
+.dt-shell .dt-name-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.dt-shell .dt-name-actions button{flex:1;min-width:138px}
+.dt-shell .dt-name-actions button:first-child{background:#244f42;color:white;border-color:#244f42}
+.dt-shell .dt-name-actions button:focus-visible{outline:3px solid #79a126;outline-offset:2px}
