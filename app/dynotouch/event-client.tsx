@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {auth,db,storage} from '../firebase.js';
 import {collection,getDocs,query,where} from 'firebase/firestore';
 import {getDownloadURL,ref,uploadBytes} from 'firebase/storage';
-import {CATEGORIES,categoryOf,groupEvents,groupRankings,modeOf,eventGroupKey,demoTemplateId} from './rankings.js';
+import {CATEGORIES,categoryOf,groupEvents,groupRankings,modeOf,eventGroupKey,demoTemplateId,medalForRank} from './rankings.js';
 
 const EVENT_API=import.meta.env.VITE_DYNOTOUCH_API_URL||'https://dynoforce-events.dario-neuenschwander.chatgpt.site';
 let moderatorSession='';
@@ -95,10 +95,10 @@ function Leaderboards({challenges}:{challenges:Array<{event:Any,entries:Any[]}>}
       <header className="leaderboard-direction-header"><span className="leaderboard-direction-symbol" aria-hidden="true">{group.mode==='multi'?'M':'S'}</span>
         <div className="leaderboard-direction-title"><small>Disziplin</small><h3>{group.mode==='multi'?'Multi Target':'Single Target'}</h3></div><Rules event={group.event}/></header>
       <div className="leaderboard-gender-grid">
-        {group.sections.filter(section=>section.key!=='unknown'||section.entries.length>0).map(section=><section className="leaderboard-gender-card" key={section.key}>
+        {group.sections.map(section=><section className="leaderboard-gender-card" key={section.key}>
           <div className="leaderboard-gender-heading"><h4>{section.label}</h4><span>Kategorie</span></div>
-          <div className="table-wrap"><table className="leaderboard-table grouped-leaderboard-table"><thead><tr><th>Platz</th><th>Name</th><th className="right">Punkte</th><th className="right">Zeit</th></tr></thead>
-            <tbody>{section.entries.map((entry:Any)=><tr key={entry.id}><td className="rank"><span className="rank-pill">{entry.rank}</span></td><td className="player">{entry.name}</td><td className="right score">{entry.score}</td><td className="right mono">{seconds(entry.duration??entry.durationMs)}</td></tr>)}
+          <div className="table-wrap"><table className="leaderboard-table grouped-leaderboard-table"><thead><tr><th>#</th><th>Name</th><th className="right">Punkte</th><th className="right">Zeit</th></tr></thead>
+            <tbody>{section.entries.map((entry:Any)=><tr key={entry.id}><td className="rank"><span className="rank-pill">{medalForRank(entry.rank)}</span></td><td className="player">{entry.name}</td><td className="right score">{entry.score}</td><td className="right mono">{seconds(entry.duration??entry.durationMs)}</td></tr>)}
               {!section.entries.length&&<tr className="leaderboard-empty-row"><td colSpan={4}>Noch kein Ergebnis</td></tr>}</tbody></table></div>
         </section>)}
       </div>
@@ -224,7 +224,7 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
       });}}>
         <label htmlFor="player">Dein Anzeigename</label><input id="player" value={name} onChange={e=>setName(e.target.value)} maxLength={32} minLength={2} autoComplete="nickname" placeholder="z. B. Alex" required/>
         <fieldset className="dt-category"><legend>Kategorie auswählen (Pflichtfeld)</legend>
-          {CATEGORIES.filter(c=>c.key!=='unknown').map(c=><label key={c.key}><input type="radio" name="category" value={c.key} checked={category===c.key} onChange={()=>setCategory(c.key)} required/>{c.label}</label>)}
+          {CATEGORIES.map(c=><label key={c.key}><input type="radio" name="category" value={c.key} checked={category===c.key} onChange={()=>setCategory(c.key)} required/>{c.label}</label>)}
         </fieldset>
         <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/><span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
         <button disabled={busy||!consent||!category} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
@@ -270,5 +270,5 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
 function ModerationRow({run,busy,save}:{run:Any;busy:boolean;save:(changes:Any)=>void}){
   const [name,setName]=useState(run.name);
   const [category,setCategory]=useState(categoryOf(run));
-  return <div className="moderation-row"><div><strong>{run.score} Punkte</strong><span className="small"> · {seconds(run.duration)}</span>{run.hidden===1&&<span className="badge">Ausgeblendet</span>}</div><div className="inline-form"><input aria-label="Anzeigename bearbeiten" maxLength={32} value={name} onChange={e=>setName(e.target.value)}/><select aria-label="Kategorie korrigieren" value={category} onChange={e=>setCategory(e.target.value)}>{CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select><button disabled={busy||(name===run.name&&category===categoryOf(run))} onClick={()=>save({name,category})}>Speichern</button><button disabled={busy} onClick={()=>save({hidden:!run.hidden})}>{run.hidden?'Einblenden':'Ausblenden'}</button></div></div>;
+  return <div className="moderation-row"><div><strong>{run.score} Punkte</strong><span className="small"> · {seconds(run.duration)}</span>{run.hidden===1&&<span className="badge">Ausgeblendet</span>}</div><div className="inline-form"><input aria-label="Anzeigename bearbeiten" maxLength={32} value={name} onChange={e=>setName(e.target.value)}/><select aria-label="Kategorie korrigieren" value={CATEGORIES.some(c=>c.key===category)?category:''} onChange={e=>setCategory(e.target.value)} required><option value="" disabled>Kategorie auswählen</option>{CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select><button disabled={busy||!CATEGORIES.some(c=>c.key===category)||(name===run.name&&category===categoryOf(run))} onClick={()=>save({name,category})}>Speichern</button><button disabled={busy} onClick={()=>save({hidden:!run.hidden})}>{run.hidden?'Einblenden':'Ausblenden'}</button></div></div>;
 }
