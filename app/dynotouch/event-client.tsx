@@ -191,12 +191,15 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
 function ClaimForm({data,id}:{data:Any;id:string}){
   const eventId=String(data.eventId||'');
   // Only a display preference is kept locally. Consent, tokens and scores are never stored.
-  const [profile,setProfile]=useState<Any|null>(()=>readParticipantProfile(window.localStorage,eventId));
+  function claimStorage(){try{return window.localStorage;}catch{return null;}}
+  const [profile,setProfile]=useState<Any|null>(()=>readParticipantProfile(claimStorage(),eventId));
   const [name,setName]=useState(()=>profile?.name||'');
   const [category,setCategory]=useState(()=>profile?.category||'');
   const [consent,setConsent]=useState(false);
-  const [known,setKnown]=useState<Set<string>|null>(null);
-  const [checking,setChecking]=useState(true);
+  // Optimized backend: GET /claim/:token can deliver this index with the QR data.
+  const providedNames=Array.isArray(data.nameIndex)?data.nameIndex:null;
+  const [known,setKnown]=useState<Set<string>|null>(()=>providedNames?knownNames(providedNames):null);
+  const [checking,setChecking]=useState(!providedNames);
   const [lookupError,setLookupError]=useState('');
   const [allowReuse,setAllowReuse]=useState(true);
   const [confirmedFor,setConfirmedFor]=useState('');
@@ -205,7 +208,15 @@ function ClaimForm({data,id}:{data:Any;id:string}){
 
   useEffect(()=>{
     let alive=true;
-    setKnown(null);setChecking(true);setLookupError('');
+    setLookupError('');
+    if(providedNames){
+      // One response, instant lookup: avoids all additional network roundtrips.
+      setKnown(knownNames(providedNames));
+      setAllowReuse(data.allowExistingName!==false);
+      setChecking(false);
+      return;
+    }
+    setKnown(null);setChecking(true);
     // Fetch once in the background while the participant types, not on every keystroke.
     // Reuse the selected event's first page and fetch all pages so even rank 101+ is checked.
     (async()=>{
@@ -247,7 +258,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
       // All runs are immutable. The existing leaderboard groups identical names
       // *within the same discipline and category* to show only the best result.
       const result=await api('claim/'+encodeURIComponent(id),'POST',{name:cleanName,consent,category});
-      saveParticipantProfile(window.localStorage,eventId,cleanName,category);
+      saveParticipantProfile(claimStorage(),eventId,cleanName,category);
       setProfile({eventId,name:cleanName,category});
       window.location.hash='/dynotouch/e/'+encodeURIComponent(result.eventId||eventId);
     }catch(err){setError((err as Error).message);}
