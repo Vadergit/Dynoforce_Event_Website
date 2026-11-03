@@ -63,7 +63,7 @@ export function bestResults(entries) {
       ||(Number(a.duration??a.durationMs)||0)-(Number(b.duration??b.durationMs)||0));
   const best=new Map();
   for(const row of sorted) {
-    const name=String(row.name||'').trim().toLocaleLowerCase('de-CH');
+    const name=String(row.name||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('de-CH');
     const key=name || 'id:'+String(row.id);
     if(!best.has(key))best.set(key,row);
   }

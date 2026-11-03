@@ -40,7 +40,7 @@ async function api(path:string,method='GET',body?:unknown){
   }
   const response=await fetch(EVENT_API+'/api/'+path,{method,cache:'no-store',headers,body:body?JSON.stringify(body):undefined});
   const result:any=await response.json();
-  if(!response.ok){const error=new Error(result.error||'Anfrage fehlgeschlagen') as Error & {status:number};error.status=response.status;throw error;}
+  if(!response.ok){const error=new Error(result.error||'Anfrage fehlgeschlagen') as Error & {status:number;data:Any};error.status=response.status;error.data=result;throw error;}
   if(result.sessionToken)moderatorSession=result.sessionToken;
   return result;
 }
@@ -201,7 +201,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
   const [known,setKnown]=useState<Set<string>|null>(()=>providedNames?knownNames(providedNames):null);
   const [checking,setChecking]=useState(!providedNames);
   const [lookupError,setLookupError]=useState('');
-  const [allowReuse,setAllowReuse]=useState(true);
+  const [allowReuse,setAllowReuse]=useState(data.allowExistingName!==false);
   const [discipline,setDiscipline]=useState('dieser Disziplin');
   const [confirmedFor,setConfirmedFor]=useState('');
   const [busy,setBusy]=useState(false);
@@ -259,11 +259,19 @@ function ClaimForm({data,id}:{data:Any;id:string}){
       const cleanName=name.trim().replace(/\s+/g,' ');
       // All runs are immutable. The existing leaderboard groups identical names
       // *within the same discipline and category* to show only the best result.
-      const result=await api('claim/'+encodeURIComponent(id),'POST',{name:cleanName,consent,category});
+      const confirmExistingName=status==='returning'||confirmed;
+      const result=await api('claim/'+encodeURIComponent(id),'POST',{name:cleanName,consent,category,confirmExistingName});
       saveParticipantProfile(claimStorage(),eventId,cleanName,category);
       setProfile({eventId,name:cleanName,category});
       window.location.hash='/dynotouch/e/'+encodeURIComponent(result.eventId||eventId);
-    }catch(err){setError((err as Error).message);}
+    }catch(err){
+      const failure=err as Error & {data?:Any};
+      if(['NAME_CONFIRMATION_REQUIRED','NAME_TAKEN'].includes(failure.data?.code)){
+        setKnown(knownNames(failure.data?.nameIndex));setAllowReuse(failure.data?.allowExistingName!==false);
+        setChecking(false);setLookupError('');setConfirmedFor('');
+      }
+      setError(failure.message);
+    }
     finally{setBusy(false);}
   }
 
@@ -306,7 +314,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
         <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/>
           <span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
         <button disabled={busy||!consent||!ready} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
-        <p className="small">Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.</p>
+        <p className="small">{allowReuse?'Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.':'Spiele so oft du möchtest. Für jeden Versuch ist in dieser Disziplin und Kategorie ein neuer Anzeigename erforderlich.'}</p>
         {error&&<div className="notice error" role="alert">{error}</div>}
       </form>}
     <a className="text-link" href={'#/dynotouch/e/'+encodeURIComponent(eventId)}>Zur Rangliste →</a>
