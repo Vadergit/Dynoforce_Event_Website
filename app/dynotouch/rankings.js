@@ -4,8 +4,16 @@ export const CATEGORIES = [
   {key:'male',label:'Mann'},
   {key:'female',label:'Frau'},
   {key:'youth',label:'Jugendliche unter 16'},
-  {key:'unknown',label:'Nicht zugeordnet'},
 ];
+
+// Same podium symbols as the existing DynoForce event leaderboards.
+// Use the actual rank, so equal scores and durations share the same medal.
+export function medalForRank(rank) {
+  if(rank===1)return '🏆';
+  if(rank===2)return '🥈';
+  if(rank===3)return '🥉';
+  return String(rank);
+}
 
 export function categoryOf(entry) {
   const value=String(entry?.category || entry?.gender || entry?.division || '').trim().toLowerCase();
