@@ -100,7 +100,8 @@
 
 
 /* Claim name availability is computed synchronously from the prefetched list. */
-.dt-shell .dt-returning-hint{padding:10px 13px;margin:0 0 14px;border-radius:10px;background:#f1f6e7;color:#40512d;font-size:12px}
+.dt-shell .dt-returning-hint{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 13px;margin:0 0 14px;border-radius:10px;background:#f1f6e7;color:#40512d;font-size:12px}
+.dt-shell .dt-returning-hint button{padding:7px 10px;border-radius:7px;font-size:11px;flex-shrink:0}
 .dt-shell .dt-name-check{margin:12px 0 8px;font-size:13px;min-height:20px}
 .dt-shell .dt-name-neutral{color:var(--muted)}
 .dt-shell .dt-name-success{color:#2b693a;font-weight:700}
