@@ -35,7 +35,7 @@ async function api(path:string,method='GET',body?:unknown){
   }
   const response=await fetch(EVENT_API+'/api/'+path,{method,cache:'no-store',headers,body:body?JSON.stringify(body):undefined});
   const result:any=await response.json();
-  if(!response.ok)throw Error(result.error||'Anfrage fehlgeschlagen');
+  if(!response.ok){const error=new Error(result.error||'Anfrage fehlgeschlagen') as Error & {status:number};error.status=response.status;throw error;}
   if(result.sessionToken)moderatorSession=result.sessionToken;
   return result;
 }
@@ -181,7 +181,8 @@ function EventSettings({event,onSaved}:{event:Any,onSaved:()=>Promise<void>}){
 export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'event'|'claim'|'admin'|'manage';id?:string;signedIn?:boolean}){
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),
     [name,setName]=useState(''),[category,setCategory]=useState(''),[consent,setConsent]=useState(false),
-    [password,setPassword]=useState(''),[paired,setPaired]=useState<Any|null>(null),[activeId,setActiveId]=useState('');
+    [password,setPassword]=useState(''),[paired,setPaired]=useState<Any|null>(null),[activeId,setActiveId]=useState(''),
+    [legacyClaimAvailable,setLegacyClaimAvailable]=useState(false),[legacySaved,setLegacySaved]=useState(false);
   async function load(){
     try{
       const result=kind==='home'?await api('events'):kind==='claim'?await api('claim/'+encodeURIComponent(id))
@@ -215,16 +216,32 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
       {data&&homeEvents.length===0&&<div className="card empty"><h2>Noch keine DynoTouch Events</h2><p>Events werden im DynoTouch-Webportal erstellt und anschliessend hier angezeigt.</p></div>}
     </>}
     {kind==='claim'&&data&&<section className="claim card"><div className="eyebrow">{data.eventName}</div><h1 className="compact">Dein Ergebnis</h1><div className="result"><strong>{data.score}</strong><span>PUNKTE · {seconds(data.durationMs)}</span></div>
-      {data.claimed?<div className="notice">Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.</div>:data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>:<form onSubmit={e=>{e.preventDefault();action(async()=>{
-        const result=await api('claim/'+encodeURIComponent(id),'POST',{name,consent,category});
-        window.location.hash='/dynotouch/e/'+result.eventId;
+      {data.claimed?<div className="notice">{legacySaved?'Ergebnis ohne Kategorie gespeichert. Der Event-Server unterstützt die Kategorien noch nicht.':'Dieses Ergebnis wurde bereits eingetragen. Für einen weiteren Versuch scanne einen neuen QR-Code.'}</div>:data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>:<form onSubmit={e=>{e.preventDefault();action(async()=>{
+        try{
+          const result=await api('claim/'+encodeURIComponent(id),'POST',{name,consent,category});
+          window.location.hash='/dynotouch/e/'+result.eventId;
+        }catch(e){
+          const status=(e as Error & {status?:number}).status;
+          if(status===400||status===422){
+            setLegacyClaimAvailable(true);
+            setError('Der Server hat die Kategorie-Eingabe abgelehnt. Die Kategorie ist noch nicht unterstützt oder ein anderes Formularfeld ist ungültig. Du kannst das Resultat alternativ ohne Kategorie eintragen.');
+            return;
+          }
+          throw e;
+        }
       });}}>
         <label htmlFor="player">Dein Anzeigename</label><input id="player" value={name} onChange={e=>setName(e.target.value)} maxLength={32} minLength={2} autoComplete="nickname" placeholder="z. B. Alex" required/>
         <fieldset className="dt-category"><legend>Kategorie auswählen (Pflichtfeld)</legend>
           {CATEGORIES.filter(c=>c.key!=='unknown').map(c=><label key={c.key}><input type="radio" name="category" value={c.key} checked={category===c.key} onChange={()=>setCategory(c.key)} required/>{c.label}</label>)}
         </fieldset>
         <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/><span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
-        <button disabled={busy||!consent||!category} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button><p className="small">Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.</p>
+        <button disabled={busy||!consent||!category} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
+        {legacyClaimAvailable&&<button type="button" className="dt-legacy-save" disabled={busy} onClick={()=>action(async()=>{
+          const result=await api('claim/'+encodeURIComponent(id),'POST',{name,consent});
+          setData({...data,claimed:true,eventId:result.eventId});
+          setLegacySaved(true);setLegacyClaimAvailable(false);
+        })}>Ohne Kategorie speichern (alter Server)</button>}
+        <p className="small">Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.</p>
       </form>}<a className="text-link" href={'#/dynotouch/e/'+data.eventId}>Zur Rangliste →</a>
     </section>}
     {kind==='event'&&data&&<><EventHero event={event}/>
