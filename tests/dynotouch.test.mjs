@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {CATEGORIES,categoryOf,eventGroupKey,groupEvents,groupRankings,demoTemplateId,medalForRank} from '../app/dynotouch/rankings.js';
+import {normalizeParticipantName,competitionKey,knownNames,nameCheckState,readParticipantProfile,saveParticipantProfile,clearParticipantProfile} from '../app/dynotouch/claim-names.js';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('DynoTouch retains isolated routing and a dashboard return link',()=>{
@@ -18,7 +19,7 @@ test('organizer retains Firebase identity, existing presets, and approved upload
   const client=read('app/dynotouch/event-client.tsx');
   assert.match(client,/auth.currentUser.getIdToken\(\)/);
   assert.match(client,/X-Event-Session/);
-  assert.doesNotMatch(client,/auth\.openai|ChatGPT|localStorage/);
+  assert.doesNotMatch(client,/auth\.openai|ChatGPT|moderatorSession.*localStorage/);
   assert.match(client,/collection\(db,'brandingPresets'\)/);
   assert.match(client,/getDownloadURL/);
   for(const venue of ['bouba-baden','kraftreaktor-lenzburg-aarau','mito-zuerich','minimum-zuerich','grindelboulder-bassersdorf','boulderlounge-schlieren'])assert.ok(client.includes(venue));
@@ -26,9 +27,9 @@ test('organizer retains Firebase identity, existing presets, and approved upload
 
 test('claim requires one of the three competition categories',()=>{
   const client=read('app/dynotouch/event-client.tsx');
-  assert.match(client,/'claim\/'.*'POST',\{name,consent,category\}/);
+  assert.match(client,/'claim\/'.*'POST',\{name:cleanName,consent,category\}/);
   assert.match(client,/type="radio" name="category"/);
-  assert.match(client,/!consent\|\|!category/);
+  assert.match(client,/!consent\|\|!ready/);
   assert.match(client,/data.claimed/);
   assert.match(client,/data.expired/);
   assert.match(client,/Ergebnis speichern/);
@@ -124,4 +125,73 @@ test('public DynoTouch leaderboards show the identical medals as DynoForce',()=>
   const css=read('app/dynotouch/dynotouch.css');
   assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(css,/\.dt-shell \.leaderboard-table \.rank-pill\{[^}]*width:30px;height:30px/);
+});
+
+
+test('live name checks do not debounce: no per-keystroke HTTP calls',()=>{
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/setKnown\(knownNames\(batches\.flat\(\)\)\)/);
+  assert.match(client,/nameCheckState\(\{name,category,known,profile,loading:checking/);
+  assert.match(client,/fetchAllEntries\(event,String\(event\.id\)===eventId/);
+  assert.match(client,/competitionKey\(other\)===competitionKey\(selected\)/);
+  assert.doesNotMatch(client,/setTimeout\(/);
+  assert.match(client,/Ja, das bin ich/);
+  assert.match(client,/Nein, anderer Name/);
+  assert.match(client,/saveParticipantProfile\(claimStorage\(\),eventId,cleanName,category\)/);
+  assert.match(client,/readParticipantProfile\(claimStorage\(\),eventId\)/);
+  assert.match(client,/allowExistingName/);
+});
+
+test('same name belongs to a specific event, discipline, rule set and category',()=>{
+  const base={name:'Demo',starts:1793718000000,ends:1793757600000};
+  const single={...base,id:'single',rules:{mode:'single',mask:31,targetMs:5000}};
+  const multi={...base,id:'multi',rules:{mode:'multi',mask:31,targetMs:5000}};
+  const differentRule={...single,rules:{...single.rules,targetMs:2500}};
+  const renamed={...single,id:'duplicate',name:'Demo'};
+  assert.notEqual(competitionKey(single),competitionKey(multi));
+  assert.notEqual(competitionKey(single),competitionKey(differentRule));
+  assert.equal(competitionKey(single),competitionKey(renamed));
+  assert.equal(normalizeParticipantName('  Älex   Müller  '),'älex müller');
+  const matches=knownNames([
+    {name:' Alex  Test ',category:'male'},
+    {name:'Alex Test',category:'female'},
+    {name:'Invisible',category:'male',hidden:1},
+  ]);
+  assert.equal(nameCheckState({name:'alex test',category:'male',known:matches,loading:false}),'duplicate');
+  assert.equal(nameCheckState({name:'Alex Test',category:'youth',known:matches,loading:false}),'available');
+  assert.equal(nameCheckState({name:'Invisible',category:'male',known:matches,loading:false}),'available');
+  assert.equal(nameCheckState({name:'Alex Test',category:'male',known:null,loading:true}),'checking');
+  assert.equal(nameCheckState({name:'Alex Test',category:'male',known:matches,loading:false,allowReuse:false}),'blocked');
+  assert.equal(nameCheckState({name:'Someone New',category:'male',known:new Set(),loading:false,error:true}),'unverified');
+});
+
+test('a successful claim can prefill the last participant on exactly the same device and event',()=>{
+  const map=new Map();
+  const storage={
+    getItem:key=>map.get(key)||null,
+    setItem:(key,value)=>map.set(key,value),
+    removeItem:key=>map.delete(key)
+  };
+  assert.equal(readParticipantProfile(storage,'event-single'),null);
+  assert.equal(saveParticipantProfile(storage,'event-single','Dario','male'),true);
+  const profile=readParticipantProfile(storage,'event-single');
+  assert.deepEqual(profile,{eventId:'event-single',name:'Dario',category:'male'});
+  assert.equal(readParticipantProfile(storage,'event-multi'),null);
+  const matches=new Set(['male|dario']);
+  assert.equal(nameCheckState({name:'Dario',category:'male',profile,known:null,loading:true}),'returning');
+  assert.equal(nameCheckState({name:'Dario',category:'female',profile,known:matches,loading:false}),'available');
+  assert.equal(nameCheckState({name:'Dario',category:'male',profile,known:matches,loading:false,allowReuse:false}),'blocked');
+  assert.equal(nameCheckState({name:'Other',category:'male',profile,known:new Set(['male|other']),loading:false}),'duplicate');
+  assert.equal(saveParticipantProfile({setItem:()=>{throw Error('Denied')}},'event','Other','male'),false);
+  assert.equal(clearParticipantProfile(storage,'event-single'),true);
+  assert.equal(readParticipantProfile(storage,'event-single'),null);
+  assert.match(read('app/dynotouch/event-client.tsx'),/Anderer Teilnehmer/);
+});
+
+test('the optimized claim response can provide names without extra requests',()=>{
+  const client=read('app/dynotouch/event-client.tsx');
+  assert.match(client,/Array\.isArray\(data\.nameIndex\)\?data\.nameIndex:null/);
+  assert.match(client,/if\(providedNames\)\{/);
+  assert.match(client,/setKnown\(knownNames\(providedNames\)\)/);
+  assert.match(client,/setChecking\(false\)/);
 });
