@@ -196,6 +196,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
   const [name,setName]=useState(()=>profile?.name||'');
   const [category,setCategory]=useState(()=>profile?.category||'');
   const [consent,setConsent]=useState(false);
+  const [consentError,setConsentError]=useState(false);
   // Optimized backend: GET /claim/:token can deliver this index with the QR data.
   const providedNames=Array.isArray(data.nameIndex)?data.nameIndex:null;
   const [known,setKnown]=useState<Set<string>|null>(()=>providedNames?knownNames(providedNames):null);
@@ -251,9 +252,18 @@ function ClaimForm({data,id}:{data:Any;id:string}){
   const ready=status==='available'||status==='returning'||
     ((status==='duplicate'||status==='unverified')&&confirmed);
 
+  function explainConsent(){
+    setConsentError(true);
+    const field=document.getElementById('public-consent');
+    field?.scrollIntoView({behavior:'smooth',block:'center'});
+    field?.focus({preventScroll:true});
+  }
+
   async function save(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault();
-    if(busy||!consent||!ready)return;
+    if(busy)return;
+    if(!consent){explainConsent();return;}
+    if(!ready){setError('Bitte prüfe deinen Anzeigenamen und bestätige gegebenenfalls die Wiederverwendung.');return;}
     setBusy(true);setError('');
     try{
       const cleanName=name.trim().replace(/\s+/g,' ');
@@ -282,7 +292,7 @@ function ClaimForm({data,id}:{data:Any;id:string}){
       :data.expired?<div className="notice">Der QR-Code ist abgelaufen. Du kannst erneut spielen.</div>
       :<form onSubmit={save}>
         {profile&&<div className="dt-returning-hint"><span>Angaben vom letzten Versuch auf diesem Natel übernommen.</span><button type="button" onClick={()=>{
-          clearParticipantProfile(claimStorage(),eventId);setProfile(null);setName('');setCategory('');setConfirmedFor('');
+          clearParticipantProfile(claimStorage(),eventId);setProfile(null);setName('');setCategory('');setConfirmedFor('');setConsent(false);setConsentError(false);
           document.getElementById('player')?.focus();
         }}>Anderer Teilnehmer</button></div>}
         <label htmlFor="player">Dein Anzeigename</label>
@@ -311,9 +321,16 @@ function ClaimForm({data,id}:{data:Any;id:string}){
               :<button type="button" onClick={()=>setConfirmedFor(lookupKey)}>Trotzdem mit diesem Namen fortfahren</button>}
           </div>}
         </div>
-        <label className="check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required/>
-          <span>Mein Anzeigename, Kategorie, Punkte und Spieldauer dürfen in der öffentlichen Rangliste erscheinen. Ich kann einen Spitznamen verwenden.</span></label>
-        <button disabled={busy||!consent||!ready} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
+        <div className={'dt-consent'+(consent?' is-checked':'')+(consentError?' has-error':'')}>
+          <label htmlFor="public-consent"><input id="public-consent" type="checkbox" checked={consent}
+            aria-required="true" aria-invalid={consentError} aria-describedby={consentError?'consent-error':'consent-help'}
+            onChange={e=>{setConsent(e.target.checked);setConsentError(false);}}/>
+            <span><span>Ich bin einverstanden, dass mein Anzeigename und mein Ergebnis öffentlich in der Rangliste angezeigt werden.</span>
+              {consentError?<span className="dt-consent-hint" id="consent-error" role="alert">Bitte setze hier den Haken, bevor du dein Ergebnis speicherst. Ohne deine Zustimmung wird nichts veröffentlicht.</span>
+                :<span className="dt-consent-hint" id="consent-help">Dazu gehören Kategorie, Punkte und Spieldauer. Du kannst einen Spitznamen verwenden.</span>}
+            </span></label>
+        </div>
+        <button disabled={busy} onClick={e=>{if(!consent){e.preventDefault();explainConsent();}}} className="primary">{busy?'Wird gespeichert …':'Ergebnis speichern →'}</button>
         <p className="small">{allowReuse?'Spiele so oft du möchtest. Verwende immer denselben Namen – nur dein bestes Ergebnis zählt.':'Spiele so oft du möchtest. Für jeden Versuch ist in dieser Disziplin und Kategorie ein neuer Anzeigename erforderlich.'}</p>
         {error&&<div className="notice error" role="alert">{error}</div>}
       </form>}
@@ -346,7 +363,7 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
   const brand=brandingFor(event);
   return <main className="dt-page" style={{'--primary':brand.primaryColor,'--primary-soft':'#e8f0ec'} as React.CSSProperties}>
     <header className="dt-header"><a href="#/" className="brand"><img src="/dynoforce-icon.png" alt="DynoForce"/><span>DYNOFORCE<span className="brand-sub">EVENTS · DYNOTOUCH</span></span></a>
-      <nav className="dt-nav"><a href="#/">← Dashboard</a><a href="#/dynotouch">Alle DynoTouch Events</a>{kind==='admin'?<a href="#/dynotouch">Ranglisten</a>:<a href="#/dynotouch/admin">Veranstalter</a>}</nav>
+      <nav className="dt-nav"><a className="dt-back" href={kind==='claim'?'#/dynotouch/e/'+encodeURIComponent(data?.eventId||''):'#/'}><span aria-hidden="true">←</span> Zurück</a><a href="#/dynotouch">Alle DynoTouch Events</a>{kind==='admin'?<a href="#/dynotouch">Ranglisten</a>:<a href="#/dynotouch/admin">Veranstalter</a>}</nav>
     </header>
     {error&&<div className="notice error" role="alert">{error}</div>}
     {kind==='home'&&<><div className="eyebrow">DYNOTOUCH · EVENTS</div><h1 className="compact">Events & Ranglisten</h1><p className="intro">Single Target und Multi Target gemeinsam pro Event – mit eigener Rangliste für jede Disziplin und Kategorie.</p>
@@ -371,7 +388,7 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
       <div className="card public-leaderboard-card dt-leaderboard"><div className="card-header"><div><h3>Komplette Ranglisten</h3><p>Single Target und Multi Target · getrennt nach Mann, Frau und Jugendlichen unter 16 Jahren.</p></div></div>
         <Leaderboards challenges={group}/></div>
       {brand.sponsorBanner&&<footer className="brand-sponsor-footer" aria-label="Event Partner"><div className="brand-sponsor-footer-frame"><img className="brand-hero-sponsor" src={brand.sponsorBanner} alt="Sponsor-Banner"/></div></footer>}
-      <div className="dt-page-links"><a className="text-link" href="#/dynotouch">← Alle DynoTouch Events</a><a className="quiet-link" href={'#/dynotouch/e/'+id+'/manage'}>Event verwalten</a></div>
+      <div className="dt-page-links"><a className="dt-back" href="#/dynotouch"><span aria-hidden="true">←</span> Zurück</a><a className="quiet-link" href={'#/dynotouch/e/'+id+'/manage'}>Event verwalten</a></div>
     </>}
     {kind==='admin'&&<><div className="eyebrow">FÜR VERANSTALTER</div><h1 className="compact">DynoTouch verwalten</h1>
       {!signedIn?<section className="card"><p>Melde dich mit dem bestehenden DynoForce-Eventkonto an, um ein Board zu koppeln und das Branding zu bearbeiten.</p><a className="primary" href="#/">Zum Login im Dashboard →</a></section>:<>
@@ -388,7 +405,7 @@ export default function EventClient({kind,id='',signedIn=false}:{kind:'home'|'ev
     </>}
     {kind==='manage'&&<><div className="eyebrow">GESCHÜTZTE EVENT-VERWALTUNG</div><h1 className="compact">Namen & Einträge</h1>
       {!data?<section className="card"><p>Verwende das Moderationspasswort des Events oder melde dich als Veranstalter an.</p><form onSubmit={e=>{e.preventDefault();action(async()=>{await api('events/'+id+'/login','POST',{password});setPassword('');await load();});}}><label htmlFor="event-password">Event-Passwort</label><input id="event-password" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/><button className="primary" disabled={busy}>Anmelden</button></form><a className="text-link" href="#/">Als Veranstalter anmelden →</a></section>:<section className="card"><h2>{data.event.name}</h2><p>Umbenennen und Ausblenden werden protokolliert. Ein verwendeter QR-Code bleibt gesperrt.</p>{data.entries.map((r:Any)=><ModerationRow key={r.id} run={r} busy={busy} save={(changes:Any)=>action(async()=>{await api('events/'+id+'/manage','PATCH',{id:r.id,...changes});await load();})}/>)}{!data.entries.length&&<p>Noch keine eingetragenen Namen.</p>}</section>}
-      <a className="text-link" href={'#/dynotouch/e/'+id}>← Zur öffentlichen Rangliste</a>
+      <a className="dt-back" href={'#/dynotouch/e/'+id}><span aria-hidden="true">←</span> Zurück</a>
     </>}
     {!data&&kind!=='admin'&&!error&&<p className="loading">Wird geladen …</p>}
     <footer className="dt-footer">DYNOFORCE · DYNOTOUCH<span>Präzise Runs. Echte Ergebnisse.</span></footer>
