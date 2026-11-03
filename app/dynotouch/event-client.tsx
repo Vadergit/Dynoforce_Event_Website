@@ -237,7 +237,6 @@ function ClaimForm({data,id}:{data:Any;id:string}){
   const confirmed=confirmedFor===lookupKey;
   const ready=status==='available'||status==='returning'||
     ((status==='duplicate'||status==='unverified')&&confirmed);
-  const discipline=String(data.eventName||'').toLowerCase().includes('multi')?'Multi Target':null;
 
   async function save(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault();
