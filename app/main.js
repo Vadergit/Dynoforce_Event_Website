@@ -54,6 +54,8 @@ const ATTEMPT_START_THRESHOLD = 2.0;
 const ATTEMPT_END_THRESHOLD = 2.0;
 const DEFAULT_DYNOFORCE_LOGO = "/dynoforce-icon.png";
 const DEFAULT_EVENT_HEADER_BANNER = "/dynoforce-event-banner-template.png";
+const DYNOFORCE_STANDARD_PRESET_ID = "builtin-dynoforce-standard";
+const DYNOFORCE_STANDARD_COLOR = "#1f4f46";
 const DEVICE_TONES = {
   connect: [{ frequency: 1047, duration: 80 }],
   attempt: [{ frequency: 1175, duration: 90 }],
@@ -1782,6 +1784,10 @@ function resetBrandingDraft() {
   document.documentElement.style.setProperty("--primary", state.event.primaryColor || "#1f4f46");
 }
 
+function getDynoForceStandardBranding() {
+  return { ...emptyBranding, primaryColor: DYNOFORCE_STANDARD_COLOR };
+}
+
 function applyBrandingPresetData(data = {}) {
   BRANDING_PRESET_FIELDS.forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(data, field)) {
@@ -2524,15 +2530,24 @@ async function saveBrandingPreset(name) {
 }
 
 async function applyBrandingPreset(presetId) {
-  const preset = state.brandingPresets.find((item) => item.id === presetId);
+  const isStandard = presetId === DYNOFORCE_STANDARD_PRESET_ID;
+  const preset = isStandard
+    ? { name: "DynoForce Standard", data: getDynoForceStandardBranding() }
+    : state.brandingPresets.find((item) => item.id === presetId);
   if (!preset) return;
   markBrandingDirty();
   applyBrandingPresetData(preset.data);
+  document.documentElement.style.setProperty("--primary", state.event.primaryColor || DYNOFORCE_STANDARD_COLOR);
   setFlash(`Vorlage "${preset.name}" geladen. Mit „Änderungen übernehmen“ wird sie veröffentlicht.`);
   render();
 }
 
 async function deleteBrandingPreset(presetId) {
+  if (presetId === DYNOFORCE_STANDARD_PRESET_ID) {
+    setError("Die integrierte DynoForce Standard-Vorlage kann nicht gelöscht werden.");
+    render();
+    return;
+  }
   const preset = state.brandingPresets.find((item) => item.id === presetId);
   if (!preset || !window.confirm(`Branding Vorlage "${preset.name}" wirklich löschen?`)) return;
   try {
@@ -3721,6 +3736,7 @@ function brandingPresetControls() {
         <button class="button primary" id="saveBrandingPreset">Als Branding-Vorlage speichern</button>
         <select id="brandingPresetSelect">
           <option value="">${state.brandingPresetsLoaded ? "Vorlage auswählen" : "Vorlagen werden geladen..."}</option>
+          <option value="${DYNOFORCE_STANDARD_PRESET_ID}">DynoForce Standard (integriert)</option>
           ${state.brandingPresets.map((preset) => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`).join("")}
         </select>
         <button class="button" id="applyBrandingPreset">Vorlage laden</button>
