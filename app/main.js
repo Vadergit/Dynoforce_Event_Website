@@ -859,11 +859,15 @@ function resultEditorMarkup() {
       <div class="event-list moderation-list">
         ${state.results.map((entry) => {
           const nameParts = getEditableResultNameParts(entry);
+          const separateInputs = usesSeparateNames() && entry.nameMode !== "single";
+          const nameInputs = separateInputs
+            ? '<div class="field"><label>Vorname</label><input data-result-first-name="' + entry.id + '" value="' + escapeHtml(nameParts.firstName) + '" /></div>'
+              + '<div class="field"><label>Name</label><input data-result-last-name="' + entry.id + '" value="' + escapeHtml(nameParts.lastName) + '" /></div>'
+            : '<div class="field"><label>Name</label><input data-result-first-name="' + entry.id + '" data-result-single-name="true" value="' + escapeHtml([nameParts.firstName, nameParts.lastName].filter(Boolean).join(" ") || entry.participantName || "") + '" /></div>';
           return `
             <div class="event-item moderation-item">
               <div class="moderation-fields">
-                <div class="field"><label>Vorname</label><input data-result-first-name="${entry.id}" value="${escapeHtml(nameParts.firstName)}" /></div>
-                <div class="field"><label>Name</label><input data-result-last-name="${entry.id}" value="${escapeHtml(nameParts.lastName)}" /></div>
+                ${nameInputs}
                 <div class="field"><label>Kategorie</label><select data-result-gender="${entry.id}"><option value="" ${resultGenderKey(entry) === "unknown" ? "selected" : ""}>Nicht zugeordnet</option><option value="male" ${resultGenderKey(entry) === "male" ? "selected" : ""}>Mann</option><option value="female" ${resultGenderKey(entry) === "female" ? "selected" : ""}>Frau</option></select></div>
                 <div class="field"><label>Resultat in kg</label><input data-result-value="${entry.id}" type="number" min="0" step="0.1" value="${Number(entry.value || 0).toFixed(1)}" /></div>
               </div>
@@ -1092,8 +1096,8 @@ function guidedStageMarkup() {
         <h2>Wie heisst du?</h2>
         <p>Gib deinen Namen ein. Danach starten deine ${state.event.attempts} Versuche.</p>
         <div class="guided-name-form">
-          <div class="field"><label for="participantFirstNameInput">Vorname</label><input id="participantFirstNameInput" value="${escapeHtml(state.liveEntry.draftFirstName || "")}" placeholder="Vorname" autocomplete="given-name" enterkeyhint="next" /></div>
-          <div class="field"><label for="participantLastNameInput">Name</label><input id="participantLastNameInput" value="${escapeHtml(state.liveEntry.draftLastName || "")}" placeholder="Nachname" autocomplete="family-name" enterkeyhint="done" /></div>
+          <div class="field"><label for="participantFirstNameInput">${usesSeparateNames() ? "Vorname" : "Name"}</label><input id="participantFirstNameInput" value="${escapeHtml(state.liveEntry.draftFirstName || "")}" placeholder="${usesSeparateNames() ? "Vorname" : "Name oder Nickname"}" autocomplete="${usesSeparateNames() ? "given-name" : "nickname"}" enterkeyhint="${usesSeparateNames() ? "next" : "done"}" /></div>
+          ${usesSeparateNames() ? `<div class="field"><label for="participantLastNameInput">Name</label><input id="participantLastNameInput" value="${escapeHtml(state.liveEntry.draftLastName || "")}" placeholder="Nachname" autocomplete="family-name" enterkeyhint="done" /></div>` : ""}
           <div class="guided-gender-field">
             <span>Kategorie</span>
             <div class="guided-gender-options" role="radiogroup" aria-label="Kategorie auswählen">
@@ -1296,12 +1300,12 @@ function getEditableResultNameParts(entry) {
   };
 }
 
-async function updateResultEntry(resultId, firstName, lastName, gender, value) {
+async function updateResultEntry(resultId, firstName, lastName, gender, value, nameMode = "separate") {
   const cleanFirstName = firstName.trim();
-  const cleanLastName = lastName.trim();
+  const cleanLastName = nameMode === "single" ? "" : lastName.trim();
   const cleanGender = normalizeGender(gender);
-  if (!cleanFirstName || !cleanLastName) {
-    setError("Vorname und Name müssen beide ausgefüllt sein.");
+  if (!cleanFirstName || (nameMode !== "single" && !cleanLastName)) {
+    setError(nameMode === "single" ? "Bitte einen Namen eingeben." : "Vorname und Name müssen beide ausgefüllt sein.");
     render();
     return;
   }
@@ -1326,6 +1330,7 @@ async function updateResultEntry(resultId, firstName, lastName, gender, value) {
       firstName: cleanFirstName,
       lastName: cleanLastName,
       participantName,
+      nameMode,
       gender: cleanGender,
       value: Number(numericValue.toFixed(1)),
       updatedAt: serverTimestamp(),
@@ -1339,6 +1344,7 @@ async function updateResultEntry(resultId, firstName, lastName, gender, value) {
             firstName: cleanFirstName,
             lastName: cleanLastName,
             participantName,
+            nameMode,
             gender: cleanGender,
             value: Number(numericValue.toFixed(1)),
             updatedAt: new Date(),
@@ -3211,7 +3217,7 @@ function privacyPageMarkup() {
 
         <section>
           <h2>Welche Daten werden erfasst?</h2>
-          <p>Erfasst werden dein Vorname, dein Nachname, die gewählte Kategorie, dein gemessenes Resultat sowie die Zuordnung zu diesem Event.</p>
+          <p>${usesSeparateNames() ? "Erfasst werden dein Vorname und Nachname" : "Erfasst wird dein frei gewählter Name"}. Zusätzlich werden die gewählte Kategorie, dein gemessenes Resultat sowie die Zuordnung zu diesem Event gespeichert.</p>
         </section>
 
         <section>
@@ -3973,6 +3979,10 @@ function template(page) {
                   <div class="field"><label>Wertung</label><select id="scoringModeInput"><option ${state.event.scoringMode === "Bester Versuch" ? "selected" : ""}>Bester Versuch</option><option ${state.event.scoringMode === "Durchschnitt" ? "selected" : ""}>Durchschnitt</option><option ${state.event.scoringMode === "Letzter Versuch" ? "selected" : ""}>Letzter Versuch</option></select></div>
                 </div>
                 <label class="setup-feature-toggle">
+                  <input type="checkbox" id="separateNameFieldsInput" ${usesSeparateNames() ? "checked" : ""} />
+                  <span><strong>Vorname und Name separat erfassen</strong><small>Aktiv: zwei Pflichtfelder. Inaktiv: ein Feld für frei wählbare Namen, Nicknames oder Teamnamen.</small></span>
+                </label>
+                <label class="setup-feature-toggle">
                   <input type="checkbox" id="showDailyLeadersInput" ${state.event.showDailyLeaders === false ? "" : "checked"} />
                   <span><strong>Heutige Rekordhalter anzeigen</strong><small>Zeigt in der Live-Mitte ausschliesslich die besten Resultate des heutigen Tages, getrennt nach Mann/Frau und Ziehen/Drücken.</small></span>
                 </label>
@@ -4040,13 +4050,13 @@ function template(page) {
                     <div class="participant-entry-head">
                       <div>
                         <div class="eyebrow">Nächster Teilnehmer</div>
-                        <h3>Vorname und Name eingeben</h3>
+                                                 <h3>${usesSeparateNames() ? "Vorname und Name eingeben" : "Name eingeben"}</h3>
                       </div>
                       <p>Eingeben, aktivieren, danach messen.</p>
                     </div>
                     <div class="field-grid participant-fields">
-                      <div class="field"><label>Vorname</label><input id="participantFirstNameInput" value="${state.liveEntry.draftFirstName || ""}" placeholder="Vorname eingeben" autocomplete="off" /></div>
-                      <div class="field"><label>Name</label><input id="participantLastNameInput" value="${state.liveEntry.draftLastName || ""}" placeholder="Nachname eingeben" autocomplete="off" /></div>
+                      <div class="field"><label>${usesSeparateNames() ? "Vorname" : "Name"}</label><input id="participantFirstNameInput" value="${escapeHtml(state.liveEntry.draftFirstName || "")}" placeholder="${usesSeparateNames() ? "Vorname eingeben" : "Name oder Nickname"}" autocomplete="off" /></div>
+                      ${usesSeparateNames() ? `<div class="field"><label>Name</label><input id="participantLastNameInput" value="${escapeHtml(state.liveEntry.draftLastName || "")}" placeholder="Nachname eingeben" autocomplete="off" /></div>` : ""}
                       <div class="field"><label>Kategorie</label><select id="participantGenderSelect"><option value="">Auswählen</option><option value="male" ${state.liveEntry.draftGender === "male" ? "selected" : ""}>Mann</option><option value="female" ${state.liveEntry.draftGender === "female" ? "selected" : ""}>Frau</option></select></div>
                       <div class="field participant-activate-field"><label>Freigabe</label><button class="button primary participant-activate-button" id="activateParticipantButton" type="button">Teilnehmer aktivieren</button></div>
                     </div>
@@ -4306,11 +4316,13 @@ function bindSetupActions() {
     state.event.attempts = Number(root.querySelector("#attemptsInput").value.split(" ")[0]);
     state.event.scoringMode = root.querySelector("#scoringModeInput").value;
     state.event.showDailyLeaders = root.querySelector("#showDailyLeadersInput")?.checked !== false;
+    state.event.separateNameFields = root.querySelector("#separateNameFieldsInput")?.checked !== false;
     state.event.ownerUid = state.user?.uid || state.event.ownerUid;
     await saveEvent();
   });
 
   root.querySelector("#startEvent")?.addEventListener("click", async () => {
+    state.event.separateNameFields = root.querySelector("#separateNameFieldsInput")?.checked !== false;
     state.event.status = "Aktiv";
     await saveEvent();
   });
@@ -4495,7 +4507,8 @@ function bindLiveActions() {
   root.querySelector("#participantFirstNameInput")?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    root.querySelector("#participantLastNameInput")?.focus();
+    if (usesSeparateNames()) root.querySelector("#participantLastNameInput")?.focus();
+    else if (!document.getElementById("activateParticipantButton")?.disabled) activateParticipantFromInputs();
   });
   root.querySelector("#participantLastNameInput")?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
@@ -4556,11 +4569,13 @@ function bindResultEditorActions() {
   root.querySelectorAll("[data-update-result]").forEach((button) => {
     button.addEventListener("click", async () => {
       const resultId = button.dataset.updateResult;
-      const firstName = root.querySelector(`[data-result-first-name="${resultId}"]`)?.value || "";
+      const nameInput = root.querySelector(`[data-result-first-name="${resultId}"]`);
+      const firstName = nameInput?.value || "";
       const lastName = root.querySelector(`[data-result-last-name="${resultId}"]`)?.value || "";
+      const nameMode = nameInput?.dataset.resultSingleName === "true" ? "single" : "separate";
       const gender = root.querySelector(`[data-result-gender="${resultId}"]`)?.value || "";
       const value = root.querySelector(`[data-result-value="${resultId}"]`)?.value || "";
-      await updateResultEntry(resultId, firstName, lastName, gender, value);
+      await updateResultEntry(resultId, firstName, lastName, gender, value, nameMode);
     });
   });
 
