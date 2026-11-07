@@ -68,6 +68,7 @@ const DEVICE_TONES = {
   ],
 };
 const USE_GUIDED_LIVE_UI = true;
+function usesSeparateNames() { return state.event.separateNameFields !== false; }
 const EVENT_TIME_ZONE = "Europe/Zurich";
 
 const emptyBranding = {
@@ -127,6 +128,7 @@ const state = {
     lastName: "",
     draftFirstName: "",
     draftLastName: "",
+    nameMode: "separate",
     gender: "",
     draftGender: "",
     attempts: [],
@@ -184,6 +186,7 @@ const state = {
     attempts: 3,
     scoringMode: "Bester Versuch",
     showDailyLeaders: true,
+    separateNameFields: true,
     status: "Inaktiv",
     primaryColor: "#1f4f46",
     ownerUid: "",
@@ -651,7 +654,7 @@ function readLiveParticipantInputs() {
   const selectedGenderInput = document.querySelector('input[name="participantGender"]:checked');
   const legacyGenderSelect = document.getElementById("participantGenderSelect");
   const firstName = String(firstNameInput?.value ?? state.liveEntry.draftFirstName ?? "").trim();
-  const lastName = String(lastNameInput?.value ?? state.liveEntry.draftLastName ?? "").trim();
+  const lastName = usesSeparateNames() ? String(lastNameInput?.value ?? state.liveEntry.draftLastName ?? "").trim() : "";
   const selectedGender = selectedGenderInput?.value ?? legacyGenderSelect?.value ?? state.liveEntry.draftGender ?? "";
   const gender = normalizeGender(selectedGender);
   return {
@@ -685,7 +688,7 @@ function syncParticipantDraftFromInputs() {
 
 function getParticipantDraftKey() {
   const { firstName, lastName, gender } = syncParticipantDraftFromInputs();
-  return firstName && lastName && gender
+  return firstName && (lastName || !usesSeparateNames()) && gender
     ? `${normalizeParticipantNameForMatch(firstName, lastName)}|${gender}`
     : "";
 }
@@ -709,8 +712,8 @@ function updateParticipantActivationButton() {
 
 function activateParticipantFromInputs() {
   const { firstName, lastName, gender, participantName } = readLiveParticipantInputs();
-  if (!firstName || !lastName) {
-    setError("Bitte Vorname und Name vollständig eingeben.");
+  if (!firstName || (usesSeparateNames() && !lastName)) {
+    setError(usesSeparateNames() ? "Bitte Vorname und Name vollständig eingeben." : "Bitte einen Namen eingeben.");
     render();
     return;
   }
@@ -729,6 +732,7 @@ function activateParticipantFromInputs() {
   resetAttemptsForParticipantChange();
   state.liveEntry.firstName = firstName;
   state.liveEntry.lastName = lastName;
+  state.liveEntry.nameMode = usesSeparateNames() ? "separate" : "single";
   state.liveEntry.gender = gender;
   state.liveEntry.draftFirstName = firstName;
   state.liveEntry.draftLastName = lastName;
@@ -776,7 +780,7 @@ function getCurrentRunScoreValue() {
 }
 
 function getLiveStatusHint() {
-  const hasParticipant = Boolean(state.liveEntry.firstName && state.liveEntry.lastName);
+  const hasParticipant = Boolean(state.liveEntry.firstName && (state.liveEntry.lastName || state.liveEntry.nameMode === "single"));
   if (!hasParticipant) return "";
   if (!state.liveEntry.readyForAttempt) return "Kraft vollständig lösen – danach startet die Wertung frisch bei 0 Versuchen.";
   return "";
@@ -1223,6 +1227,7 @@ function resetLiveEntryState() {
   state.liveEntry.lastName = "";
   state.liveEntry.draftFirstName = "";
   state.liveEntry.draftLastName = "";
+  state.liveEntry.nameMode = usesSeparateNames() ? "separate" : "single";
   state.liveEntry.gender = "";
   state.liveEntry.draftGender = "";
   state.liveEntry.attempts = [];
@@ -1497,8 +1502,8 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
   }
 
   const { firstName, lastName, gender, participantName } = getParticipantNameParts();
-  if (!firstName || !lastName) {
-    setError("Bitte Vorname und Name eingeben.");
+  if (!firstName || (state.liveEntry.nameMode !== "single" && !lastName)) {
+    setError(state.liveEntry.nameMode === "single" ? "Bitte einen Namen eingeben." : "Bitte Vorname und Name eingeben.");
     render();
     return false;
   }
@@ -1558,6 +1563,7 @@ async function finalizeParticipantResult(forceManualSave = false, { playCompleti
         firstName,
         lastName,
         participantName,
+        nameMode: state.liveEntry.nameMode || "separate",
         gender,
         value: group.finalValue,
         unit: "kg",
@@ -2258,6 +2264,7 @@ function eventDocToState(id, data) {
     attempts: Number(data.attempts || 3),
     scoringMode: data.scoringMode || "Bester Versuch",
     showDailyLeaders: data.showDailyLeaders !== false,
+    separateNameFields: data.separateNameFields !== false,
     status: normalizeEventStatus(data.status),
     primaryColor: data.primaryColor || "#1f4f46",
     ownerUid: data.ownerUid || "",
@@ -2321,6 +2328,7 @@ async function subscribeToEvent(eventId) {
     attempts: 3,
     scoringMode: "Bester Versuch",
     showDailyLeaders: true,
+    separateNameFields: true,
     status: "Inaktiv",
     participantCount: 0,
     createdAt: null,
@@ -2584,6 +2592,7 @@ async function saveEvent(overrides = {}) {
       attempts: state.event.attempts,
       scoringMode: state.event.scoringMode,
       showDailyLeaders: state.event.showDailyLeaders !== false,
+      separateNameFields: usesSeparateNames(),
       status: state.event.status,
       ownerUid: state.user.uid,
       primaryColor: state.event.primaryColor,
@@ -3294,7 +3303,7 @@ function processAttemptDetectionTick() {
   const absForce = state.currentForce;
   const direction = state.lockedMode || state.forceDirection;
   const { firstName, lastName } = getParticipantNameParts();
-  const hasParticipant = Boolean(firstName && lastName);
+  const hasParticipant = Boolean(firstName && (lastName || state.liveEntry.nameMode === "single"));
   if (hasParticipant && !state.liveEntry.readyForAttempt && absForce < ATTEMPT_END_THRESHOLD) {
     state.liveEntry.readyForAttempt = true;
   }
@@ -4197,6 +4206,7 @@ function bindDashboardActions() {
       attempts: 3,
       scoringMode: "Bester Versuch",
       showDailyLeaders: true,
+      separateNameFields: true,
       status: "Inaktiv",
       ownerUid: state.user.uid,
       participantCount: 0,
@@ -4208,6 +4218,9 @@ function bindDashboardActions() {
       lastName: "",
       draftFirstName: "",
       draftLastName: "",
+      nameMode: "separate",
+      gender: "",
+      draftGender: "",
       attempts: [],
       participantKey: "",
       readyForAttempt: false,
